@@ -1,0 +1,12 @@
+{
+  "name": "congress-trade-tracker",
+  "private": true,
+  "workspaces": [
+    "ingest",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace web",
+    "ingest": "npm run ingest --workspace ingest"
+  }
+}

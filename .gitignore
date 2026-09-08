@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+*.log
+*.tsbuildinfo
+
+# downloaded ZIP/PDF cache (regenerable via `npm run ingest`)
+ingest/data/raw/*
+ingest/data/pdfs/*
+
+!ingest/data/raw/.gitkeep
+!ingest/data/pdfs/.gitkeep
+
+.env
+.env.local
+.DS_Store
+logs/

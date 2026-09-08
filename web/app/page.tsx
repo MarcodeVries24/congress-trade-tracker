@@ -24,20 +24,21 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-// Unlike formatDate (date-only fields), this takes a full timestamp and
-// shows the exact time in the viewer's local timezone, abbreviation included.
-function formatDateTime(iso: string | null): string {
+// Unlike formatDate (date-only fields, no time component), these take a full
+// timestamp — used together so the date can be the prominent stat value and
+// the time+timezone a smaller note underneath, in the viewer's local zone.
+function formatDateFromTimestamp(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatTimeWithZone(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
 const compactUSD = new Intl.NumberFormat("en-US", {
@@ -325,7 +326,11 @@ export default function Home() {
             <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
             <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
             <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
-            <StatCard label="Last updated" value={formatDateTime(stats.lastIngestedAt)} wrap />
+            <StatCard
+              label="Last updated"
+              value={formatDateFromTimestamp(stats.lastIngestedAt)}
+              note={formatTimeWithZone(stats.lastIngestedAt)}
+            />
           </div>
         )}
 
@@ -686,19 +691,16 @@ export default function Home() {
   );
 }
 
-function StatCard({ label, value, wrap = false }: { label: string; value: string; wrap?: boolean }) {
+function StatCard({ label, value, note }: { label: string; value: string; note?: string | null }) {
   return (
     <div className="rounded-lg border border-line bg-panel p-2 sm:p-4">
       <div className="truncate text-[9px] uppercase tracking-wide text-ink-faint sm:overflow-visible sm:whitespace-normal sm:text-xs">
         {label}
       </div>
-      <div
-        className={`mt-0.5 text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl ${
-          wrap ? "" : "truncate"
-        }`}
-      >
+      <div className="mt-0.5 truncate text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl">
         {value}
       </div>
+      {note && <div className="mt-0.5 truncate text-[10px] text-ink-faint sm:text-xs">{note}</div>}
     </div>
   );
 }

@@ -435,12 +435,13 @@ export default function Home() {
               <Select
                 value=""
                 onChange={(e) => {
-                  const days = Number(e.target.value);
-                  if (days) applyDatePreset(days);
+                  if (e.target.value !== "") applyDatePreset(Number(e.target.value));
                 }}
                 className="w-full sm:w-auto"
               >
                 <option value="">Quick range…</option>
+                <option value="0">Today</option>
+                <option value="5">Last 5 days</option>
                 <option value="30">Last 30 days</option>
                 <option value="45">Last 45 days</option>
                 <option value="90">Last 90 days</option>

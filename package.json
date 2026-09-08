@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace web",
-    "ingest": "npm run ingest --workspace ingest"
+    "ingest": "npm run ingest --workspace ingest",
+    "sync-members": "npm run sync-members --workspace ingest"
   }
 }

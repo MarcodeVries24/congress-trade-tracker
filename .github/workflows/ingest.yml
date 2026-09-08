@@ -18,6 +18,10 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run sync-members --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - run: npm run ingest --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

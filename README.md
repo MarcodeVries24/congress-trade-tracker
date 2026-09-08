@@ -20,6 +20,11 @@ Clerk. This project:
    and the REST API (as Next.js API routes) straight off that database.
 5. A scheduled GitHub Actions workflow re-runs the ingest every 4 hours, so
    the dataset stays current with nothing needing to run on your own machine.
+6. Separately, each House seat's official photo and party are synced from the
+   public [unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators)
+   dataset into a `members_reference` table, joined by `state_district` — no
+   name-matching involved, since that field is already shared with filings.
+   Photos are hotlinked from `congress.gov`'s own CDN.
 
 **Senate coverage is intentionally not implemented.** `efdsearch.senate.gov`
 blocks plain HTTP requests at the network edge (Akamai), even with a real
@@ -63,8 +68,9 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
 1. In the GitHub repo's **Settings → Secrets and variables → Actions**, add a
    secret named `DATABASE_URL` with the Neon connection string.
 2. That's it — [.github/workflows/ingest.yml](.github/workflows/ingest.yml)
-   runs `npm run ingest --workspace ingest` every 4 hours (`0 */4 * * *`), and
-   can also be triggered manually from the Actions tab (**Run workflow**).
+   runs `npm run sync-members` then `npm run ingest` every 4 hours
+   (`0 */4 * * *`), and can also be triggered manually from the Actions tab
+   (**Run workflow**).
 
 ### 3. Website + API — Vercel
 
@@ -84,8 +90,9 @@ npm install
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
 
 ```bash
-npm run dev          # Next.js site + API at http://localhost:3000
-npm run ingest        # run the ingestion CLI once, against DATABASE_URL
+npm run dev            # Next.js site + API at http://localhost:3000
+npm run ingest         # run the PTR ingestion CLI once
+npm run sync-members   # refresh member photos/party (~440 rows, cheap)
 ```
 
 Ingest options:

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
   const assetType = sp.get("assetType") ?? undefined;
   const amountRanges = sp.getAll("amountRanges");
-  const lateOnly = sp.get("lateOnly") === "1";
+  const filedStatus = sp.get("filedStatus") ?? undefined; // "late" | "onTime" | undefined
   const dateFrom = sp.get("dateFrom") ?? undefined;
   const dateTo = sp.get("dateTo") ?? undefined;
   const sortKey = sp.get("sort") ?? "";
@@ -54,10 +54,10 @@ export async function GET(req: NextRequest) {
   if (dateFrom) conditions.push(`t.transaction_date >= ${addParam(dateFrom)}`);
   if (dateTo) conditions.push(`t.transaction_date <= ${addParam(dateTo)}`);
   // STOCK Act requires filing within 45 days of the transaction.
-  if (lateOnly) {
-    conditions.push(
-      `(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) > 45`
-    );
+  if (filedStatus === "late") {
+    conditions.push(`(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) > 45`);
+  } else if (filedStatus === "onTime") {
+    conditions.push(`(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) <= 45`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -68,10 +68,11 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url,
+      `SELECT t.*, f.filing_date, f.pdf_url, mr.photo_url, mr.party,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
+       LEFT JOIN members_reference mr ON mr.state_district = t.state_district
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,

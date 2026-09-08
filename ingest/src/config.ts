@@ -16,3 +16,9 @@ export const HOUSE_CLERK = {
     `https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${year}/${docId}.pdf`,
   filingPortal: "https://disclosures-clerk.house.gov/FinancialDisclosure",
 };
+
+export const MEMBERS_REFERENCE = {
+  legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
+  // Official portraits, hosted by Congress's own site.
+  photoUrl: (bioguideId: string) => `https://www.congress.gov/img/member/${bioguideId.toLowerCase()}_200.jpg`,
+};

@@ -14,6 +14,7 @@ import {
   TradeFilters,
 } from "@/lib/api";
 import { MultiSelect } from "@/components/MultiSelect";
+import { Header } from "@/components/Header";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -32,16 +33,16 @@ const compactUSD = new Intl.NumberFormat("en-US", {
 function typeBadge(type: string): { label: string; className: string; accent: string } {
   const t = type.toUpperCase();
   if (t.startsWith("P"))
-    return { label: "Purchase", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", accent: "border-l-emerald-500" };
+    return { label: "Purchase", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", accent: "border-l-emerald-500" };
   if (t.startsWith("S"))
     return {
       label: type.includes("partial") ? "Sale (partial)" : "Sale",
-      className: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+      className: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
       accent: "border-l-rose-500",
     };
   if (t.startsWith("E"))
-    return { label: "Exchange", className: "bg-amber-500/15 text-amber-400 border-amber-500/30", accent: "border-l-amber-500" };
-  return { label: type, className: "bg-slate-500/15 text-slate-300 border-slate-500/30", accent: "border-l-slate-600" };
+    return { label: "Exchange", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30", accent: "border-l-amber-500" };
+  return { label: type, className: "bg-ink-faint/10 text-ink-muted border-ink-faint/30", accent: "border-l-line-strong" };
 }
 
 // Rough magnitude tier so the eye can scan trade size without reading text.
@@ -59,7 +60,7 @@ function SizeIndicator({ amountLow }: { amountLow: number | null }) {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className={`w-1 rounded-sm ${i <= tier ? "bg-amber-400" : "bg-slate-700"}`}
+          className={`w-1 rounded-sm ${i <= tier ? "bg-amber-400" : "bg-line-strong"}`}
           style={{ height: `${i * 4 + 3}px` }}
         />
       ))}
@@ -68,14 +69,14 @@ function SizeIndicator({ amountLow }: { amountLow: number | null }) {
 }
 
 const AVATAR_COLORS = [
-  "bg-rose-500/20 text-rose-300",
-  "bg-amber-500/20 text-amber-300",
-  "bg-emerald-500/20 text-emerald-300",
-  "bg-sky-500/20 text-sky-300",
-  "bg-violet-500/20 text-violet-300",
-  "bg-pink-500/20 text-pink-300",
-  "bg-teal-500/20 text-teal-300",
-  "bg-indigo-500/20 text-indigo-300",
+  "bg-rose-500/20 text-rose-600 dark:text-rose-300",
+  "bg-amber-500/20 text-amber-600 dark:text-amber-300",
+  "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300",
+  "bg-sky-500/20 text-sky-600 dark:text-sky-300",
+  "bg-violet-500/20 text-violet-600 dark:text-violet-300",
+  "bg-pink-500/20 text-pink-600 dark:text-pink-300",
+  "bg-teal-500/20 text-teal-600 dark:text-teal-300",
+  "bg-indigo-500/20 text-indigo-600 dark:text-indigo-300",
 ];
 
 function initials(name: string): string {
@@ -91,7 +92,7 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function Avatar({ name }: { name: string }) {
+function InitialsAvatar({ name }: { name: string }) {
   return (
     <div
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarColor(name)}`}
@@ -99,6 +100,22 @@ function Avatar({ name }: { name: string }) {
     >
       {initials(name)}
     </div>
+  );
+}
+
+// Official photos are hotlinked from congress.gov; fall back to an initials
+// avatar if one isn't mapped yet or fails to load, rather than guessing.
+function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+  const [errored, setErrored] = useState(false);
+  if (!photoUrl || errored) return <InitialsAvatar name={name} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={photoUrl}
+      alt=""
+      onError={() => setErrored(true)}
+      className="h-8 w-8 shrink-0 rounded-full bg-panel-muted object-cover"
+    />
   );
 }
 
@@ -112,7 +129,7 @@ function useDebounced<T>(value: T, delay = 350): T {
 }
 
 const inputClass =
-  "rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500 transition-colors";
+  "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
 
 export default function Home() {
   const [q, setQ] = useState("");
@@ -122,13 +139,14 @@ export default function Home() {
   const [owner, setOwner] = useState("");
   const [assetType, setAssetType] = useState("");
   const [amountRanges, setAmountRanges] = useState<string[]>([]);
-  const [lateOnly, setLateOnly] = useState(false);
+  const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState("transaction_date");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [result, setResult] = useState<{ data: Trade[]; total: number; totalPages: number } | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -148,7 +166,7 @@ export default function Home() {
       owner: owner || undefined,
       assetType: assetType || undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
-      lateOnly: lateOnly ? 1 : undefined,
+      filedStatus: filedStatus || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       sort,
@@ -164,7 +182,7 @@ export default function Home() {
       owner,
       assetType,
       amountRanges,
-      lateOnly,
+      filedStatus,
       dateFrom,
       dateTo,
       sort,
@@ -176,7 +194,7 @@ export default function Home() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, lateOnly, dateFrom, dateTo, sort, order, pageSize]);
+  }, [debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +236,7 @@ export default function Home() {
       <th className="px-4 py-3">
         <button
           onClick={() => toggleSort(sortKey)}
-          className={`flex items-center gap-1 uppercase tracking-wide hover:text-slate-200 ${active ? "text-slate-200" : ""}`}
+          className={`flex items-center gap-1 uppercase tracking-wide hover:text-ink ${active ? "text-ink" : ""}`}
         >
           {label}
           <span className="text-[10px]">{active ? (order === "asc" ? "▲" : "▼") : ""}</span>
@@ -228,289 +246,379 @@ export default function Home() {
   }
 
   const activeFilterCount =
-    [type, owner, assetType, dateFrom, dateTo, member].filter(Boolean).length + amountRanges.length + (lateOnly ? 1 : 0);
+    [type, owner, assetType, dateFrom, dateTo, member, filedStatus].filter(Boolean).length + amountRanges.length;
+
+  function clearFilters() {
+    setMember("");
+    setType("");
+    setOwner("");
+    setAssetType("");
+    setAmountRanges([]);
+    setFiledStatus("");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Congress Trade Tracker</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          U.S. House stock trades, sourced directly from Periodic Transaction Reports filed with the{" "}
-          <a
-            href="https://disclosures-clerk.house.gov/FinancialDisclosure"
-            target="_blank"
-            rel="noreferrer"
-            className="underline decoration-slate-600 hover:decoration-slate-400"
-          >
-            Office of the Clerk
-          </a>
-          . Senate coverage is not yet available.
-        </p>
-      </header>
-
-      {stats && (
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <StatCard label="Transactions" value={stats.totalTransactions.toLocaleString()} />
-          <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
-          <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
-          <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
-          <StatCard
-            label="Last updated"
-            value={stats.lastIngestedAt ? formatDate(stats.lastIngestedAt.slice(0, 10)) : "—"}
-          />
-        </div>
-      )}
-
-      <div className="mb-6 space-y-3 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-        <div className="flex flex-wrap gap-3">
-          <input
-            type="text"
-            placeholder="Search asset or ticker…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className={`min-w-[200px] flex-1 ${inputClass}`}
-          />
-          <input
-            type="text"
-            placeholder="Filter by member name…"
-            value={member}
-            onChange={(e) => setMember(e.target.value)}
-            className={`min-w-[200px] flex-1 ${inputClass}`}
-          />
-          <input
-            type="text"
-            placeholder="Ticker (e.g. NVDA)"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            className={`w-40 ${inputClass}`}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
-            <option value="">All types</option>
-            <option value="P">Purchase</option>
-            <option value="S">Sale</option>
-            <option value="E">Exchange</option>
-          </select>
-          <select value={owner} onChange={(e) => setOwner(e.target.value)} className={inputClass}>
-            <option value="">All owners</option>
-            {Object.entries(OWNER_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className={inputClass}>
-            <option value="">All asset types</option>
-            {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <MultiSelect
-            placeholder="Any trade size"
-            className="w-48"
-            selected={amountRanges}
-            onChange={setAmountRanges}
-            options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
-          />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className={inputClass}
-          />
-          <span className="text-slate-500">to</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={lateOnly}
-              onChange={(e) => setLateOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-700 bg-slate-950"
-            />
-            Filed late only (&gt;45 days)
-          </label>
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => {
-                setMember("");
-                setType("");
-                setOwner("");
-                setAssetType("");
-                setAmountRanges([]);
-                setLateOnly(false);
-                setDateFrom("");
-                setDateTo("");
-              }}
-              className="text-xs text-slate-500 underline decoration-slate-700 hover:text-slate-300 hover:decoration-slate-400"
+    <>
+      <Header />
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mb-8 rounded-xl border border-line bg-panel px-5 py-6 sm:px-8 sm:py-8">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Every disclosed House stock trade, searchable</h1>
+          <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+            Built directly from Periodic Transaction Reports filed with the{" "}
+            <a
+              href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
             >
-              Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+              Office of the Clerk
+            </a>{" "}
+            — no third-party API in between. Refreshed automatically every 4 hours. Senate coverage isn&apos;t available yet.
+          </p>
+        </div>
+
+        {stats && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatCard label="Transactions" value={stats.totalTransactions.toLocaleString()} />
+            <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
+            <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
+            <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
+            <StatCard
+              label="Last updated"
+              value={stats.lastIngestedAt ? formatDate(stats.lastIngestedAt.slice(0, 10)) : "—"}
+            />
+          </div>
+        )}
+
+        <div className="mb-6 rounded-lg border border-line bg-panel p-4">
+          <div className="flex items-center justify-between gap-3 sm:hidden">
+            <button
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
+            >
+              Filters {activeFilterCount > 0 && <span className="rounded-full bg-accent/20 px-1.5 text-xs text-accent">{activeFilterCount}</span>}
+              <span className="text-[10px] text-ink-faint">{filtersOpen ? "▴" : "▾"}</span>
             </button>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-md border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">
-          {error}. Check that DATABASE_URL is set and the database is reachable.
-        </div>
-      )}
-
-      <div className="overflow-x-auto rounded-lg border border-slate-800">
-        <table className="w-full min-w-[960px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-800 bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
-              <SortHeader label="Member" sortKey="member_name" />
-              <SortHeader label="Asset" sortKey="ticker" />
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Owner</th>
-              <SortHeader label="Amount" sortKey="amount_low" />
-              <SortHeader label="Traded" sortKey="transaction_date" />
-              <SortHeader label="Filed" sortKey="days_to_file" />
-              <th className="px-4 py-3">Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  Loading…
-                </td>
-              </tr>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="text-xs text-ink-faint underline decoration-line-strong">
+                Clear
+              </button>
             )}
-            {!loading && result?.data.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No trades match these filters.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              result?.data.map((trade) => {
-                const badge = typeBadge(trade.transaction_type);
-                const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
-                const late = trade.days_to_file !== null && trade.days_to_file > 45;
-                return (
-                  <tr key={trade.id} className="border-b border-slate-800/60 transition-colors hover:bg-slate-900/40">
-                    <td className={`border-l-2 px-4 py-3 ${badge.accent}`}>
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={trade.member_name} />
-                        <div>
-                          <button
-                            onClick={() => setMember(trade.member_name)}
-                            className="text-left font-medium hover:underline"
-                            title={`Filter to ${displayName(trade.member_name)}`}
-                          >
-                            {displayName(trade.member_name)}
-                          </button>
-                          {trade.state_district && (
-                            <div className="text-xs text-slate-500">{trade.state_district}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>{trade.asset_name}</div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-                        {trade.ticker && (
-                          <button
-                            onClick={() => setTicker(trade.ticker as string)}
-                            className="font-mono hover:text-slate-200 hover:underline"
-                            title={`Filter to ${trade.ticker}`}
-                          >
-                            {trade.ticker}
-                          </button>
-                        )}
-                        {assetTypeLabel && <span>{assetTypeLabel}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
-                    <td className="px-4 py-3 text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <SizeIndicator amountLow={trade.amount_low} />
-                        <span>{trade.amount_range}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{formatDate(trade.transaction_date)}</td>
-                    <td className="px-4 py-3 text-slate-300">
-                      <div>{formatDate(trade.filing_date)}</div>
-                      {trade.days_to_file !== null && (
-                        <div className={`text-xs ${late ? "text-rose-400" : "text-slate-500"}`}>
-                          {trade.days_to_file}d {late ? "· late" : ""}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={trade.pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-slate-400 underline decoration-slate-700 hover:text-slate-200 hover:decoration-slate-400"
-                      >
-                        PTR PDF
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
+          </div>
 
-      {result && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-          <span>
-            Page {result.data.length ? page : 0} of {result.totalPages} · {result.total.toLocaleString()} trades
-          </span>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2">
-              Show
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className={inputClass}
-              >
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
+          <div className={`${filtersOpen ? "mt-3 flex" : "hidden"} flex-col gap-3 sm:mt-0 sm:flex`}>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="text"
+                placeholder="Search asset or ticker…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className={`min-w-[160px] flex-1 ${inputClass}`}
+              />
+              <input
+                type="text"
+                placeholder="Filter by member name…"
+                value={member}
+                onChange={(e) => setMember(e.target.value)}
+                className={`min-w-[160px] flex-1 ${inputClass}`}
+              />
+              <input
+                type="text"
+                placeholder="Ticker (e.g. NVDA)"
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
+                className={`w-full sm:w-40 ${inputClass}`}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
+                <option value="">All types</option>
+                <option value="P">Purchase</option>
+                <option value="S">Sale</option>
+                <option value="E">Exchange</option>
+              </select>
+              <select value={owner} onChange={(e) => setOwner(e.target.value)} className={inputClass}>
+                <option value="">All owners</option>
+                {Object.entries(OWNER_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
                   </option>
                 ))}
               </select>
-            </label>
-            <div className="flex gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
+              <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className={inputClass}>
+                <option value="">All asset types</option>
+                {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <MultiSelect
+                placeholder="Any trade size"
+                className="w-full sm:w-48"
+                selected={amountRanges}
+                onChange={setAmountRanges}
+                options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
+              />
+              <select
+                value={filedStatus}
+                onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}
+                className={inputClass}
               >
-                Previous
-              </button>
-              <button
-                disabled={page >= result.totalPages}
-                onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
-                className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
-              >
-                Next
-              </button>
+                <option value="">Any filing status</option>
+                <option value="onTime">Filed on time (≤45 days)</option>
+                <option value="late">Filed late (&gt;45 days)</option>
+              </select>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
+              <span className="text-ink-faint">to</span>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="hidden text-xs text-ink-faint underline decoration-line-strong hover:text-ink-muted hover:decoration-ink-muted sm:inline"
+                >
+                  Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+                </button>
+              )}
             </div>
           </div>
         </div>
-      )}
-    </main>
+
+        {error && (
+          <div className="mb-4 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
+            {error}. Check that DATABASE_URL is set and the database is reachable.
+          </div>
+        )}
+
+        {/* Desktop table */}
+        <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead>
+              <tr className="border-b border-line bg-panel-muted text-left text-xs uppercase tracking-wide text-ink-faint">
+                <SortHeader label="Member" sortKey="member_name" />
+                <SortHeader label="Asset" sortKey="ticker" />
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Owner</th>
+                <SortHeader label="Amount" sortKey="amount_low" />
+                <SortHeader label="Traded" sortKey="transaction_date" />
+                <SortHeader label="Filed" sortKey="days_to_file" />
+                <th className="px-4 py-3">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-ink-faint">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!loading && result?.data.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-ink-faint">
+                    No trades match these filters.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                result?.data.map((trade) => {
+                  const badge = typeBadge(trade.transaction_type);
+                  const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
+                  const late = trade.days_to_file !== null && trade.days_to_file > 45;
+                  return (
+                    <tr key={trade.id} className="border-b border-line/60 transition-colors hover:bg-panel-muted">
+                      <td className={`border-l-2 px-4 py-3 ${badge.accent}`}>
+                        <div className="flex items-center gap-2.5">
+                          <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                          <div>
+                            <button
+                              onClick={() => setMember(trade.member_name)}
+                              className="text-left font-medium hover:underline"
+                              title={`Filter to ${displayName(trade.member_name)}`}
+                            >
+                              {displayName(trade.member_name)}
+                            </button>
+                            {trade.state_district && <div className="text-xs text-ink-faint">{trade.state_district}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>{trade.asset_name}</div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                          {trade.ticker && (
+                            <button
+                              onClick={() => setTicker(trade.ticker as string)}
+                              className="font-mono hover:text-ink hover:underline"
+                              title={`Filter to ${trade.ticker}`}
+                            >
+                              {trade.ticker}
+                            </button>
+                          )}
+                          {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
+                      <td className="px-4 py-3 text-ink-muted">
+                        <div className="flex items-center gap-2">
+                          <SizeIndicator amountLow={trade.amount_low} />
+                          <span className="whitespace-nowrap">{trade.amount_range}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.transaction_date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
+                        <div>{formatDate(trade.filing_date)}</div>
+                        {trade.days_to_file !== null && (
+                          <div className={`text-xs ${late ? "text-rose-500 dark:text-rose-400" : "text-ink-faint"}`}>
+                            {trade.days_to_file}d {late ? "· late" : ""}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <a
+                          href={trade.pdf_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                        >
+                          PTR PDF
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="flex flex-col gap-3 sm:hidden">
+          {loading && <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">Loading…</div>}
+          {!loading && result?.data.length === 0 && (
+            <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">
+              No trades match these filters.
+            </div>
+          )}
+          {!loading &&
+            result?.data.map((trade) => {
+              const badge = typeBadge(trade.transaction_type);
+              const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
+              const late = trade.days_to_file !== null && trade.days_to_file > 45;
+              return (
+                <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <button onClick={() => setMember(trade.member_name)} className="flex items-center gap-2.5 text-left">
+                      <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                      <div>
+                        <div className="font-medium">{displayName(trade.member_name)}</div>
+                        {trade.state_district && <div className="text-xs text-ink-faint">{trade.state_district}</div>}
+                      </div>
+                    </button>
+                    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-sm">{trade.asset_name}</div>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                    {trade.ticker && (
+                      <button onClick={() => setTicker(trade.ticker as string)} className="font-mono hover:text-ink hover:underline">
+                        {trade.ticker}
+                      </button>
+                    )}
+                    {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs">
+                    <div>
+                      <div className="text-ink-faint">Amount</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-ink-muted">
+                        <SizeIndicator amountLow={trade.amount_low} />
+                        {trade.amount_range}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Owner</div>
+                      <div className="mt-0.5 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Traded</div>
+                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.transaction_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Filed</div>
+                      <div className="mt-0.5 text-ink-muted">
+                        {formatDate(trade.filing_date)}
+                        {trade.days_to_file !== null && (
+                          <span className={late ? "text-rose-500 dark:text-rose-400" : "text-ink-faint"}> · {trade.days_to_file}d{late ? " late" : ""}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={trade.pdf_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
+                  >
+                    View PTR PDF
+                  </a>
+                </div>
+              );
+            })}
+        </div>
+
+        {result && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
+            <span>
+              Page {result.data.length ? page : 0} of {result.totalPages} · {result.total.toLocaleString()} trades
+            </span>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2">
+                Show
+                <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className={inputClass}>
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= result.totalPages}
+                  onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
+                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+    <div className="rounded-lg border border-line bg-panel p-4">
+      <div className="text-xs uppercase tracking-wide text-ink-faint">{label}</div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
     </div>
   );

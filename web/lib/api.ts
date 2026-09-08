@@ -16,6 +16,8 @@ export interface Trade {
   filing_date: string | null;
   days_to_file: number | null;
   pdf_url: string;
+  photo_url: string | null;
+  party: string | null;
 }
 
 export interface TradesResponse {
@@ -44,7 +46,7 @@ export interface TradeFilters {
   owner?: string;
   assetType?: string;
   amountRanges?: string[];
-  lateOnly?: 0 | 1;
+  filedStatus?: "late" | "onTime";
   dateFrom?: string;
   dateTo?: string;
   page?: number;

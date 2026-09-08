@@ -39,4 +39,16 @@ export const SCHEMA_STATEMENTS = [
     reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // One row per current House seat (state+district), from the public
+  // unitedstates/congress-legislators dataset. Used to attach an official
+  // photo + party to trades without any name-matching: state_district is
+  // already a reliable join key shared with filings/transactions.
+  `CREATE TABLE IF NOT EXISTS members_reference (
+    state_district TEXT PRIMARY KEY,
+    bioguide_id TEXT NOT NULL,
+    official_name TEXT NOT NULL,
+    party TEXT,
+    photo_url TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];

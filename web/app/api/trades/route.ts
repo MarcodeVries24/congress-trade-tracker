@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const type = sp.get("type") ?? undefined;
   const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
   const assetType = sp.get("assetType") ?? undefined;
-  const amountRange = sp.get("amountRange") ?? undefined;
+  const amountRanges = sp.getAll("amountRanges");
   const lateOnly = sp.get("lateOnly") === "1";
   const dateFrom = sp.get("dateFrom") ?? undefined;
   const dateTo = sp.get("dateTo") ?? undefined;
@@ -47,7 +47,10 @@ export async function GET(req: NextRequest) {
   if (owner === "self") conditions.push(`t.owner IS NULL`);
   else if (owner) conditions.push(`t.owner = ${addParam(owner)}`);
   if (assetType) conditions.push(`t.asset_type_code = ${addParam(assetType)}`);
-  if (amountRange) conditions.push(`t.amount_range = ${addParam(amountRange)}`);
+  if (amountRanges.length) {
+    const placeholders = amountRanges.map((r) => addParam(r));
+    conditions.push(`t.amount_range IN (${placeholders.join(", ")})`);
+  }
   if (dateFrom) conditions.push(`t.transaction_date >= ${addParam(dateFrom)}`);
   if (dateTo) conditions.push(`t.transaction_date <= ${addParam(dateTo)}`);
   // STOCK Act requires filing within 45 days of the transaction.

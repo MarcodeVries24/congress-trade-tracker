@@ -4,13 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
+  displayName,
   fetchStats,
   fetchTrades,
   OWNER_LABELS,
+  PAGE_SIZE_OPTIONS,
   Stats,
   Trade,
   TradeFilters,
 } from "@/lib/api";
+import { MultiSelect } from "@/components/MultiSelect";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -26,12 +29,77 @@ const compactUSD = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-function typeBadge(type: string): { label: string; className: string } {
+function typeBadge(type: string): { label: string; className: string; accent: string } {
   const t = type.toUpperCase();
-  if (t.startsWith("P")) return { label: "Purchase", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
-  if (t.startsWith("S")) return { label: type.includes("partial") ? "Sale (partial)" : "Sale", className: "bg-rose-500/15 text-rose-400 border-rose-500/30" };
-  if (t.startsWith("E")) return { label: "Exchange", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
-  return { label: type, className: "bg-slate-500/15 text-slate-300 border-slate-500/30" };
+  if (t.startsWith("P"))
+    return { label: "Purchase", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", accent: "border-l-emerald-500" };
+  if (t.startsWith("S"))
+    return {
+      label: type.includes("partial") ? "Sale (partial)" : "Sale",
+      className: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+      accent: "border-l-rose-500",
+    };
+  if (t.startsWith("E"))
+    return { label: "Exchange", className: "bg-amber-500/15 text-amber-400 border-amber-500/30", accent: "border-l-amber-500" };
+  return { label: type, className: "bg-slate-500/15 text-slate-300 border-slate-500/30", accent: "border-l-slate-600" };
+}
+
+// Rough magnitude tier so the eye can scan trade size without reading text.
+function sizeTier(amountLow: number | null): number {
+  if (amountLow === null) return 0;
+  if (amountLow < 100_000) return 1;
+  if (amountLow < 1_000_000) return 2;
+  return 3;
+}
+
+function SizeIndicator({ amountLow }: { amountLow: number | null }) {
+  const tier = sizeTier(amountLow);
+  return (
+    <div className="flex items-end gap-0.5" title={tier ? `Size tier ${tier}/3` : "Unknown size"} aria-hidden>
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className={`w-1 rounded-sm ${i <= tier ? "bg-amber-400" : "bg-slate-700"}`}
+          style={{ height: `${i * 4 + 3}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const AVATAR_COLORS = [
+  "bg-rose-500/20 text-rose-300",
+  "bg-amber-500/20 text-amber-300",
+  "bg-emerald-500/20 text-emerald-300",
+  "bg-sky-500/20 text-sky-300",
+  "bg-violet-500/20 text-violet-300",
+  "bg-pink-500/20 text-pink-300",
+  "bg-teal-500/20 text-teal-300",
+  "bg-indigo-500/20 text-indigo-300",
+];
+
+function initials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <div
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarColor(name)}`}
+      aria-hidden
+    >
+      {initials(name)}
+    </div>
+  );
 }
 
 function useDebounced<T>(value: T, delay = 350): T {
@@ -44,21 +112,23 @@ function useDebounced<T>(value: T, delay = 350): T {
 }
 
 const inputClass =
-  "rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500";
+  "rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500 transition-colors";
 
 export default function Home() {
   const [q, setQ] = useState("");
+  const [member, setMember] = useState("");
   const [ticker, setTicker] = useState("");
   const [type, setType] = useState("");
   const [owner, setOwner] = useState("");
   const [assetType, setAssetType] = useState("");
-  const [amountRange, setAmountRange] = useState("");
+  const [amountRanges, setAmountRanges] = useState<string[]>([]);
   const [lateOnly, setLateOnly] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState("transaction_date");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const [result, setResult] = useState<{ data: Trade[]; total: number; totalPages: number } | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -66,29 +136,47 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const debouncedQ = useDebounced(q);
+  const debouncedMember = useDebounced(member);
   const debouncedTicker = useDebounced(ticker);
 
   const filters: TradeFilters = useMemo(
     () => ({
       q: debouncedQ || undefined,
+      member: debouncedMember || undefined,
       ticker: debouncedTicker || undefined,
       type: type || undefined,
       owner: owner || undefined,
       assetType: assetType || undefined,
-      amountRange: amountRange || undefined,
+      amountRanges: amountRanges.length ? amountRanges : undefined,
       lateOnly: lateOnly ? 1 : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       sort,
       order,
       page,
+      limit: pageSize,
     }),
-    [debouncedQ, debouncedTicker, type, owner, assetType, amountRange, lateOnly, dateFrom, dateTo, sort, order, page]
+    [
+      debouncedQ,
+      debouncedMember,
+      debouncedTicker,
+      type,
+      owner,
+      assetType,
+      amountRanges,
+      lateOnly,
+      dateFrom,
+      dateTo,
+      sort,
+      order,
+      page,
+      pageSize,
+    ]
   );
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, debouncedTicker, type, owner, assetType, amountRange, lateOnly, dateFrom, dateTo, sort, order]);
+  }, [debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, lateOnly, dateFrom, dateTo, sort, order, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,7 +227,8 @@ export default function Home() {
     );
   }
 
-  const activeFilterCount = [type, owner, assetType, amountRange, dateFrom, dateTo].filter(Boolean).length + (lateOnly ? 1 : 0);
+  const activeFilterCount =
+    [type, owner, assetType, dateFrom, dateTo, member].filter(Boolean).length + amountRanges.length + (lateOnly ? 1 : 0);
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
@@ -176,10 +265,17 @@ export default function Home() {
         <div className="flex flex-wrap gap-3">
           <input
             type="text"
-            placeholder="Search member, asset, or ticker…"
+            placeholder="Search asset or ticker…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className={`min-w-[220px] flex-1 ${inputClass}`}
+            className={`min-w-[200px] flex-1 ${inputClass}`}
+          />
+          <input
+            type="text"
+            placeholder="Filter by member name…"
+            value={member}
+            onChange={(e) => setMember(e.target.value)}
+            className={`min-w-[200px] flex-1 ${inputClass}`}
           />
           <input
             type="text"
@@ -212,14 +308,13 @@ export default function Home() {
               </option>
             ))}
           </select>
-          <select value={amountRange} onChange={(e) => setAmountRange(e.target.value)} className={inputClass}>
-            <option value="">Any trade size</option>
-            {AMOUNT_RANGES.map((range) => (
-              <option key={range} value={range}>
-                {range}
-              </option>
-            ))}
-          </select>
+          <MultiSelect
+            placeholder="Any trade size"
+            className="w-48"
+            selected={amountRanges}
+            onChange={setAmountRanges}
+            options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
+          />
           <input
             type="date"
             value={dateFrom}
@@ -240,10 +335,11 @@ export default function Home() {
           {activeFilterCount > 0 && (
             <button
               onClick={() => {
+                setMember("");
                 setType("");
                 setOwner("");
                 setAssetType("");
-                setAmountRange("");
+                setAmountRanges([]);
                 setLateOnly(false);
                 setDateFrom("");
                 setDateTo("");
@@ -263,7 +359,7 @@ export default function Home() {
       )}
 
       <div className="overflow-x-auto rounded-lg border border-slate-800">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
               <SortHeader label="Member" sortKey="member_name" />
@@ -297,17 +393,36 @@ export default function Home() {
                 const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
                 const late = trade.days_to_file !== null && trade.days_to_file > 45;
                 return (
-                  <tr key={trade.id} className="border-b border-slate-800/60 hover:bg-slate-900/40">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{trade.member_name}</div>
-                      {trade.state_district && (
-                        <div className="text-xs text-slate-500">{trade.state_district}</div>
-                      )}
+                  <tr key={trade.id} className="border-b border-slate-800/60 transition-colors hover:bg-slate-900/40">
+                    <td className={`border-l-2 px-4 py-3 ${badge.accent}`}>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={trade.member_name} />
+                        <div>
+                          <button
+                            onClick={() => setMember(trade.member_name)}
+                            className="text-left font-medium hover:underline"
+                            title={`Filter to ${displayName(trade.member_name)}`}
+                          >
+                            {displayName(trade.member_name)}
+                          </button>
+                          {trade.state_district && (
+                            <div className="text-xs text-slate-500">{trade.state_district}</div>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div>{trade.asset_name}</div>
-                      <div className="mt-0.5 flex gap-2 text-xs text-slate-500">
-                        {trade.ticker && <span className="font-mono">{trade.ticker}</span>}
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                        {trade.ticker && (
+                          <button
+                            onClick={() => setTicker(trade.ticker as string)}
+                            className="font-mono hover:text-slate-200 hover:underline"
+                            title={`Filter to ${trade.ticker}`}
+                          >
+                            {trade.ticker}
+                          </button>
+                        )}
                         {assetTypeLabel && <span>{assetTypeLabel}</span>}
                       </div>
                     </td>
@@ -317,7 +432,12 @@ export default function Home() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-300">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
-                    <td className="px-4 py-3 text-slate-300">{trade.amount_range}</td>
+                    <td className="px-4 py-3 text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <SizeIndicator amountLow={trade.amount_low} />
+                        <span>{trade.amount_range}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-slate-300">{formatDate(trade.transaction_date)}</td>
                     <td className="px-4 py-3 text-slate-300">
                       <div>{formatDate(trade.filing_date)}</div>
@@ -344,26 +464,42 @@ export default function Home() {
         </table>
       </div>
 
-      {result && result.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
+      {result && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
           <span>
             Page {result.data.length ? page : 0} of {result.totalPages} · {result.total.toLocaleString()} trades
           </span>
-          <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              disabled={page >= result.totalPages}
-              onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
-              className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
-            >
-              Next
-            </button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2">
+              Show
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className={inputClass}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                disabled={page >= result.totalPages}
+                onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
+                className="rounded-md border border-slate-700 px-3 py-1.5 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { sql } from "@/lib/db";
 const SORT_EXPRESSIONS: Record<string, string> = {
   transaction_date: "t.transaction_date",
   notification_date: "t.notification_date",
+  filing_date: "f.filing_date",
   member_name: "t.member_name",
   ticker: "t.ticker",
   amount_low: "t.amount_low",
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   const dateFrom = sp.get("dateFrom") ?? undefined;
   const dateTo = sp.get("dateTo") ?? undefined;
   const sortKey = sp.get("sort") ?? "";
-  const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.transaction_date;
+  const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.filing_date;
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";
 
   const limitNum = Math.min(Number(sp.get("limit")) || 50, 200);

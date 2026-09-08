@@ -120,6 +120,21 @@ function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string | null
   );
 }
 
+// Used by the mobile sort dropdown, which has no clickable column headers
+// to sort by — same fields the desktop table's headers sort on.
+const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" | "desc" }[] = [
+  { value: "filing_date:desc", label: "Newest filed", sort: "filing_date", order: "desc" },
+  { value: "filing_date:asc", label: "Oldest filed", sort: "filing_date", order: "asc" },
+  { value: "transaction_date:desc", label: "Newest traded", sort: "transaction_date", order: "desc" },
+  { value: "transaction_date:asc", label: "Oldest traded", sort: "transaction_date", order: "asc" },
+  { value: "days_to_file:desc", label: "Most days to file", sort: "days_to_file", order: "desc" },
+  { value: "days_to_file:asc", label: "Fewest days to file", sort: "days_to_file", order: "asc" },
+  { value: "amount_low:desc", label: "Amount: high to low", sort: "amount_low", order: "desc" },
+  { value: "amount_low:asc", label: "Amount: low to high", sort: "amount_low", order: "asc" },
+  { value: "member_name:asc", label: "Member A→Z", sort: "member_name", order: "asc" },
+  { value: "ticker:asc", label: "Ticker A→Z", sort: "ticker", order: "asc" },
+];
+
 function useDebounced<T>(value: T, delay = 350): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -143,7 +158,7 @@ export default function Home() {
   const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sort, setSort] = useState("transaction_date");
+  const [sort, setSort] = useState("filing_date");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -317,6 +332,25 @@ export default function Home() {
             )}
           </div>
 
+          <div className="mt-3 sm:hidden">
+            <Select
+              value={`${sort}:${order}`}
+              onChange={(e) => {
+                const opt = SORT_OPTIONS.find((o) => o.value === e.target.value);
+                if (opt) {
+                  setSort(opt.sort);
+                  setOrder(opt.order);
+                }
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  Sort: {opt.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
           <div className={`${filtersOpen ? "mt-3 flex" : "hidden"} flex-col gap-3 sm:mt-0 sm:flex`}>
             <div className="flex flex-wrap gap-3">
               <input
@@ -427,7 +461,7 @@ export default function Home() {
                 <th className="px-4 py-3">Owner</th>
                 <SortHeader label="Amount" sortKey="amount_low" />
                 <SortHeader label="Traded" sortKey="transaction_date" />
-                <th className="px-4 py-3">Filed</th>
+                <SortHeader label="Filed" sortKey="filing_date" />
                 <SortHeader label="Days to file" sortKey="days_to_file" />
                 <th className="px-4 py-3">Source</th>
               </tr>

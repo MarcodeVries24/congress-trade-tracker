@@ -19,6 +19,10 @@ export const HOUSE_CLERK = {
 
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
-  // Official portraits, hosted by Congress's own site.
-  photoUrl: (bioguideId: string) => `https://www.congress.gov/img/member/${bioguideId.toLowerCase()}_200.jpg`,
+  // The Bioguide (bioguide.congress.gov) is Congress's own biographical
+  // directory and covers ~99% of current members, vs. ~77% for the photo
+  // congress.gov's own site CDN happens to have on file (newer members in
+  // particular are often missing there but present here).
+  photoUrl: (bioguideId: string) =>
+    `https://bioguide.congress.gov/bioguide/photo/${bioguideId[0].toUpperCase()}/${bioguideId.toUpperCase()}.jpg`,
 };

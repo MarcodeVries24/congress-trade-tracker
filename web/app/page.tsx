@@ -14,6 +14,7 @@ import {
   TradeFilters,
 } from "@/lib/api";
 import { MultiSelect } from "@/components/MultiSelect";
+import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
 
 function formatDate(iso: string | null): string {
@@ -333,28 +334,28 @@ export default function Home() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
+              <Select value={type} onChange={(e) => setType(e.target.value)} className="w-full sm:w-auto">
                 <option value="">All types</option>
                 <option value="P">Purchase</option>
                 <option value="S">Sale</option>
                 <option value="E">Exchange</option>
-              </select>
-              <select value={owner} onChange={(e) => setOwner(e.target.value)} className={inputClass}>
+              </Select>
+              <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full sm:w-auto">
                 <option value="">All owners</option>
                 {Object.entries(OWNER_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
                 ))}
-              </select>
-              <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className={inputClass}>
+              </Select>
+              <Select value={assetType} onChange={(e) => setAssetType(e.target.value)} className="w-full sm:w-auto">
                 <option value="">All asset types</option>
                 {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
                 ))}
-              </select>
+              </Select>
               <MultiSelect
                 placeholder="Any trade size"
                 className="w-full sm:w-48"
@@ -362,15 +363,15 @@ export default function Home() {
                 onChange={setAmountRanges}
                 options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
               />
-              <select
+              <Select
                 value={filedStatus}
                 onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}
-                className={inputClass}
+                className="w-full sm:w-auto"
               >
                 <option value="">Any filing status</option>
                 <option value="onTime">Filed on time (≤45 days)</option>
                 <option value="late">Filed late (&gt;45 days)</option>
-              </select>
+              </Select>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
               <span className="text-ink-faint">to</span>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
@@ -583,13 +584,13 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2">
                 Show
-                <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className={inputClass}>
+                <Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="w-20">
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <div className="flex gap-2">
                 <button

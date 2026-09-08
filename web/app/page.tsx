@@ -263,13 +263,13 @@ export default function Home() {
     }
   }
 
-  function SortHeader({ label, sortKey }: { label: string; sortKey: string }) {
+  function SortHeader({ label, sortKey, className = "" }: { label: string; sortKey: string; className?: string }) {
     const active = sort === sortKey;
     return (
-      <th className="px-4 py-3">
+      <th className={`px-4 py-3 ${className}`}>
         <button
           onClick={() => toggleSort(sortKey)}
-          className={`flex items-center gap-1 uppercase tracking-wide hover:text-ink ${active ? "text-ink" : ""}`}
+          className={`flex items-center gap-1 whitespace-nowrap uppercase tracking-wide hover:text-ink ${active ? "text-ink" : ""}`}
         >
           {label}
           <span className="text-[10px]">{active ? (order === "asc" ? "▲" : "▼") : ""}</span>
@@ -473,7 +473,7 @@ export default function Home() {
           <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-line bg-panel-muted text-left text-xs uppercase tracking-wide text-ink-faint">
-                <SortHeader label="Member" sortKey="member_name" />
+                <SortHeader label="Member" sortKey="member_name" className="min-w-[170px]" />
                 <SortHeader label="Asset" sortKey="ticker" />
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Owner</th>
@@ -506,7 +506,7 @@ export default function Home() {
                   const late = trade.days_to_file !== null && trade.days_to_file > 45;
                   return (
                     <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
-                      <td className={`border-l-2 px-4 py-3 ${badge.accent}`}>
+                      <td className={`min-w-[170px] border-l-2 px-4 py-3 ${badge.accent}`}>
                         <div className="flex items-center gap-2.5">
                           <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                           <div>

@@ -24,6 +24,22 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+// Unlike formatDate (date-only fields), this takes a full timestamp and
+// shows the exact time in the viewer's local timezone, abbreviation included.
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 const compactUSD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -309,10 +325,7 @@ export default function Home() {
             <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
             <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
             <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
-            <StatCard
-              label="Last updated"
-              value={stats.lastIngestedAt ? formatDate(stats.lastIngestedAt.slice(0, 10)) : "—"}
-            />
+            <StatCard label="Last updated" value={formatDateTime(stats.lastIngestedAt)} wrap />
           </div>
         )}
 
@@ -673,13 +686,17 @@ export default function Home() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, wrap = false }: { label: string; value: string; wrap?: boolean }) {
   return (
     <div className="rounded-lg border border-line bg-panel p-2 sm:p-4">
       <div className="truncate text-[9px] uppercase tracking-wide text-ink-faint sm:overflow-visible sm:whitespace-normal sm:text-xs">
         {label}
       </div>
-      <div className="mt-0.5 truncate text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl">
+      <div
+        className={`mt-0.5 text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl ${
+          wrap ? "" : "truncate"
+        }`}
+      >
         {value}
       </div>
     </div>

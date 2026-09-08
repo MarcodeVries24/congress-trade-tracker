@@ -39,6 +39,14 @@ export async function GET(req: NextRequest) {
     return `$${params.length}`;
   };
 
+  // A transaction dated after its own filing date is impossible — that's a
+  // typo in the source document (see README), not a real trade. Exclude
+  // these from the default view rather than showing an evidently wrong date.
+  conditions.push(
+    `((NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
+      OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0)`
+  );
+
   if (q) conditions.push(`(t.member_name ILIKE ${addParam(`%${q}%`)} OR t.asset_name ILIKE ${addParam(`%${q}%`)} OR t.ticker ILIKE ${addParam(`%${q}%`)})`);
   if (member) conditions.push(`t.member_name ILIKE ${addParam(`%${member}%`)}`);
   if (ticker) conditions.push(`t.ticker = ${addParam(ticker.toUpperCase())}`);

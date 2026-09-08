@@ -1,21 +1,35 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+// A transaction dated after its own filing date is impossible (a source
+// document typo) — excluded here too, so stats match what the trade list
+// actually shows. See the same condition in app/api/trades/route.ts.
+const VALID_DATE_ORDER = `(
+  (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
+  OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0
+)`;
+
 export async function GET() {
   const [totals, filings, members, volume, topTickers, lastIngested, failedFilings] = (await Promise.all([
-    sql.query(`SELECT COUNT(*)::int as transactions FROM transactions`),
+    sql.query(
+      `SELECT COUNT(*)::int as transactions
+       FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE ${VALID_DATE_ORDER}`
+    ),
     sql.query(`SELECT COUNT(*)::int as filings FROM filings`),
     sql.query(`SELECT COUNT(DISTINCT member_name)::int as members FROM transactions`),
     // Amount is disclosed as a range, not an exact figure — this is the sum of
     // range midpoints, i.e. a rough estimate, not a precise trading volume.
     sql.query(
-      `SELECT SUM((COALESCE(amount_low, 0) + COALESCE(amount_high, amount_low, 0)) / 2.0)::float8 as volume
-       FROM transactions`
+      `SELECT SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)::float8 as volume
+       FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE ${VALID_DATE_ORDER}`
     ),
     sql.query(
-      `SELECT ticker, COUNT(*)::int as count FROM transactions
-       WHERE ticker IS NOT NULL
-       GROUP BY ticker ORDER BY count DESC LIMIT 10`
+      `SELECT t.ticker, COUNT(*)::int as count
+       FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER}
+       GROUP BY t.ticker ORDER BY count DESC LIMIT 10`
     ),
     sql.query(`SELECT MAX(ingested_at) as last FROM filings`),
     sql.query(`SELECT COUNT(*)::int as count FROM filings WHERE parse_status = 'failed'`),

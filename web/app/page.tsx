@@ -404,21 +404,22 @@ export default function Home() {
                 <th className="px-4 py-3">Owner</th>
                 <SortHeader label="Amount" sortKey="amount_low" />
                 <SortHeader label="Traded" sortKey="transaction_date" />
-                <SortHeader label="Filed" sortKey="days_to_file" />
+                <th className="px-4 py-3">Filed</th>
+                <SortHeader label="Days to file" sortKey="days_to_file" />
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && result?.data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
                     No trades match these filters.
                   </td>
                 </tr>
@@ -473,12 +474,14 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.transaction_date)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                        <div>{formatDate(trade.filing_date)}</div>
-                        {trade.days_to_file !== null && (
-                          <div className={`text-xs ${late ? "text-rose-500 dark:text-rose-400" : "text-ink-faint"}`}>
-                            {trade.days_to_file}d {late ? "· late" : ""}
-                          </div>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.filing_date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {trade.days_to_file !== null ? (
+                          <span className={late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}>
+                            {trade.days_to_file}d{late ? " · late" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-ink-faint">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -554,11 +557,12 @@ export default function Home() {
                     </div>
                     <div>
                       <div className="text-ink-faint">Filed</div>
-                      <div className="mt-0.5 text-ink-muted">
-                        {formatDate(trade.filing_date)}
-                        {trade.days_to_file !== null && (
-                          <span className={late ? "text-rose-500 dark:text-rose-400" : "text-ink-faint"}> · {trade.days_to_file}d{late ? " late" : ""}</span>
-                        )}
+                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.filing_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Days to file</div>
+                      <div className={`mt-0.5 ${late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}`}>
+                        {trade.days_to_file !== null ? `${trade.days_to_file}d${late ? " · late" : ""}` : "—"}
                       </div>
                     </div>
                   </div>

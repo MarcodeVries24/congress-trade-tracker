@@ -41,9 +41,13 @@ Watcher project. Getting past it needs a full headless-browser scraper
 - The parser is regex-based and tuned against real filings, but PTR PDFs
   aren't perfectly uniform. Any transaction line it can't confidently match to
   an asset name is logged to the `parse_issues` table instead of guessed at.
-- Dates are stored exactly as filed. Members occasionally file with a typo
-  (e.g. a transaction date shown as after the filing date) — that's an error
-  in the source document, not the parser, and it isn't silently corrected.
+- Dates are stored exactly as filed, never silently corrected. Members
+  occasionally file with a typo — e.g. a transaction date shown as after the
+  filing date, which is impossible — and that's an error in the source
+  document, not the parser. Rows like that (a handful out of thousands) are
+  excluded from the site and from `/api/stats` by default, since displaying
+  a data-entry error as a real trade would be misleading; the raw row stays
+  in the database untouched.
 
 ## Project layout
 

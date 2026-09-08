@@ -432,6 +432,7 @@ export default function Home() {
                 <option value="onTime">Filed on time (≤45 days)</option>
                 <option value="late">Filed late (&gt;45 days)</option>
               </Select>
+              <span className="text-xs text-ink-faint">Filed:</span>
               <Select
                 value=""
                 onChange={(e) => {
@@ -448,9 +449,21 @@ export default function Home() {
                 <option value="180">Last 180 days</option>
                 <option value="365">Last year</option>
               </Select>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                title="Filed on or after"
+                className={inputClass}
+              />
               <span className="text-ink-faint">to</span>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                title="Filed on or before"
+                className={inputClass}
+              />
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}

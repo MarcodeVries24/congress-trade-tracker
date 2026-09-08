@@ -60,8 +60,8 @@ export async function GET(req: NextRequest) {
     const placeholders = amountRanges.map((r) => addParam(r));
     conditions.push(`t.amount_range IN (${placeholders.join(", ")})`);
   }
-  if (dateFrom) conditions.push(`t.transaction_date >= ${addParam(dateFrom)}`);
-  if (dateTo) conditions.push(`t.transaction_date <= ${addParam(dateTo)}`);
+  if (dateFrom) conditions.push(`f.filing_date >= ${addParam(dateFrom)}`);
+  if (dateTo) conditions.push(`f.filing_date <= ${addParam(dateTo)}`);
   // STOCK Act requires filing within 45 days of the transaction.
   if (filedStatus === "late") {
     conditions.push(`(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) > 45`);

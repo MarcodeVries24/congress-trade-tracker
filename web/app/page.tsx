@@ -260,6 +260,14 @@ export default function Home() {
     setDateTo("");
   }
 
+  function applyDatePreset(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    setDateTo(to.toISOString().slice(0, 10));
+    setDateFrom(from.toISOString().slice(0, 10));
+  }
+
   return (
     <>
       <Header />
@@ -372,6 +380,21 @@ export default function Home() {
                 <option value="onTime">Filed on time (≤45 days)</option>
                 <option value="late">Filed late (&gt;45 days)</option>
               </Select>
+              <Select
+                value=""
+                onChange={(e) => {
+                  const days = Number(e.target.value);
+                  if (days) applyDatePreset(days);
+                }}
+                className="w-full sm:w-auto"
+              >
+                <option value="">Quick range…</option>
+                <option value="30">Last 30 days</option>
+                <option value="45">Last 45 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="180">Last 180 days</option>
+                <option value="365">Last year</option>
+              </Select>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
               <span className="text-ink-faint">to</span>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
@@ -430,7 +453,7 @@ export default function Home() {
                   const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
                   const late = trade.days_to_file !== null && trade.days_to_file > 45;
                   return (
-                    <tr key={trade.id} className="border-b border-line/60 transition-colors hover:bg-panel-muted">
+                    <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                       <td className={`border-l-2 px-4 py-3 ${badge.accent}`}>
                         <div className="flex items-center gap-2.5">
                           <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />

@@ -3,7 +3,7 @@ import { ThemeToggle } from "./ThemeToggle";
 function Logo() {
   return (
     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2.4" strokeLinecap="round">
         <path d="M5 19V13" />
         <path d="M12 19V8" />
         <path d="M19 19V5" />

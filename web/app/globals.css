@@ -2,33 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Values are space-separated RGB channels (not hex), so Tailwind's
+ * opacity modifiers (e.g. border-line/60) can blend them correctly via
+ * rgb(var(--x) / <alpha-value>) — see tailwind.config.ts. A plain hex
+ * value here would make any `/NN` opacity utility silently fail and
+ * fall back to `currentColor`.
+ */
 :root {
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --panel-muted: #f1f5f9;
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
-  --ink: #0f172a;
-  --ink-muted: #475569;
-  --ink-faint: #94a3b8;
-  --accent: #0284c7;
+  --bg: 248 250 252;
+  --panel: 255 255 255;
+  --panel-muted: 241 245 249;
+  --line: 226 232 240;
+  --line-strong: 203 213 225;
+  --ink: 15 23 42;
+  --ink-muted: 71 85 105;
+  --ink-faint: 148 163 184;
+  --accent: 2 132 199;
   color-scheme: light;
 }
 
 .dark {
-  --bg: #0b0d12;
-  --panel: #11151d;
-  --panel-muted: #161b26;
-  --line: #1e293b;
-  --line-strong: #334155;
-  --ink: #e6e8eb;
-  --ink-muted: #94a3b8;
-  --ink-faint: #64748b;
-  --accent: #38bdf8;
+  --bg: 11 13 18;
+  --panel: 17 21 29;
+  --panel-muted: 22 27 38;
+  --line: 30 41 59;
+  --line-strong: 51 65 85;
+  --ink: 230 232 235;
+  --ink-muted: 148 163 184;
+  --ink-faint: 100 116 139;
+  --accent: 56 189 248;
   color-scheme: dark;
 }
 
 body {
-  background-color: var(--bg);
-  color: var(--ink);
+  background-color: rgb(var(--bg));
+  color: rgb(var(--ink));
 }

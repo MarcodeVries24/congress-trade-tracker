@@ -1,11 +1,15 @@
 import { SelectHTMLAttributes } from "react";
 
-export function Select({ className = "", children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { className?: string }) {
+export function Select({ className = "", children, value, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { className?: string }) {
+  const isEmpty = value === "" || value === undefined;
   return (
     <div className={`relative ${className}`}>
       <select
         {...props}
-        className="w-full appearance-none rounded-md border border-line bg-panel px-3 py-2 pr-8 text-sm text-ink outline-none transition-colors focus:border-line-strong"
+        value={value}
+        className={`w-full appearance-none rounded-md border bg-panel px-3 py-2 pr-8 text-sm outline-none transition-colors focus:border-line-strong ${
+          isEmpty ? "border-line text-ink-muted" : "border-accent text-accent"
+        }`}
       >
         {children}
       </select>

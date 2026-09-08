@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-const SORTABLE = new Set(["transaction_date", "notification_date", "member_name", "ticker", "amount_low"]);
+// Plain columns sort directly; "days_to_file" is a computed expression.
+const SORT_EXPRESSIONS: Record<string, string> = {
+  transaction_date: "t.transaction_date",
+  notification_date: "t.notification_date",
+  member_name: "t.member_name",
+  ticker: "t.ticker",
+  amount_low: "t.amount_low",
+  days_to_file: "days_to_file",
+};
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -10,9 +18,14 @@ export async function GET(req: NextRequest) {
   const ticker = sp.get("ticker") ?? undefined;
   const state = sp.get("state") ?? undefined;
   const type = sp.get("type") ?? undefined;
+  const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
+  const assetType = sp.get("assetType") ?? undefined;
+  const amountRange = sp.get("amountRange") ?? undefined;
+  const lateOnly = sp.get("lateOnly") === "1";
   const dateFrom = sp.get("dateFrom") ?? undefined;
   const dateTo = sp.get("dateTo") ?? undefined;
-  const sort = SORTABLE.has(sp.get("sort") ?? "") ? sp.get("sort")! : "transaction_date";
+  const sortKey = sp.get("sort") ?? "";
+  const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.transaction_date;
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";
 
   const limitNum = Math.min(Number(sp.get("limit")) || 50, 200);
@@ -31,8 +44,18 @@ export async function GET(req: NextRequest) {
   if (ticker) conditions.push(`t.ticker = ${addParam(ticker.toUpperCase())}`);
   if (state) conditions.push(`t.state_district ILIKE ${addParam(`${state}%`)}`);
   if (type) conditions.push(`t.transaction_type ILIKE ${addParam(`${type}%`)}`);
+  if (owner === "self") conditions.push(`t.owner IS NULL`);
+  else if (owner) conditions.push(`t.owner = ${addParam(owner)}`);
+  if (assetType) conditions.push(`t.asset_type_code = ${addParam(assetType)}`);
+  if (amountRange) conditions.push(`t.amount_range = ${addParam(amountRange)}`);
   if (dateFrom) conditions.push(`t.transaction_date >= ${addParam(dateFrom)}`);
   if (dateTo) conditions.push(`t.transaction_date <= ${addParam(dateTo)}`);
+  // STOCK Act requires filing within 45 days of the transaction.
+  if (lateOnly) {
+    conditions.push(
+      `(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) > 45`
+    );
+  }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -42,15 +65,22 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url
+      `SELECT t.*, f.filing_date, f.pdf_url,
+              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        ${where}
-       ORDER BY t.${sort} ${order} NULLS LAST
+       ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams
     ),
-    sql.query(`SELECT COUNT(*)::int as count FROM transactions t ${where}`, params),
+    sql.query(
+      `SELECT COUNT(*)::int as count
+       FROM transactions t
+       JOIN filings f ON f.doc_id = t.doc_id
+       ${where}`,
+      params
+    ),
   ]);
 
   const total = (countRows as { count: number }[])[0]?.count ?? 0;

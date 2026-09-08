@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fetchStats, fetchTrades, Stats, Trade, TradeFilters } from "@/lib/api";
+import {
+  AMOUNT_RANGES,
+  ASSET_TYPE_LABELS,
+  fetchStats,
+  fetchTrades,
+  OWNER_LABELS,
+  Stats,
+  Trade,
+  TradeFilters,
+} from "@/lib/api";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -9,6 +18,13 @@ function formatDate(iso: string | null): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
+
+const compactUSD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 function typeBadge(type: string): { label: string; className: string } {
   const t = type.toUpperCase();
@@ -27,10 +43,17 @@ function useDebounced<T>(value: T, delay = 350): T {
   return debounced;
 }
 
+const inputClass =
+  "rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500";
+
 export default function Home() {
   const [q, setQ] = useState("");
   const [ticker, setTicker] = useState("");
   const [type, setType] = useState("");
+  const [owner, setOwner] = useState("");
+  const [assetType, setAssetType] = useState("");
+  const [amountRange, setAmountRange] = useState("");
+  const [lateOnly, setLateOnly] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState("transaction_date");
@@ -50,18 +73,22 @@ export default function Home() {
       q: debouncedQ || undefined,
       ticker: debouncedTicker || undefined,
       type: type || undefined,
+      owner: owner || undefined,
+      assetType: assetType || undefined,
+      amountRange: amountRange || undefined,
+      lateOnly: lateOnly ? 1 : undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       sort,
       order,
       page,
     }),
-    [debouncedQ, debouncedTicker, type, dateFrom, dateTo, sort, order, page]
+    [debouncedQ, debouncedTicker, type, owner, assetType, amountRange, lateOnly, dateFrom, dateTo, sort, order, page]
   );
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, debouncedTicker, type, dateFrom, dateTo, sort, order]);
+  }, [debouncedQ, debouncedTicker, type, owner, assetType, amountRange, lateOnly, dateFrom, dateTo, sort, order]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,8 +115,34 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
+  function toggleSort(key: string) {
+    if (sort === key) {
+      setOrder((o) => (o === "asc" ? "desc" : "asc"));
+    } else {
+      setSort(key);
+      setOrder(key === "member_name" || key === "ticker" ? "asc" : "desc");
+    }
+  }
+
+  function SortHeader({ label, sortKey }: { label: string; sortKey: string }) {
+    const active = sort === sortKey;
+    return (
+      <th className="px-4 py-3">
+        <button
+          onClick={() => toggleSort(sortKey)}
+          className={`flex items-center gap-1 uppercase tracking-wide hover:text-slate-200 ${active ? "text-slate-200" : ""}`}
+        >
+          {label}
+          <span className="text-[10px]">{active ? (order === "asc" ? "▲" : "▼") : ""}</span>
+        </button>
+      </th>
+    );
+  }
+
+  const activeFilterCount = [type, owner, assetType, amountRange, dateFrom, dateTo].filter(Boolean).length + (lateOnly ? 1 : 0);
+
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-6 py-10">
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Congress Trade Tracker</h1>
         <p className="mt-1 text-sm text-slate-400">
@@ -107,8 +160,9 @@ export default function Home() {
       </header>
 
       {stats && (
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <StatCard label="Transactions" value={stats.totalTransactions.toLocaleString()} />
+          <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
           <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
           <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
           <StatCard
@@ -118,59 +172,88 @@ export default function Home() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-3 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-        <input
-          type="text"
-          placeholder="Search member, asset, or ticker…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="min-w-[220px] flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        />
-        <input
-          type="text"
-          placeholder="Ticker (e.g. NVDA)"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value)}
-          className="w-40 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        />
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        >
-          <option value="">All types</option>
-          <option value="P">Purchase</option>
-          <option value="S">Sale</option>
-          <option value="E">Exchange</option>
-        </select>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        />
-        <span className="self-center text-slate-500">to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        />
-        <select
-          value={`${sort}:${order}`}
-          onChange={(e) => {
-            const [s, o] = e.target.value.split(":");
-            setSort(s);
-            setOrder(o as "asc" | "desc");
-          }}
-          className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-slate-500"
-        >
-          <option value="transaction_date:desc">Newest first</option>
-          <option value="transaction_date:asc">Oldest first</option>
-          <option value="member_name:asc">Member A→Z</option>
-          <option value="ticker:asc">Ticker A→Z</option>
-          <option value="amount_low:desc">Amount high→low</option>
-        </select>
+      <div className="mb-6 space-y-3 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="text"
+            placeholder="Search member, asset, or ticker…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className={`min-w-[220px] flex-1 ${inputClass}`}
+          />
+          <input
+            type="text"
+            placeholder="Ticker (e.g. NVDA)"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value)}
+            className={`w-40 ${inputClass}`}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
+            <option value="">All types</option>
+            <option value="P">Purchase</option>
+            <option value="S">Sale</option>
+            <option value="E">Exchange</option>
+          </select>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)} className={inputClass}>
+            <option value="">All owners</option>
+            {Object.entries(OWNER_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className={inputClass}>
+            <option value="">All asset types</option>
+            {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select value={amountRange} onChange={(e) => setAmountRange(e.target.value)} className={inputClass}>
+            <option value="">Any trade size</option>
+            {AMOUNT_RANGES.map((range) => (
+              <option key={range} value={range}>
+                {range}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className={inputClass}
+          />
+          <span className="text-slate-500">to</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={lateOnly}
+              onChange={(e) => setLateOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-700 bg-slate-950"
+            />
+            Filed late only (&gt;45 days)
+          </label>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => {
+                setType("");
+                setOwner("");
+                setAssetType("");
+                setAmountRange("");
+                setLateOnly(false);
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="text-xs text-slate-500 underline decoration-slate-700 hover:text-slate-300 hover:decoration-slate-400"
+            >
+              Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -180,29 +263,30 @@ export default function Home() {
       )}
 
       <div className="overflow-x-auto rounded-lg border border-slate-800">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[920px] text-sm">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/60 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Member</th>
-              <th className="px-4 py-3">Asset</th>
+              <SortHeader label="Member" sortKey="member_name" />
+              <SortHeader label="Asset" sortKey="ticker" />
               <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Traded</th>
-              <th className="px-4 py-3">Filed</th>
+              <th className="px-4 py-3">Owner</th>
+              <SortHeader label="Amount" sortKey="amount_low" />
+              <SortHeader label="Traded" sortKey="transaction_date" />
+              <SortHeader label="Filed" sortKey="days_to_file" />
               <th className="px-4 py-3">Source</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && result?.data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No trades match these filters.
                 </td>
               </tr>
@@ -210,6 +294,8 @@ export default function Home() {
             {!loading &&
               result?.data.map((trade) => {
                 const badge = typeBadge(trade.transaction_type);
+                const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
+                const late = trade.days_to_file !== null && trade.days_to_file > 45;
                 return (
                   <tr key={trade.id} className="border-b border-slate-800/60 hover:bg-slate-900/40">
                     <td className="px-4 py-3">
@@ -220,18 +306,27 @@ export default function Home() {
                     </td>
                     <td className="px-4 py-3">
                       <div>{trade.asset_name}</div>
-                      {trade.ticker && (
-                        <div className="text-xs font-mono text-slate-500">{trade.ticker}</div>
-                      )}
+                      <div className="mt-0.5 flex gap-2 text-xs text-slate-500">
+                        {trade.ticker && <span className="font-mono">{trade.ticker}</span>}
+                        {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
                         {badge.label}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-slate-300">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
                     <td className="px-4 py-3 text-slate-300">{trade.amount_range}</td>
                     <td className="px-4 py-3 text-slate-300">{formatDate(trade.transaction_date)}</td>
-                    <td className="px-4 py-3 text-slate-300">{formatDate(trade.filing_date)}</td>
+                    <td className="px-4 py-3 text-slate-300">
+                      <div>{formatDate(trade.filing_date)}</div>
+                      {trade.days_to_file !== null && (
+                        <div className={`text-xs ${late ? "text-rose-400" : "text-slate-500"}`}>
+                          {trade.days_to_file}d {late ? "· late" : ""}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <a
                         href={trade.pdf_url}

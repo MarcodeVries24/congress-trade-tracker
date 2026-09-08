@@ -14,6 +14,7 @@ export interface Trade {
   amount_low: number | null;
   amount_high: number | null;
   filing_date: string | null;
+  days_to_file: number | null;
   pdf_url: string;
 }
 
@@ -29,6 +30,7 @@ export interface Stats {
   totalTransactions: number;
   totalFilings: number;
   totalMembers: number;
+  estimatedVolume: number;
   topTickers: { ticker: string; count: number }[];
   lastIngestedAt: string | null;
   failedFilings: number;
@@ -38,12 +40,53 @@ export interface TradeFilters {
   q?: string;
   ticker?: string;
   type?: string;
+  owner?: string;
+  assetType?: string;
+  amountRange?: string;
+  lateOnly?: 0 | 1;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
   sort?: string;
   order?: "asc" | "desc";
 }
+
+// STOCK Act disclosure bands, in the exact strings the parser stores them as.
+export const AMOUNT_RANGES = [
+  "$1,001 - $15,000",
+  "$15,001 - $50,000",
+  "$50,001 - $100,000",
+  "$100,001 - $250,000",
+  "$250,001 - $500,000",
+  "$500,001 - $1,000,000",
+  "$1,000,001 - $5,000,000",
+  "$5,000,001 - $25,000,000",
+  "$25,000,001 - $50,000,000",
+];
+
+export const OWNER_LABELS: Record<string, string> = {
+  self: "Self",
+  JT: "Joint",
+  SP: "Spouse",
+  DC: "Dependent Child",
+};
+
+// Reference: https://fd.house.gov/reference/asset-type-codes.aspx
+export const ASSET_TYPE_LABELS: Record<string, string> = {
+  ST: "Stock",
+  OP: "Option",
+  OT: "Other Securities",
+  GS: "Government Security",
+  CS: "Corporate Security",
+  CT: "Cryptocurrency",
+  PS: "Preferred Stock",
+  RS: "Restricted Stock Unit",
+  AB: "Asset-Backed Security",
+  OI: "Other Investment Fund",
+  HN: "Hedge Fund",
+  OL: "Ownership Interest (LLC/LLP)",
+  VA: "Variable Annuity",
+};
 
 export async function fetchTrades(filters: TradeFilters): Promise<TradesResponse> {
   const params = new URLSearchParams();

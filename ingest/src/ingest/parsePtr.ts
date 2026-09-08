@@ -24,7 +24,15 @@ const METADATA_LINE = new RegExp("^[A-Za-z][A-Za-z" + NUL_CHAR + "\\s]{0,40}:");
 const TXN_LINE =
   /^(.*?)\s*(P|S\s*\([^)]*\)|S|E)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\$[\d,]+(?:\s*-\s*\$[\d,]+)?|\$1,000 or less|Over \$[\d,]+)\s*$/;
 
+// A ticker only counts when it's parenthesized and starts with a letter —
+// government securities are identified by a CUSIP instead (e.g. "(91282CGH8)"),
+// which must NOT be mistaken for a ticker.
 const TICKER_PATTERN = /\(([A-Z][A-Z0-9.\/]{0,6})\)\s*\[([A-Za-z]{1,3})\]/;
+// The asset type code ("[ST]", "[GS]", ...) is always the trailing bracketed
+// tag regardless of what precedes it, so it's extracted separately from the
+// ticker — otherwise CUSIP-identified assets (bonds, treasuries) silently lose
+// their type code just because they have no real ticker.
+const ASSET_TYPE_PATTERN = /\[([A-Za-z]{1,3})\]\s*$/;
 
 // The table header ("ID Owner Asset Transaction Type Date Notification Date
 // Amount Cap. Gains > $200?") repeats at the top of every page, and can leak
@@ -110,6 +118,7 @@ export function parsePtrText(
       }
 
       const tickerMatch = assetText.match(TICKER_PATTERN);
+      const assetTypeMatch = assetText.match(ASSET_TYPE_PATTERN);
       const { low, high } = parseAmountRange(amountRange);
 
       if (!assetText) {
@@ -120,7 +129,7 @@ export function parsePtrText(
       transactions.push({
         assetName: assetText,
         ticker: tickerMatch ? tickerMatch[1] : null,
-        assetTypeCode: tickerMatch ? tickerMatch[2] : null,
+        assetTypeCode: tickerMatch ? tickerMatch[2] : assetTypeMatch ? assetTypeMatch[1] : null,
         owner,
         transactionType: txnTypeRaw.replace(/\s+/g, " ").trim(),
         transactionDate: toIsoDateSlash(date1),

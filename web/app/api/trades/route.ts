@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 const SORTABLE = new Set(["transaction_date", "notification_date", "member_name", "ticker", "amount_low"]);
 
@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
   const limitPlaceholder = `$${dataParams.length - 1}`;
   const offsetPlaceholder = `$${dataParams.length}`;
 
-  const [dataResult, countResult] = await Promise.all([
-    pool.query(
+  const [dataRows, countRows] = await Promise.all([
+    sql.query(
       `SELECT t.*, f.filing_date, f.pdf_url
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
@@ -50,13 +50,13 @@ export async function GET(req: NextRequest) {
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams
     ),
-    pool.query(`SELECT COUNT(*)::int as count FROM transactions t ${where}`, params),
+    sql.query(`SELECT COUNT(*)::int as count FROM transactions t ${where}`, params),
   ]);
 
-  const total = countResult.rows[0]?.count ?? 0;
+  const total = (countRows as { count: number }[])[0]?.count ?? 0;
 
   return NextResponse.json({
-    data: dataResult.rows,
+    data: dataRows,
     page: pageNum,
     limit: limitNum,
     total,

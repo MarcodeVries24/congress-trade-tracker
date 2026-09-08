@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
-  const result = await pool.query(
+  const rows = await sql.query(
     `SELECT t.*, f.filing_date, f.pdf_url
      FROM transactions t
      JOIN filings f ON f.doc_id = t.doc_id
@@ -11,5 +11,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
      ORDER BY t.transaction_date DESC`,
     [decodeURIComponent(name)]
   );
-  return NextResponse.json({ data: result.rows });
+  return NextResponse.json({ data: rows });
 }

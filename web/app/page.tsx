@@ -287,9 +287,9 @@ export default function Home() {
     <>
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mb-8 rounded-xl border border-line bg-panel px-5 py-6 sm:px-8 sm:py-8">
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Every disclosed House stock trade, searchable</h1>
-          <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+        <div className="mb-4 rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Every disclosed House stock trade, searchable</h1>
+          <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
             Built directly from Periodic Transaction Reports filed with the{" "}
             <a
               href="https://disclosures-clerk.house.gov/FinancialDisclosure"
@@ -304,7 +304,7 @@ export default function Home() {
         </div>
 
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:mb-6 sm:grid-cols-5 sm:gap-3">
             <StatCard label="Transactions" value={stats.totalTransactions.toLocaleString()} />
             <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
             <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
@@ -605,10 +605,6 @@ export default function Home() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-ink-faint">Owner</div>
-                      <div className="mt-0.5 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</div>
-                    </div>
-                    <div>
                       <div className="text-ink-faint">Traded</div>
                       <div className="mt-0.5 text-ink-muted">{formatDate(trade.transaction_date)}</div>
                     </div>
@@ -679,9 +675,13 @@ export default function Home() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-panel p-4">
-      <div className="text-xs uppercase tracking-wide text-ink-faint">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
+    <div className="rounded-lg border border-line bg-panel p-2 sm:p-4">
+      <div className="truncate text-[9px] uppercase tracking-wide text-ink-faint sm:overflow-visible sm:whitespace-normal sm:text-xs">
+        {label}
+      </div>
+      <div className="mt-0.5 truncate text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl">
+        {value}
+      </div>
     </div>
   );
 }

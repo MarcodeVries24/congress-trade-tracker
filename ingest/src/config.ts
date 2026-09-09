@@ -17,6 +17,14 @@ export const HOUSE_CLERK = {
   filingPortal: "https://disclosures-clerk.house.gov/FinancialDisclosure",
 };
 
+export const SENATE_EFD = {
+  homeUrl: "https://efdsearch.senate.gov/search/home/",
+  searchUrl: "https://efdsearch.senate.gov/search/",
+  reportUrl: (id: string) => `https://efdsearch.senate.gov/search/view/ptr/${id}/`,
+  // "Periodic Transactions" report_type checkbox value on the search form.
+  periodicTransactionsReportType: "11",
+};
+
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
   // The Bioguide (bioguide.congress.gov) is Congress's own biographical

@@ -51,6 +51,11 @@ export const SCHEMA_STATEMENTS = [
     photo_url TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // state_district is a real "STATE+district" for House, but for Senate it's
+  // a synthetic "SEN:lastname" join key (Senate filings carry no district
+  // field to key on) — not fit to show a user. This column holds the actual
+  // 2-letter state for both chambers, for display.
+  `ALTER TABLE members_reference ADD COLUMN IF NOT EXISTS state TEXT`,
   // Single-row heartbeat, updated at the end of every ingest run whether or
   // not it found anything new. Distinct from filings.ingested_at (which only
   // moves when a filing is actually inserted/updated) — this is what proves

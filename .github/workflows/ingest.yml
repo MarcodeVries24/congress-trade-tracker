@@ -1,4 +1,4 @@
-name: Ingest House PTR filings
+name: Ingest Congress PTR filings
 
 on:
   # Off the hour on purpose — GitHub queues everyone's on-the-hour cron
@@ -10,7 +10,7 @@ on:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -20,10 +20,23 @@ jobs:
 
       - run: npm ci
 
+      # efdsearch.senate.gov (Akamai) blocks Playwright's bundled Chromium
+      # outright but not a real Chrome build — see ingest/src/ingest/senate/
+      # browser.ts. `playwright install chrome` is Playwright's own
+      # provisioning path for the "chrome" channel (as opposed to
+      # `install chromium`, the bundled build) — needed so
+      # chromium.launch({ channel: "chrome" }) has something to find.
+      - run: npx playwright install --with-deps chrome
+        working-directory: ingest
+
       - run: npm run sync-members --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - run: npm run ingest --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - run: npm run ingest-senate --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

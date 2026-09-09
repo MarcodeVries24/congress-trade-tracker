@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ingest": "tsx src/ingest/run.ts",
+    "ingest-senate": "tsx src/ingest/runSenate.ts",
     "sync-members": "tsx src/ingest/syncMembers.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -12,7 +13,8 @@
     "@neondatabase/serverless": "^1.1.0",
     "adm-zip": "^0.5.16",
     "js-yaml": "^5.4.1",
-    "pdf-parse": "^2.1.1"
+    "pdf-parse": "^2.1.1",
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

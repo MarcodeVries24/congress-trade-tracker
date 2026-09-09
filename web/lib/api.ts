@@ -18,6 +18,8 @@ export interface Trade {
   pdf_url: string;
   photo_url: string | null;
   party: string | null;
+  chamber: "house" | "senate";
+  member_state: string | null;
 }
 
 export interface TradesResponse {
@@ -40,6 +42,7 @@ export interface Stats {
 }
 
 export interface TradeFilters {
+  chamber?: string[];
   q?: string;
   member?: string;
   ticker?: string;
@@ -116,8 +119,10 @@ export async function fetchTrades(filters: TradeFilters): Promise<TradesResponse
   return res.json();
 }
 
-export async function fetchStats(): Promise<Stats> {
-  const res = await fetch(`/api/stats`);
+export async function fetchStats(chambers?: string[]): Promise<Stats> {
+  const params = new URLSearchParams();
+  for (const c of chambers ?? []) params.append("chamber", c);
+  const res = await fetch(`/api/stats?${params.toString()}`);
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
   return res.json();
 }

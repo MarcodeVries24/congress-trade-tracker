@@ -35,6 +35,7 @@ export interface Stats {
   estimatedVolume: number;
   topTickers: { ticker: string; count: number }[];
   lastIngestedAt: string | null;
+  lastCheckedAt: string | null;
   failedFilings: number;
 }
 

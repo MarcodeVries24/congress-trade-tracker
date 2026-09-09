@@ -327,9 +327,9 @@ export default function Home() {
             <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
             <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
             <StatCard
-              label="Last updated"
-              value={formatDateFromTimestamp(stats.lastIngestedAt)}
-              note={formatTimeWithZone(stats.lastIngestedAt)}
+              label="Last checked"
+              value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              note={formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}
             />
           </div>
         )}

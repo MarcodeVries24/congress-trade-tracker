@@ -10,7 +10,7 @@ const VALID_DATE_ORDER = `(
 )`;
 
 export async function GET() {
-  const [totals, filings, members, volume, topTickers, lastIngested, failedFilings] = (await Promise.all([
+  const [totals, filings, members, volume, topTickers, lastIngested, failedFilings, lastCheckedRun] = (await Promise.all([
     sql.query(
       `SELECT COUNT(*)::int as transactions
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
@@ -33,6 +33,10 @@ export async function GET() {
     ),
     sql.query(`SELECT MAX(ingested_at) as last FROM filings`),
     sql.query(`SELECT COUNT(*)::int as count FROM filings WHERE parse_status = 'failed'`),
+    // Heartbeat: written at the end of every scheduled run, whether or not
+    // it found anything new — proves the pipeline is alive even on a quiet
+    // check, unlike lastIngestedAt which only moves on actual new data.
+    sql.query(`SELECT checked_at FROM ingest_runs LIMIT 1`),
   ])) as [
     { transactions: number }[],
     { filings: number }[],
@@ -41,6 +45,7 @@ export async function GET() {
     { ticker: string; count: number }[],
     { last: string | null }[],
     { count: number }[],
+    { checked_at: string }[],
   ];
 
   return NextResponse.json({
@@ -50,6 +55,7 @@ export async function GET() {
     estimatedVolume: volume[0]?.volume ?? 0,
     topTickers,
     lastIngestedAt: lastIngested[0]?.last ?? null,
+    lastCheckedAt: lastCheckedRun[0]?.checked_at ?? null,
     failedFilings: failedFilings[0]?.count ?? 0,
   });
 }

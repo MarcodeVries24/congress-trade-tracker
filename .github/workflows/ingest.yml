@@ -1,8 +1,10 @@
 name: Ingest House PTR filings
 
 on:
+  # Off the hour on purpose — GitHub queues everyone's on-the-hour cron
+  # jobs together, which can delay a run by 1-2+ hours during busy periods.
   schedule:
-    - cron: "0 */4 * * *"
+    - cron: "17 */4 * * *"
   workflow_dispatch: {}
 
 jobs:

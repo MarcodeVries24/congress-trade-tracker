@@ -51,4 +51,17 @@ export const SCHEMA_STATEMENTS = [
     photo_url TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // Single-row heartbeat, updated at the end of every ingest run whether or
+  // not it found anything new. Distinct from filings.ingested_at (which only
+  // moves when a filing is actually inserted/updated) — this is what proves
+  // the scheduled job is still alive even on a quiet run.
+  `CREATE TABLE IF NOT EXISTS ingest_runs (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE,
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    filings_found INTEGER NOT NULL DEFAULT 0,
+    filings_processed INTEGER NOT NULL DEFAULT 0,
+    transactions_extracted INTEGER NOT NULL DEFAULT 0,
+    failed INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT ingest_runs_singleton CHECK (id)
+  )`,
 ];

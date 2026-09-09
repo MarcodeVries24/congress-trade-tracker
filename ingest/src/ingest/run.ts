@@ -119,6 +119,21 @@ async function main() {
   }
 
   console.log(`\nDone. Processed ${capped.length} filings, ${totalTransactions} transactions extracted, ${failed} failed.`);
+
+  // Runs unconditionally, including on a "nothing new" run — this is the
+  // signal that the scheduled job is alive, separate from filings.ingested_at
+  // which only moves when a filing actually changes.
+  await sql.query(
+    `INSERT INTO ingest_runs (id, checked_at, filings_found, filings_processed, transactions_extracted, failed)
+     VALUES (TRUE, NOW(), $1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET
+       checked_at = EXCLUDED.checked_at,
+       filings_found = EXCLUDED.filings_found,
+       filings_processed = EXCLUDED.filings_processed,
+       transactions_extracted = EXCLUDED.transactions_extracted,
+       failed = EXCLUDED.failed`,
+    [ptrFilings.length, capped.length, totalTransactions, failed]
+  );
 }
 
 main().catch((err) => {

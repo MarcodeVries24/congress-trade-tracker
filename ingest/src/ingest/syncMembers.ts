@@ -2,6 +2,7 @@ import "../loadEnv.js";
 import { load as loadYaml } from "js-yaml";
 import { sql, ensureSchema } from "../db/index.js";
 import { MEMBERS_REFERENCE } from "../config.js";
+import { senateMemberKey } from "./normalizeLastName.js";
 
 interface LegislatorTerm {
   type: "rep" | "sen";
@@ -25,32 +26,45 @@ async function main() {
   const legislators = loadYaml(await res.text()) as Legislator[];
 
   const upsert = sql.query.bind(sql);
-  let count = 0;
+  let houseCount = 0;
+  let senateCount = 0;
 
   for (const legislator of legislators) {
     const currentTerm = legislator.terms.at(-1);
-    if (!currentTerm || currentTerm.type !== "rep") continue; // senators / no longer serving
+    if (!currentTerm) continue; // no longer serving
 
-    const district = currentTerm.district ?? 0;
-    const stateDistrict = `${currentTerm.state}${String(district).padStart(2, "0")}`;
     const bioguideId = legislator.id.bioguide;
     const officialName = legislator.name.official_full ?? `${legislator.name.first} ${legislator.name.last}`;
 
+    let key: string;
+    if (currentTerm.type === "rep") {
+      const district = currentTerm.district ?? 0;
+      key = `${currentTerm.state}${String(district).padStart(2, "0")}`;
+      houseCount++;
+    } else if (currentTerm.type === "sen") {
+      // Senate filings carry no district/state field the way House ones do,
+      // so senators are matched by last name instead — see normalizeLastName.ts.
+      key = senateMemberKey(legislator.name.last);
+      senateCount++;
+    } else {
+      continue;
+    }
+
     await upsert(
-      `INSERT INTO members_reference (state_district, bioguide_id, official_name, party, photo_url, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
+      `INSERT INTO members_reference (state_district, bioguide_id, official_name, party, photo_url, state, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
        ON CONFLICT (state_district) DO UPDATE SET
          bioguide_id = EXCLUDED.bioguide_id,
          official_name = EXCLUDED.official_name,
          party = EXCLUDED.party,
          photo_url = EXCLUDED.photo_url,
+         state = EXCLUDED.state,
          updated_at = NOW()`,
-      [stateDistrict, bioguideId, officialName, currentTerm.party ?? null, MEMBERS_REFERENCE.photoUrl(bioguideId)]
+      [key, bioguideId, officialName, currentTerm.party ?? null, MEMBERS_REFERENCE.photoUrl(bioguideId), currentTerm.state]
     );
-    count++;
   }
 
-  console.log(`Synced ${count} current House members (by state+district).`);
+  console.log(`Synced ${houseCount} current House members (by state+district) and ${senateCount} current Senators (by last name).`);
 }
 
 main().catch((err) => {

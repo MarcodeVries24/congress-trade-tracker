@@ -41,6 +41,16 @@ function formatTimeWithZone(iso: string | null): string | null {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
+// House's state_district ("MO04") is real and display-ready. Senate rows key
+// members_reference by a synthetic "SEN:lastname" (Senate filings carry no
+// district/state field) — not fit to show, so those use the joined state
+// column from members_reference instead. Falls back to state_district if the
+// state lookup hasn't matched (see README's Senate name-matching note).
+function memberLocation(trade: Trade): string | null {
+  if (trade.chamber === "senate") return trade.member_state ?? trade.state_district;
+  return trade.state_district;
+}
+
 const compactUSD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -165,6 +175,7 @@ const inputClass =
   "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
 
 export default function Home() {
+  const [chamber, setChamber] = useState<"house" | "senate" | "both">("house");
   const [q, setQ] = useState("");
   const [member, setMember] = useState("");
   const [ticker, setTicker] = useState("");
@@ -192,6 +203,7 @@ export default function Home() {
 
   const filters: TradeFilters = useMemo(
     () => ({
+      chamber: chamber === "both" ? ["house", "senate"] : [chamber],
       q: debouncedQ || undefined,
       member: debouncedMember || undefined,
       ticker: debouncedTicker || undefined,
@@ -208,6 +220,7 @@ export default function Home() {
       limit: pageSize,
     }),
     [
+      chamber,
       debouncedQ,
       debouncedMember,
       debouncedTicker,
@@ -227,7 +240,7 @@ export default function Home() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
+  }, [chamber, debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -249,10 +262,10 @@ export default function Home() {
   }, [filters]);
 
   useEffect(() => {
-    fetchStats()
+    fetchStats(chamber === "both" ? ["house", "senate"] : [chamber])
       .then(setStats)
       .catch(() => {});
-  }, []);
+  }, [chamber]);
 
   function toggleSort(key: string) {
     if (sort === key) {
@@ -305,19 +318,48 @@ export default function Home() {
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-4 rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Every disclosed House stock trade, searchable</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
+            Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} stock trade, searchable
+          </h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
             Built directly from Periodic Transaction Reports filed with the{" "}
-            <a
-              href="https://disclosures-clerk.house.gov/FinancialDisclosure"
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-            >
-              Office of the Clerk
-            </a>{" "}
-            — no third-party API in between. Refreshed automatically every 4 hours. Senate coverage isn&apos;t available yet.
+            {chamber !== "senate" && (
+              <a
+                href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+              >
+                House Clerk
+              </a>
+            )}
+            {chamber === "both" && " and the "}
+            {chamber !== "house" && (
+              <a
+                href="https://efdsearch.senate.gov/search/home/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+              >
+                Senate eFD
+              </a>
+            )}{" "}
+            — no third-party API in between. Refreshed automatically every 4 hours.
           </p>
+        </div>
+
+        <div className="mb-4 inline-flex rounded-lg border border-line bg-panel p-1 sm:mb-6">
+          {(["house", "senate", "both"] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setChamber(c)}
+              className={`rounded-md px-4 py-1.5 text-sm capitalize transition-colors ${
+                chamber === c ? "bg-accent/15 text-accent" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
         </div>
 
         {stats && (
@@ -531,7 +573,7 @@ export default function Home() {
                             >
                               {displayName(trade.member_name)}
                             </button>
-                            {trade.state_district && <div className="text-xs text-ink-faint">{trade.state_district}</div>}
+                            {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
                           </div>
                         </div>
                       </td>
@@ -580,7 +622,7 @@ export default function Home() {
                           rel="noreferrer"
                           className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
                         >
-                          PTR PDF
+                          {trade.chamber === "senate" ? "View Report" : "PTR PDF"}
                         </a>
                       </td>
                     </tr>
@@ -610,7 +652,7 @@ export default function Home() {
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div>
                         <div className="font-medium">{displayName(trade.member_name)}</div>
-                        {trade.state_district && <div className="text-xs text-ink-faint">{trade.state_district}</div>}
+                        {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
                       </div>
                     </button>
                     <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
@@ -658,7 +700,7 @@ export default function Home() {
                     rel="noreferrer"
                     className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
                   >
-                    View PTR PDF
+                    {trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
                   </a>
                 </div>
               );

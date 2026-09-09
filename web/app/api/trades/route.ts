@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, mr.photo_url, mr.party,
+      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, mr.photo_url, mr.party, mr.state AS member_state,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id

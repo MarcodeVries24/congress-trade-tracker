@@ -1,43 +1,62 @@
 # Congress Trade Tracker
 
-A searchable database of U.S. House stock trades, built directly from the
-government's own disclosure filings — no third-party API in between, and
-fully cloud-hosted (works even when your own machine is off).
+A searchable database of U.S. House and Senate stock trades, built directly
+from the government's own disclosure filings — no third-party API in
+between, and fully cloud-hosted (works even when your own machine is off).
 
 ## How it works
 
 Members of Congress must disclose stock trades within 45 days via a
-**Periodic Transaction Report (PTR)**, filed as a PDF with the Office of the
-Clerk. This project:
+**Periodic Transaction Report (PTR)**.
+
+**House** — filed as a PDF with the Office of the Clerk:
 
 1. Downloads the Clerk's public yearly index (`disclosures-clerk.house.gov/public_disc/financial-pdfs/{year}FD.zip`),
    which lists every filing and its `DocID`.
 2. Downloads each PTR PDF (`.../ptr-pdfs/{year}/{DocID}.pdf`) and extracts the
    transaction table (asset, ticker, buy/sell, dates, amount range) with a
    regex-based parser tuned to the Clerk's PDF layout.
+
+**Senate** — filed as an HTML report with the Office of Public Records:
+
+1. `efdsearch.senate.gov` blocks plain HTTP requests at the network edge
+   (Akamai), even with a real browser user-agent — the same wall that ended
+   the original Senate Stock Watcher project — and also blocks Playwright's
+   *bundled* Chromium build specifically. Getting past it needs Playwright
+   driving a real, separately-installed Chrome build (`channel: "chrome"`),
+   which is what [`ingest/src/ingest/senate/browser.ts`](ingest/src/ingest/senate/browser.ts)
+   does.
+2. That browser accepts the site's access agreement, paginates the
+   DataTables-based PTR search results, and opens each report.
+3. Electronic reports are parsed directly from their HTML transaction table;
+   older paper/scanned filings have no such table and are stored with
+   `parse_status = 'unsupported'` rather than guessed at.
+4. Senate filings carry no district-style key, so senators are matched to
+   `members_reference` by a synthetic `SEN:{normalizedlastname}` key instead
+   of the real `state_district` join House uses — see
+   [`normalizeLastName.ts`](ingest/src/ingest/normalizeLastName.ts).
+
+Both chambers share the rest of the pipeline:
+
 3. Stores everything in a Postgres database (hosted on [Neon](https://neon.tech)).
 4. A Next.js site (hosted on [Vercel](https://vercel.com)) serves the search UI
-   and the REST API (as Next.js API routes) straight off that database.
-5. A scheduled GitHub Actions workflow re-runs the ingest every 4 hours, so
+   and the REST API (as Next.js API routes) straight off that database, with
+   a House / Senate / Both toggle (defaults to House).
+5. A scheduled GitHub Actions workflow re-runs both ingests every 4 hours, so
    the dataset stays current with nothing needing to run on your own machine.
-6. Separately, each House seat's official photo and party are synced from the
+6. Separately, each member's official photo and party are synced from the
    public [unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators)
-   dataset into a `members_reference` table, joined by `state_district` — no
-   name-matching involved, since that field is already shared with filings.
-   Photos are hotlinked from `congress.gov`'s own CDN.
-
-**Senate coverage is intentionally not implemented.** `efdsearch.senate.gov`
-blocks plain HTTP requests at the network edge (Akamai), even with a real
-browser user-agent — the same wall that ended the original Senate Stock
-Watcher project. Getting past it needs a full headless-browser scraper
-(Playwright), which is a separate, heavier piece of work.
+   dataset into a `members_reference` table — House by `state_district`,
+   Senate by the synthetic last-name key above. Photos are hotlinked from
+   `congress.gov`'s own CDN.
 
 ### Known data-quality limits
 
-- A small number of filings (older, paper-filed PTRs, e.g. `DocID`s under
-  ~10,000,000) are scanned images with no extractable text. These are stored
-  with `parse_status = 'empty'` rather than silently dropped — OCR would be
-  needed to recover them.
+- A small number of House filings (older, paper-filed PTRs, e.g. `DocID`s
+  under ~10,000,000) are scanned images with no extractable text. These are
+  stored with `parse_status = 'empty'` rather than silently dropped — OCR
+  would be needed to recover them. Senate paper/scanned filings are likewise
+  stored as `parse_status = 'unsupported'`.
 - The parser is regex-based and tuned against real filings, but PTR PDFs
   aren't perfectly uniform. Any transaction line it can't confidently match to
   an asset name is logged to the `parse_issues` table instead of guessed at.
@@ -48,6 +67,10 @@ Watcher project. Getting past it needs a full headless-browser scraper
   excluded from the site and from `/api/stats` by default, since displaying
   a data-entry error as a real trade would be misleading; the raw row stays
   in the database untouched.
+- A small number of senators (2 of 100, at time of writing) don't have a
+  matching entry in the upstream `congress-legislators` dataset used for
+  photos/party, so they fall back to an initials avatar — a data-quality gap
+  in that upstream source, not in the matching logic.
 
 ## Project layout
 
@@ -72,9 +95,12 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
 1. In the GitHub repo's **Settings → Secrets and variables → Actions**, add a
    secret named `DATABASE_URL` with the Neon connection string.
 2. That's it — [.github/workflows/ingest.yml](.github/workflows/ingest.yml)
-   runs `npm run sync-members` then `npm run ingest` every 4 hours
-   (`0 */4 * * *`), and can also be triggered manually from the Actions tab
-   (**Run workflow**).
+   runs `npm run sync-members`, then `npm run ingest` (House), then
+   `npm run ingest-senate` (Senate) every 4 hours (`17 */4 * * *`), and can
+   also be triggered manually from the Actions tab (**Run workflow**). The
+   Senate step needs a real Chrome build on the runner (Playwright's bundled
+   Chromium gets blocked), so the workflow provisions one first via
+   `npx playwright install --with-deps chrome`.
 
 ### 3. Website + API — Vercel
 
@@ -94,15 +120,26 @@ npm install
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
 
 ```bash
-npm run dev            # Next.js site + API at http://localhost:3000
-npm run ingest         # run the PTR ingestion CLI once
-npm run sync-members   # refresh member photos/party (~440 rows, cheap)
+npm run dev             # Next.js site + API at http://localhost:3000
+npm run ingest          # run the House PTR ingestion CLI once
+npm run ingest-senate   # run the Senate PTR ingestion CLI once (needs Chrome installed)
+npm run sync-members    # refresh member photos/party (House + Senate, cheap)
 ```
 
-Ingest options:
+House ingest options:
 - `--year=YYYY` (defaults to current year)
 - `--limit=N` — only process the first N not-yet-ingested filings (useful for testing)
 - `--force` — re-parse and overwrite filings already in the database
+
+Senate ingest options:
+- `--start=MM/DD/YYYY` (defaults to January 1st of the current year)
+- `--limit=N` — only process the first N not-yet-ingested filings
+- `--force` — re-parse and overwrite filings already in the database
+
+The Senate scraper drives a real Chrome install via Playwright's `channel:
+"chrome"` (its own bundled Chromium is blocked by the site's bot protection),
+so it needs actual Chrome present — already the case on a normal dev machine,
+or provisioned in CI via `npx playwright install --with-deps chrome`.
 
 Downloaded ZIPs/PDFs are cached under `ingest/data/` between runs (a 250ms
 delay is added between PDF downloads, out of politeness to the Clerk's
@@ -113,6 +150,5 @@ database) does, which is what actually matters.
 
 ## Possible next steps
 
-- Senate coverage via a Playwright-based scraper of `efdsearch.senate.gov`
-- OCR fallback for scanned/paper PTRs
+- OCR fallback for scanned/paper PTRs (both chambers)
 - Price-performance metrics (fetch a market price at transaction time vs. now)

@@ -426,6 +426,7 @@ export default function Home() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Select
+                aria-label="Chamber"
                 value={chamber}
                 onChange={(e) => setChamber(e.target.value as "house" | "senate" | "both")}
                 active={chamber !== "both"}

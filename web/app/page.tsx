@@ -428,6 +428,7 @@ export default function Home() {
               <Select
                 value={chamber}
                 onChange={(e) => setChamber(e.target.value as "house" | "senate" | "both")}
+                active={chamber !== "both"}
                 className="w-full sm:w-auto"
               >
                 <option value="both">House &amp; Senate</option>

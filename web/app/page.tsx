@@ -175,7 +175,7 @@ const inputClass =
   "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
 
 export default function Home() {
-  const [chamber, setChamber] = useState<"house" | "senate" | "both">("house");
+  const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
   const [q, setQ] = useState("");
   const [member, setMember] = useState("");
   const [ticker, setTicker] = useState("");
@@ -292,9 +292,12 @@ export default function Home() {
   }
 
   const activeFilterCount =
-    [type, owner, assetType, dateFrom, dateTo, member, filedStatus].filter(Boolean).length + amountRanges.length;
+    [type, owner, assetType, dateFrom, dateTo, member, filedStatus].filter(Boolean).length +
+    amountRanges.length +
+    (chamber !== "both" ? 1 : 0);
 
   function clearFilters() {
+    setChamber("both");
     setMember("");
     setType("");
     setOwner("");
@@ -346,20 +349,6 @@ export default function Home() {
             )}{" "}
             — no third-party API in between. Refreshed automatically every 4 hours.
           </p>
-        </div>
-
-        <div className="mb-4 inline-flex rounded-lg border border-line bg-panel p-1 sm:mb-6">
-          {(["house", "senate", "both"] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setChamber(c)}
-              className={`rounded-md px-4 py-1.5 text-sm capitalize transition-colors ${
-                chamber === c ? "bg-accent/15 text-accent" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
         </div>
 
         {stats && (
@@ -436,6 +425,15 @@ export default function Home() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={chamber}
+                onChange={(e) => setChamber(e.target.value as "house" | "senate" | "both")}
+                className="w-full sm:w-auto"
+              >
+                <option value="both">House &amp; Senate</option>
+                <option value="house">House only</option>
+                <option value="senate">Senate only</option>
+              </Select>
               <Select value={type} onChange={(e) => setType(e.target.value)} className="w-full sm:w-auto">
                 <option value="">All types</option>
                 <option value="P">Purchase</option>

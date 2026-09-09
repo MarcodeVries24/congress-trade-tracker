@@ -8,6 +8,9 @@ dist/
 ingest/data/raw/*
 ingest/data/pdfs/*
 
+# tesseract.js downloads its OCR language model here on first run
+*.traineddata
+
 !ingest/data/raw/.gitkeep
 !ingest/data/pdfs/.gitkeep
 

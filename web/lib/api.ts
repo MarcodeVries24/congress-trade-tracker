@@ -20,6 +20,7 @@ export interface Trade {
   party: string | null;
   chamber: "house" | "senate";
   member_state: string | null;
+  parse_status: string;
 }
 
 export interface TradesResponse {

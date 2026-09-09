@@ -28,9 +28,18 @@ Members of Congress must disclose stock trades within 45 days via a
    does.
 2. That browser accepts the site's access agreement, paginates the
    DataTables-based PTR search results, and opens each report.
-3. Electronic reports are parsed directly from their HTML transaction table;
-   older paper/scanned filings have no such table and are stored with
-   `parse_status = 'unsupported'` rather than guessed at.
+3. Electronic reports are parsed directly from their HTML transaction table.
+   Paper/scanned filings have no such table — [`ocrPaperReport.ts`](ingest/src/ingest/senate/ocrPaperReport.ts)
+   instead OCRs the scanned page images (Tesseract.js) and reconstructs the
+   transaction grid by classifying each checkbox "X" mark against the known
+   column positions of the standard Senate PTR schedule. Filings that don't
+   match that template (an older layout with a different, wider set of
+   dollar brackets was in use through at least 2024) are declined rather
+   than risk misreading a mismatched grid, and stay `parse_status =
+   'unsupported'`. Rows recovered this way are stored as `parse_status =
+   'ocr'` — a genuinely less certain read than text-native extraction, and
+   flagged as such everywhere they appear in the UI (an "OCR" badge, linking
+   to the original scan) rather than presented with the same confidence.
 4. Senate filings carry no district-style key, so senators are matched to
    `members_reference` by a synthetic `SEN:{normalizedlastname}` key instead
    of the real `state_district` join House uses — see
@@ -53,10 +62,16 @@ Both chambers share the rest of the pipeline:
 ### Known data-quality limits
 
 - A small number of House filings (older, paper-filed PTRs, e.g. `DocID`s
-  under ~10,000,000) are scanned images with no extractable text. These are
-  stored with `parse_status = 'empty'` rather than silently dropped — OCR
-  would be needed to recover them. Senate paper/scanned filings are likewise
-  stored as `parse_status = 'unsupported'`.
+  under ~10,000,000) are scanned images with no extractable text, stored with
+  `parse_status = 'empty'` rather than silently dropped — House paper filings
+  aren't OCR'd (unlike Senate's, below).
+- Senate paper filings using the current form template are OCR'd
+  (`parse_status = 'ocr'`); ones using the older, pre-2025-ish template are
+  declined (`parse_status = 'unsupported'`) rather than extracted against a
+  layout the parser wasn't calibrated for. OCR'd amounts/types/dates come
+  from classifying checkbox marks by pixel position, not reading text, so
+  it's inherently less certain than every other data source in this
+  project — verify anything load-bearing against the linked scan.
 - The parser is regex-based and tuned against real filings, but PTR PDFs
   aren't perfectly uniform. Any transaction line it can't confidently match to
   an asset name is logged to the `parse_issues` table instead of guessed at.
@@ -150,5 +165,7 @@ database) does, which is what actually matters.
 
 ## Possible next steps
 
-- OCR fallback for scanned/paper PTRs (both chambers)
+- OCR fallback for House's own scanned/paper PTRs (Senate's are covered)
+- Adaptive per-filing column calibration for Senate's older paper-form
+  template, so those filings stop being declined
 - Price-performance metrics (fetch a market price at transaction time vs. now)

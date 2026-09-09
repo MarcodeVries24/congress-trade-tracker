@@ -578,7 +578,10 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>{trade.asset_name}</div>
+                        <div className="flex items-center gap-1.5">
+                          {trade.asset_name}
+                          {trade.parse_status === "ocr" && <OcrBadge />}
+                        </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                           {trade.ticker && (
                             <button
@@ -622,7 +625,7 @@ export default function Home() {
                           rel="noreferrer"
                           className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
                         >
-                          {trade.chamber === "senate" ? "View Report" : "PTR PDF"}
+                          {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "PTR PDF"}
                         </a>
                       </td>
                     </tr>
@@ -660,7 +663,10 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="mt-3 text-sm">{trade.asset_name}</div>
+                  <div className="mt-3 flex items-center gap-1.5 text-sm">
+                    {trade.asset_name}
+                    {trade.parse_status === "ocr" && <OcrBadge />}
+                  </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                     {trade.ticker && (
                       <button onClick={() => setTicker(trade.ticker as string)} className="font-mono hover:text-ink hover:underline">
@@ -700,7 +706,7 @@ export default function Home() {
                     rel="noreferrer"
                     className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
                   >
-                    {trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
+                    {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
                   </a>
                 </div>
               );
@@ -744,6 +750,21 @@ export default function Home() {
         )}
       </main>
     </>
+  );
+}
+
+// Marks a trade extracted via OCR from a scanned paper filing (Senate only,
+// currently) — meaningfully less certain than trades read directly from
+// text, since OCR can misread a checkbox column or a digit. Shown next to
+// the asset name so it travels with the row wherever it's displayed.
+function OcrBadge() {
+  return (
+    <span
+      title="Extracted via OCR from a scanned paper filing — verify against the original scan before relying on exact figures."
+      className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400"
+    >
+      OCR
+    </span>
   );
 }
 

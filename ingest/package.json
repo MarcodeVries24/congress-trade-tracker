@@ -14,7 +14,9 @@
     "adm-zip": "^0.5.16",
     "js-yaml": "^5.4.1",
     "pdf-parse": "^2.1.1",
-    "playwright": "^1.63.0"
+    "playwright": "^1.63.0",
+    "sharp": "^0.35.4",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

@@ -432,7 +432,7 @@ export default function Home() {
                 active={chamber !== "both"}
                 className="w-full sm:w-auto"
               >
-                <option value="both">Chamber</option>
+                <option value="both">Any chamber</option>
                 <option value="house">House only</option>
                 <option value="senate">Senate only</option>
               </Select>

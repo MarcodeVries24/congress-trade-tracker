@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 // A transaction dated after its own filing date is impossible (a source
@@ -9,30 +9,44 @@ const VALID_DATE_ORDER = `(
   OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0
 )`;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Defaults to House-only, same reasoning as /api/trades.
+  const chambersParam = req.nextUrl.searchParams.getAll("chamber");
+  const chambers = chambersParam.length ? chambersParam : ["house"];
+  const placeholders = chambers.map((_, i) => `$${i + 1}`).join(", ");
+  const chamberFilter = `f.chamber IN (${placeholders})`;
+
   const [totals, filings, members, volume, topTickers, lastIngested, failedFilings, lastCheckedRun] = (await Promise.all([
     sql.query(
       `SELECT COUNT(*)::int as transactions
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER}`
+       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter}`,
+      chambers
     ),
-    sql.query(`SELECT COUNT(*)::int as filings FROM filings`),
-    sql.query(`SELECT COUNT(DISTINCT member_name)::int as members FROM transactions`),
+    sql.query(`SELECT COUNT(*)::int as filings FROM filings f WHERE ${chamberFilter}`, chambers),
+    sql.query(
+      `SELECT COUNT(DISTINCT t.member_name)::int as members
+       FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE ${chamberFilter}`,
+      chambers
+    ),
     // Amount is disclosed as a range, not an exact figure — this is the sum of
     // range midpoints, i.e. a rough estimate, not a precise trading volume.
     sql.query(
       `SELECT SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)::float8 as volume
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER}`
+       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter}`,
+      chambers
     ),
     sql.query(
       `SELECT t.ticker, COUNT(*)::int as count
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER}
-       GROUP BY t.ticker ORDER BY count DESC LIMIT 10`
+       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER} AND ${chamberFilter}
+       GROUP BY t.ticker ORDER BY count DESC LIMIT 10`,
+      chambers
     ),
-    sql.query(`SELECT MAX(ingested_at) as last FROM filings`),
-    sql.query(`SELECT COUNT(*)::int as count FROM filings WHERE parse_status = 'failed'`),
+    sql.query(`SELECT MAX(ingested_at) as last FROM filings f WHERE ${chamberFilter}`, chambers),
+    sql.query(`SELECT COUNT(*)::int as count FROM filings f WHERE parse_status = 'failed' AND ${chamberFilter}`, chambers),
     // Heartbeat: written at the end of every scheduled run, whether or not
     // it found anything new — proves the pipeline is alive even on a quiet
     // check, unlike lastIngestedAt which only moves on actual new data.

@@ -22,6 +22,11 @@ export async function GET(req: NextRequest) {
   const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
   const assetType = sp.get("assetType") ?? undefined;
   const amountRanges = sp.getAll("amountRanges");
+  // Defaults to House-only. Pass chamber=house&chamber=senate (repeated) to
+  // include both once Senate coverage exists — never implicit/all-by-default,
+  // so this stays safe even before Senate data is fully wired into the UI.
+  const chambers = sp.getAll("chamber");
+  const chamberFilter = chambers.length ? chambers : ["house"];
   const filedStatus = sp.get("filedStatus") ?? undefined; // "late" | "onTime" | undefined
   const dateFrom = sp.get("dateFrom") ?? undefined;
   const dateTo = sp.get("dateTo") ?? undefined;
@@ -47,6 +52,10 @@ export async function GET(req: NextRequest) {
     `((NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
       OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0)`
   );
+  {
+    const placeholders = chamberFilter.map((c) => addParam(c));
+    conditions.push(`f.chamber IN (${placeholders.join(", ")})`);
+  }
 
   if (q) conditions.push(`(t.member_name ILIKE ${addParam(`%${q}%`)} OR t.asset_name ILIKE ${addParam(`%${q}%`)} OR t.ticker ILIKE ${addParam(`%${q}%`)})`);
   if (member) conditions.push(`t.member_name ILIKE ${addParam(`%${member}%`)}`);
@@ -77,7 +86,7 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url, mr.photo_url, mr.party,
+      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, mr.photo_url, mr.party,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id

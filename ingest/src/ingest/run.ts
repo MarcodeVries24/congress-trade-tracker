@@ -1,8 +1,9 @@
 import "../loadEnv.js";
 import { sql, ensureSchema } from "../db/index.js";
 import { fetchYearIndex } from "./fetchIndex.js";
-import { getPtrPdfText } from "./pdfText.js";
+import { getPtrPdfBuffer, getPdfText } from "./pdfText.js";
 import { parsePtrText } from "./parsePtr.js";
+import { ocrHousePtr } from "./ocrHousePtr.js";
 import { HOUSE_CLERK } from "../config.js";
 
 const args = process.argv.slice(2);
@@ -40,14 +41,44 @@ async function main() {
 
   let totalTransactions = 0;
   let failed = 0;
+  let ocrCount = 0;
 
   for (let i = 0; i < capped.length; i++) {
     const filing = capped[i];
     const pdfUrl = HOUSE_CLERK.ptrPdfUrl(filing.year, filing.docId);
 
     try {
-      const text = await getPtrPdfText(filing.year, filing.docId);
-      const { transactions, issues } = parsePtrText(text, filing.docId);
+      const buffer = await getPtrPdfBuffer(filing.year, filing.docId);
+      const text = await getPdfText(buffer);
+      let { transactions, issues } = parsePtrText(text, filing.docId);
+      let parseStatus = transactions.length > 0 ? "ok" : "empty";
+      const issueRows: { rawText: string; reason: string }[] = issues.map((issue) => ({
+        rawText: issue,
+        reason: "asset-name-not-found",
+      }));
+
+      // No extractable text at all (a scanned paper filing) — fall back to
+      // OCR, the same last resort already used for Senate's paper filings.
+      // Meaningfully less certain than text-native extraction (see
+      // ocrHousePtr.ts), so results land under a distinct 'ocr' status and
+      // every field OCR couldn't confidently resolve is logged rather than
+      // guessed at.
+      if (transactions.length === 0) {
+        const ocrResult = await ocrHousePtr(buffer);
+        if (ocrResult) {
+          for (const issue of ocrResult.issues) {
+            issueRows.push({
+              rawText: `[p${issue.page} row ${issue.row}]${issue.context ? ` ${issue.context}` : ""}: ${issue.reason}`,
+              reason: `ocr-${issue.field}`,
+            });
+          }
+          if (ocrResult.transactions.length > 0) {
+            transactions = ocrResult.transactions;
+            parseStatus = "ocr";
+            ocrCount++;
+          }
+        }
+      }
 
       await sql.transaction((tx) => {
         const queries = [
@@ -66,7 +97,7 @@ async function main() {
               filing.filingDate,
               filing.year,
               pdfUrl,
-              transactions.length > 0 ? "ok" : "empty",
+              parseStatus,
               transactions.length,
             ]
           ),
@@ -94,11 +125,11 @@ async function main() {
               ]
             )
           ),
-          ...issues.map((issue) =>
+          ...issueRows.map((issue) =>
             tx.query(`INSERT INTO parse_issues (doc_id, raw_text, reason) VALUES ($1, $2, $3)`, [
               filing.docId,
-              issue,
-              "asset-name-not-found",
+              issue.rawText,
+              issue.reason,
             ])
           ),
         ];
@@ -106,7 +137,9 @@ async function main() {
       });
 
       totalTransactions += transactions.length;
-      console.log(`  [${i + 1}/${capped.length}] ${filing.memberName} (${filing.docId}): ${transactions.length} transactions`);
+      console.log(
+        `  [${i + 1}/${capped.length}] ${filing.memberName} (${filing.docId}): ${transactions.length} transactions${parseStatus === "ocr" ? " [OCR]" : ""}`
+      );
     } catch (err) {
       failed++;
       console.error(`  [${i + 1}/${capped.length}] FAILED ${filing.docId} (${filing.memberName}):`, (err as Error).message);
@@ -122,7 +155,9 @@ async function main() {
     await new Promise((r) => setTimeout(r, 250));
   }
 
-  console.log(`\nDone. Processed ${capped.length} filings, ${totalTransactions} transactions extracted, ${failed} failed.`);
+  console.log(
+    `\nDone. Processed ${capped.length} filings, ${totalTransactions} transactions extracted (${ocrCount} filings via OCR), ${failed} failed.`
+  );
 
   // Runs unconditionally, including on a "nothing new" run — this is the
   // signal that the scheduled job is alive, separate from filings.ingested_at

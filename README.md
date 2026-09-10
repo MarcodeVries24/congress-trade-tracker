@@ -63,25 +63,40 @@ Both chambers share the rest of the pipeline:
 
 - A meaningful share of House filings — hand-delivered paper forms, mostly,
   not correlated with any particular `DocID`/year range — are scanned images
-  with no extractable text, stored with `parse_status = 'empty'` rather than
-  silently dropped. House paper filings aren't OCR'd yet (unlike Senate's,
-  below): a first attempt found Tesseract's default OCR struggles badly with
-  this form's dense checkbox grid (word segmentation merges adjacent
-  checkboxes into unreadable blobs, and even the plain date text nearby gets
-  garbled) — it needs a more careful multi-pass approach (isolating text
-  columns from the checkbox grid before OCR'ing each separately) than a
-  straightforward port of Senate's approach, so it's a scoped follow-up
-  rather than shipped half-working. A distinct, already-fixed bug is the
-  newer digitally-typeset House PDF template rendering its checkbox/radio
-  widgets through an icon font whose glyphs corrupt the *text* extraction of
-  the whole line they're on — see `stripCheckboxGlyphs` in `parsePtr.ts`.
+  with no extractable text. A first OCR attempt was abandoned (Tesseract's
+  default segmentation garbled even clear text on this form's dense checkbox
+  grid); [`ocrHousePtr.ts`](ingest/src/ingest/ocrHousePtr.ts) is a second,
+  working attempt — row/column gridlines are found from the scan's own pixel
+  darkness (not OCR), each field is OCR'd as its own tightly-cropped cell,
+  and checkbox marks (Type of Transaction, Amount) are read by ink density,
+  cross-checked at two different crop insets against each other rather than
+  a single fixed threshold, since a bold printed checkmark and a faint
+  handwritten "X" need different treatment to isolate the mark from the
+  cell's own border. A scanned page fed in sideways is auto-detected and
+  corrected (checked at all four rotations, disambiguated by OCRing the
+  form's own header text where the grid shape alone is ambiguous). Recovered
+  filings land as `parse_status = 'ocr'`; a backfill across all pre-existing
+  empty House filings (2022-2026) recovered 199 of 381 (4,345 transactions) —
+  the remaining 182 are genuinely illegible scans, declined rather than
+  guessed. Whatever OCR can't confidently resolve on a row it does recover
+  (a checkbox mark, a date, the owner code) is logged to `parse_issues`
+  rather than guessed at, same policy as the text parser below; a filing's
+  own scan is always one click away via the "i" badge for anything that
+  looks off. A distinct, already-fixed bug is the newer digitally-typeset
+  House PDF template rendering its checkbox/radio widgets through an icon
+  font whose glyphs corrupt the *text* extraction of the whole line they're
+  on — see `stripCheckboxGlyphs` in `parsePtr.ts`.
 - Senate paper filings using the current form template are OCR'd
   (`parse_status = 'ocr'`); ones using the older, pre-2025-ish template are
   declined (`parse_status = 'unsupported'`) rather than extracted against a
   layout the parser wasn't calibrated for. OCR'd amounts/types/dates come
   from classifying checkbox marks by pixel position, not reading text, so
   it's inherently less certain than every other data source in this
-  project — verify anything load-bearing against the linked scan.
+  project — verify anything load-bearing against the linked scan. (House's
+  OCR, above, follows the same per-cell approach but was built and
+  calibrated separately, since the two chambers' paper forms differ enough
+  — column counts, checkbox style, scan quality — that a shared
+  implementation wasn't a good fit.)
 - The parser is regex-based and tuned against real filings, but PTR PDFs
   aren't perfectly uniform. Any transaction line it can't confidently match to
   an asset name is logged to the `parse_issues` table instead of guessed at.
@@ -175,10 +190,6 @@ database) does, which is what actually matters.
 
 ## Possible next steps
 
-- OCR for House's own scanned/paper PTRs — needs a multi-pass approach
-  (isolate text columns from the checkbox grid, OCR each separately) rather
-  than a direct port of Senate's single-pass technique; see the data-quality
-  note above
 - Adaptive per-filing column calibration for Senate's older paper-form
   template, so those filings stop being declined
 - Price-performance metrics (fetch a market price at transaction time vs. now)

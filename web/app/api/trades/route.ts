@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
 import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
+import { hasFeatureServer } from "@/lib/access";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
 const SORT_EXPRESSIONS: Record<string, string> = {
@@ -27,8 +27,7 @@ export async function GET(req: NextRequest) {
   // caller's gated params are silently dropped (falls back to the same
   // default view the free UI already shows) rather than erroring the whole
   // request, since q/chamber/assetTypes are legitimately still free to mix in.
-  const { has } = await auth();
-  const canUseFilters = has({ feature: "filters" });
+  const canUseFilters = await hasFeatureServer("filters");
 
   const q = sp.get("q") ?? undefined;
   const members = canUseFilters ? sp.getAll("members") : [];

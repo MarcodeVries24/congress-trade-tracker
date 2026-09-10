@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
@@ -196,13 +196,19 @@ const inputClass =
 export default function Home() {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
+  const { user } = useUser();
   const { openSignUp } = useClerk();
+  // Comp access via public metadata ({"admin": true}, set in the Clerk
+  // dashboard or Backend API) — lets a specific account use paid features
+  // without an actual subscription. Mirrors the server-side check in
+  // lib/access.ts; this one's UI-only, not the security boundary.
+  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
   // Defaults to "unlocked" while Clerk is still loading (usually well under
   // a second) rather than flashing every visitor's filters as locked first —
   // this is a UX nicety only, not the security boundary. The actual
   // enforcement is server-side in /api/trades, which never trusts the
   // client's plan state.
-  const filtersLocked = authLoaded && !has({ feature: "filters" });
+  const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
   function promptUpgrade() {
     if (isSignedIn) router.push("/upgrade");
     else openSignUp({ redirectUrl: "/upgrade" });

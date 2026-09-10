@@ -35,8 +35,11 @@ function Logo({ size = 28 }: { size?: number }) {
 export function Header() {
   return (
     <header className="border-b border-line">
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto flex max-w-7xl items-start justify-between px-4 py-3 sm:px-6">
+        {/* flex-wrap lets the tagline ride next to the wordmark whenever
+            there's room, and only fall to its own line once the row
+            actually can't fit it — no breakpoint guessing. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <div className="flex items-center gap-3">
             <div className="text-ink">
               <Logo />
@@ -45,18 +48,13 @@ export function Header() {
               <span className="text-ink">Cong</span>
               <span className="text-accent">Trade</span>
             </span>
-            <span className="hidden items-center gap-3 border-l border-line pl-3 md:flex">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">Track Congress trades</span>
-            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-          </div>
+          <span className="flex items-center gap-3 whitespace-nowrap border-l border-line pl-3">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">Track Congress trades</span>
+          </span>
         </div>
-        {/* Same tagline, on its own line under the wordmark — the inline
-            divider version above only fits once the row has room to spare. */}
-        <div className="pl-10 pt-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-faint md:hidden">
-          Track Congress trades
+        <div className="flex items-center gap-2 py-0.5">
+          <ThemeToggle />
         </div>
       </div>
     </header>

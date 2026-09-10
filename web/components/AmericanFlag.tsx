@@ -9,7 +9,10 @@ const STAR_POINTS = "0,-2.6 0.62,-0.85 2.47,-0.8 1,0.33 1.53,2.1 0,1.05 -1.53,2.
 // vector, not a hotlinked photo, so it can't break and stays crisp at any
 // size. The gentle ripple (feTurbulence + feDisplacementMap) is clipped to
 // this SVG's own viewBox, and the parent banner also carries
-// overflow-hidden, so the waving edges never spill past the box.
+// overflow-hidden, so the waving edges never spill past the box. The
+// stripes/base/canton are drawn past the 0..300 x 0..160 viewBox edges (by
+// more than the displacement's max offset) so the ripple never pulls fabric
+// away from a box edge and exposes a gap — it always has more flag to pull from.
 export function AmericanFlag({ className = "", style }: { className?: string; style?: CSSProperties }) {
   const starRows: { cy: number; cols: number[] }[] = [
     { cy: 9, cols: [12, 32, 52, 72, 92, 112] },
@@ -32,13 +35,13 @@ export function AmericanFlag({ className = "", style }: { className?: string; st
         <polygon id="flag-star" points={STAR_POINTS} fill="#FFFFFF" />
       </defs>
       <g filter="url(#flag-wave)">
-        <rect x="0" y="0" width="300" height="160" fill="#B22234" />
+        <rect x="-24" y="-24" width="348" height="208" fill="#B22234" />
         <g fill="#FFFFFF">
           {[12.3, 36.9, 61.5, 86.1, 110.7, 135.3].map((y) => (
-            <rect key={y} x="0" y={y} width="300" height="12.3" />
+            <rect key={y} x="-24" y={y} width="348" height="12.3" />
           ))}
         </g>
-        <rect x="0" y="0" width="120" height="86" fill="#3C3B6E" />
+        <rect x="-24" y="-24" width="144" height="110" fill="#3C3B6E" />
         {starRows.map((row) => row.cols.map((cx) => <use key={`${cx}-${row.cy}`} href="#flag-star" x={cx} y={row.cy} />))}
       </g>
     </svg>

@@ -1,3 +1,4 @@
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 
 // A U.S. Capitol dome — colonnade base, pediment, ringed dome, spire —
@@ -59,7 +60,17 @@ export function Header() {
             </span>
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink">
+                Sign in
+              </button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }} />
+          </SignedIn>
           <ThemeToggle />
         </div>
       </div>

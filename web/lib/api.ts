@@ -142,6 +142,13 @@ const BOND_DETAIL_MARKERS = [
 export function cleanAssetName(name: string): string {
   let cleaned = name.trim();
 
+  // Non-public / private stock is disclosed as "Company: X (City, ST)
+  // Description: ...". Keep just the company name.
+  const companyMatch = cleaned.match(/^Company:\s*(.+?)(?:\s*\([^()]*\))?\s*(?:Description:|$)/i);
+  if (companyMatch && companyMatch[1].trim()) {
+    cleaned = companyMatch[1].trim();
+  }
+
   // Truncate bond/note details at the earliest marker, if any.
   let earliestIdx = -1;
   for (const marker of BOND_DETAIL_MARKERS) {

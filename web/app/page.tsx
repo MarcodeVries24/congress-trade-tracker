@@ -207,7 +207,7 @@ export default function Home() {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
   const { user } = useUser();
-  const { openSignUp } = useClerk();
+  const { openSignUp, openSignIn } = useClerk();
   // Comp access via public metadata ({"admin": true}, set in the Clerk
   // dashboard or Backend API) — lets a specific account use paid features
   // without an actual subscription. Mirrors the server-side check in
@@ -231,6 +231,10 @@ export default function Home() {
     // after sign-up; signInForceRedirectUrl covers it too if they instead
     // click "Already have an account? Sign in" inside the same modal.
     else openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
+  }
+  function continueSignIn() {
+    setUpgradeModalOpen(false);
+    openSignIn({ forceRedirectUrl: "/upgrade", signUpForceRedirectUrl: "/upgrade" });
   }
 
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
@@ -917,7 +921,7 @@ export default function Home() {
         </div>
       </main>
       <Footer />
-      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} />
+      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} onSignIn={continueSignIn} />
     </>
   );
 }

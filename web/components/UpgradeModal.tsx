@@ -6,7 +6,17 @@ const BENEFITS = [
   "Browse without ads",
 ];
 
-export function UpgradeModal({ open, onClose, onContinue }: { open: boolean; onClose: () => void; onContinue: () => void }) {
+export function UpgradeModal({
+  open,
+  onClose,
+  onContinue,
+  onSignIn,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onContinue: () => void;
+  onSignIn: () => void;
+}) {
   if (!open) return null;
 
   return (
@@ -52,6 +62,12 @@ export function UpgradeModal({ open, onClose, onContinue }: { open: boolean; onC
         >
           Get started
         </button>
+        <p className="mt-3 text-center text-xs text-ink-faint">
+          Already a member?{" "}
+          <button type="button" onClick={onSignIn} className="text-ink-muted underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+            Sign in
+          </button>
+        </p>
         <button type="button" onClick={onClose} className="mt-2 w-full py-1 text-xs text-ink-faint hover:text-ink-muted">
           Maybe later
         </button>

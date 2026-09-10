@@ -17,11 +17,11 @@ const SORT_EXPRESSIONS: Record<string, string> = {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const q = sp.get("q") ?? undefined;
-  const member = sp.get("member") ?? undefined;
-  const ticker = sp.get("ticker") ?? undefined;
+  const members = sp.getAll("members");
+  const tickers = sp.getAll("tickers");
   const state = sp.get("state") ?? undefined;
-  const type = sp.get("type") ?? undefined;
-  const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
+  const types = sp.getAll("types"); // "P" | "S" | "E" — matched as a prefix, so "S" also covers "S (partial)"
+  const owners = sp.getAll("owners"); // "self" | "JT" | "SP" | "DC"
   const assetTypes = sp.getAll("assetTypes"); // canonical codes — expanded via ASSET_TYPE_VALUES below
   const amountRanges = sp.getAll("amountRanges");
   const marketCapTiers = sp.getAll("marketCapTiers");
@@ -61,12 +61,23 @@ export async function GET(req: NextRequest) {
   }
 
   if (q) conditions.push(`(t.member_name ILIKE ${addParam(`%${q}%`)} OR t.asset_name ILIKE ${addParam(`%${q}%`)} OR t.ticker ILIKE ${addParam(`%${q}%`)})`);
-  if (member) conditions.push(`t.member_name ILIKE ${addParam(`%${member}%`)}`);
-  if (ticker) conditions.push(`t.ticker = ${addParam(ticker.toUpperCase())}`);
+  if (members.length) {
+    const placeholders = members.map((m) => addParam(m));
+    conditions.push(`t.member_name IN (${placeholders.join(", ")})`);
+  }
+  if (tickers.length) {
+    const placeholders = tickers.map((t) => addParam(t.toUpperCase()));
+    conditions.push(`t.ticker IN (${placeholders.join(", ")})`);
+  }
   if (state) conditions.push(`t.state_district ILIKE ${addParam(`${state}%`)}`);
-  if (type) conditions.push(`t.transaction_type ILIKE ${addParam(`${type}%`)}`);
-  if (owner === "self") conditions.push(`t.owner IS NULL`);
-  else if (owner) conditions.push(`t.owner = ${addParam(owner)}`);
+  if (types.length) {
+    const typeConditions = types.map((t) => `t.transaction_type ILIKE ${addParam(`${t}%`)}`);
+    conditions.push(`(${typeConditions.join(" OR ")})`);
+  }
+  if (owners.length) {
+    const ownerConditions = owners.map((o) => (o === "self" ? `t.owner IS NULL` : `t.owner = ${addParam(o)}`));
+    conditions.push(`(${ownerConditions.join(" OR ")})`);
+  }
   if (assetTypes.length) {
     const rawValues = assetTypes.flatMap((code) => ASSET_TYPE_VALUES[code] ?? [code]);
     const placeholders = rawValues.map((v) => addParam(v));

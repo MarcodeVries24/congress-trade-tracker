@@ -7,7 +7,9 @@ import {
   cleanAssetName,
   DEFAULT_ASSET_TYPES,
   displayName,
+  fetchMemberOptions,
   fetchStats,
+  fetchTickerOptions,
   fetchTrades,
   formatMarketCap,
   marketCapTierLabel,
@@ -19,6 +21,7 @@ import {
   TradeFilters,
 } from "@/lib/api";
 import { MultiSelect } from "@/components/MultiSelect";
+import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
 import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
 
@@ -184,10 +187,10 @@ const inputClass =
 export default function Home() {
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
   const [q, setQ] = useState("");
-  const [member, setMember] = useState("");
-  const [ticker, setTicker] = useState("");
-  const [type, setType] = useState("");
-  const [owner, setOwner] = useState("");
+  const [members, setMembers] = useState<string[]>([]);
+  const [tickers, setTickers] = useState<string[]>([]);
+  const [types, setTypes] = useState<string[]>([]);
+  const [owners, setOwners] = useState<string[]>([]);
   const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
   const [amountRanges, setAmountRanges] = useState<string[]>([]);
   const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
@@ -205,18 +208,30 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [memberOptions, setMemberOptions] = useState<{ value: string; label: string }[]>([]);
+  const [tickerOptions, setTickerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([fetchMemberOptions(), fetchTickerOptions()])
+      .then(([memberRows, tickerRows]) => {
+        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: displayName(m.member_name) })));
+        setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
+      })
+      .catch(() => {})
+      .finally(() => setOptionsLoading(false));
+  }, []);
+
   const debouncedQ = useDebounced(q);
-  const debouncedMember = useDebounced(member);
-  const debouncedTicker = useDebounced(ticker);
 
   const filters: TradeFilters = useMemo(
     () => ({
       chamber: chamber === "both" ? ["house", "senate"] : [chamber],
       q: debouncedQ || undefined,
-      member: debouncedMember || undefined,
-      ticker: debouncedTicker || undefined,
-      type: type || undefined,
-      owner: owner || undefined,
+      members: members.length ? members : undefined,
+      tickers: tickers.length ? tickers : undefined,
+      types: types.length ? types : undefined,
+      owners: owners.length ? owners : undefined,
       assetTypes: assetTypes.length ? assetTypes : undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
       marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
@@ -231,10 +246,10 @@ export default function Home() {
     [
       chamber,
       debouncedQ,
-      debouncedMember,
-      debouncedTicker,
-      type,
-      owner,
+      members,
+      tickers,
+      types,
+      owners,
       assetTypes,
       amountRanges,
       marketCapTiers,
@@ -253,10 +268,10 @@ export default function Home() {
   }, [
     chamber,
     debouncedQ,
-    debouncedMember,
-    debouncedTicker,
-    type,
-    owner,
+    members,
+    tickers,
+    types,
+    owners,
     assetTypes,
     amountRanges,
     marketCapTiers,
@@ -324,7 +339,11 @@ export default function Home() {
     assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
 
   const activeFilterCount =
-    [type, owner, dateFrom, dateTo, member, filedStatus].filter(Boolean).length +
+    [dateFrom, dateTo, filedStatus].filter(Boolean).length +
+    members.length +
+    tickers.length +
+    types.length +
+    owners.length +
     amountRanges.length +
     marketCapTiers.length +
     (chamber !== "both" ? 1 : 0) +
@@ -332,9 +351,10 @@ export default function Home() {
 
   function clearFilters() {
     setChamber("both");
-    setMember("");
-    setType("");
-    setOwner("");
+    setMembers([]);
+    setTickers([]);
+    setTypes([]);
+    setOwners([]);
     setAssetTypes(DEFAULT_ASSET_TYPES);
     setMarketCapTiers([]);
     setAmountRanges([]);
@@ -447,19 +467,23 @@ export default function Home() {
                 onChange={(e) => setQ(e.target.value)}
                 className={`min-w-[160px] flex-1 ${inputClass}`}
               />
-              <input
-                type="text"
-                placeholder="Filter by member name…"
-                value={member}
-                onChange={(e) => setMember(e.target.value)}
-                className={`min-w-[160px] flex-1 ${inputClass}`}
+              <SearchableMultiSelect
+                placeholder="Any member"
+                searchPlaceholder="Type a member name…"
+                className="min-w-[160px] flex-1 sm:flex-none sm:w-56"
+                selected={members}
+                onChange={setMembers}
+                options={memberOptions}
+                loading={optionsLoading}
               />
-              <input
-                type="text"
-                placeholder="Ticker (e.g. NVDA)"
-                value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
-                className={`w-full sm:w-40 ${inputClass}`}
+              <SearchableMultiSelect
+                placeholder="Any ticker"
+                searchPlaceholder="Type a ticker…"
+                className="w-full sm:w-40"
+                selected={tickers}
+                onChange={setTickers}
+                options={tickerOptions}
+                loading={optionsLoading}
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -481,20 +505,24 @@ export default function Home() {
                 <option value="house">House only</option>
                 <option value="senate">Senate only</option>
               </Select>
-              <Select value={type} onChange={(e) => setType(e.target.value)} className="w-full sm:w-auto">
-                <option value="">All types</option>
-                <option value="P">Purchase</option>
-                <option value="S">Sale</option>
-                <option value="E">Exchange</option>
-              </Select>
-              <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full sm:w-auto">
-                <option value="">All owners</option>
-                {Object.entries(OWNER_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
+              <MultiSelect
+                placeholder="All types"
+                className="w-full sm:w-36"
+                selected={types}
+                onChange={setTypes}
+                options={[
+                  { value: "P", label: "Purchase" },
+                  { value: "S", label: "Sale" },
+                  { value: "E", label: "Exchange" },
+                ]}
+              />
+              <MultiSelect
+                placeholder="All owners"
+                className="w-full sm:w-36"
+                selected={owners}
+                onChange={setOwners}
+                options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
+              />
               <MultiSelect
                 placeholder="Any trade size"
                 className="w-full sm:w-48"
@@ -615,7 +643,7 @@ export default function Home() {
                           <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                           <div>
                             <button
-                              onClick={() => setMember(trade.member_name)}
+                              onClick={() => setMembers([trade.member_name])}
                               className="text-left font-medium hover:underline"
                               title={`Filter to ${displayName(trade.member_name)}`}
                             >
@@ -633,7 +661,7 @@ export default function Home() {
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                           {trade.ticker && (
                             <button
-                              onClick={() => setTicker(trade.ticker as string)}
+                              onClick={() => setTickers([trade.ticker as string])}
                               className="font-mono hover:text-ink hover:underline"
                               title={`Filter to ${trade.ticker}`}
                             >
@@ -706,7 +734,7 @@ export default function Home() {
               return (
                 <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <button onClick={() => setMember(trade.member_name)} className="flex items-center gap-2.5 text-left">
+                    <button onClick={() => setMembers([trade.member_name])} className="flex items-center gap-2.5 text-left">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div>
                         <div className="font-medium">{displayName(trade.member_name)}</div>
@@ -724,7 +752,7 @@ export default function Home() {
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                     {trade.ticker && (
-                      <button onClick={() => setTicker(trade.ticker as string)} className="font-mono hover:text-ink hover:underline">
+                      <button onClick={() => setTickers([trade.ticker as string])} className="font-mono hover:text-ink hover:underline">
                         {trade.ticker}
                       </button>
                     )}

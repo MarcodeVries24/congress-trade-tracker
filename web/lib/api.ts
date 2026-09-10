@@ -46,10 +46,10 @@ export interface Stats {
 export interface TradeFilters {
   chamber?: string[];
   q?: string;
-  member?: string;
-  ticker?: string;
-  type?: string;
-  owner?: string;
+  members?: string[];
+  tickers?: string[];
+  types?: string[];
+  owners?: string[];
   assetTypes?: string[];
   amountRanges?: string[];
   marketCapTiers?: string[];
@@ -94,7 +94,8 @@ export const MARKET_CAP_TIERS: MarketCapTier[] = [
   { value: "large", label: "Large Cap ($10B–$200B)", min: 10_000_000_000, max: 200_000_000_000 },
   { value: "mid", label: "Mid Cap ($2B–$10B)", min: 2_000_000_000, max: 10_000_000_000 },
   { value: "small", label: "Small Cap ($300M–$2B)", min: 300_000_000, max: 2_000_000_000 },
-  { value: "micro", label: "Micro Cap (<$300M)", min: 0, max: 300_000_000 },
+  { value: "micro", label: "Micro Cap ($50M–$300M)", min: 50_000_000, max: 300_000_000 },
+  { value: "nano", label: "Nano Cap (<$50M)", min: 0, max: 50_000_000 },
   { value: "undefined", label: "Undefined", min: null, max: null },
 ];
 
@@ -279,4 +280,25 @@ export async function fetchStats(chambers?: string[]): Promise<Stats> {
   const res = await fetch(`/api/stats?${params.toString()}`);
   if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
   return res.json();
+}
+
+// Option lists for the searchable Member / Ticker filters — fetched once
+// (not per-keystroke; filtering as the user types happens client-side
+// against this list, same as every other checkbox filter here).
+export async function fetchMemberOptions(): Promise<{ member_name: string; trade_count: number }[]> {
+  const res = await fetch("/api/members");
+  if (!res.ok) throw new Error(`Failed to fetch members: ${res.status}`);
+  const rows: { member_name: string; trade_count: number }[] = (await res.json()).data;
+  // /api/members groups by (member_name, state_district) — a member who's
+  // been redistricted can appear more than once under the same name, which
+  // would otherwise show as duplicate options.
+  const byName = new Map<string, number>();
+  for (const r of rows) byName.set(r.member_name, (byName.get(r.member_name) ?? 0) + r.trade_count);
+  return [...byName.entries()].map(([member_name, trade_count]) => ({ member_name, trade_count })).sort((a, b) => b.trade_count - a.trade_count);
+}
+
+export async function fetchTickerOptions(): Promise<{ ticker: string; trade_count: number }[]> {
+  const res = await fetch("/api/tickers");
+  if (!res.ok) throw new Error(`Failed to fetch tickers: ${res.status}`);
+  return (await res.json()).data;
 }

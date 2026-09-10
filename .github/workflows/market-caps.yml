@@ -1,12 +1,12 @@
 name: Sync market caps
 
 on:
-  # Weekly, not every-4-hours like ingest.yml — a company's market cap
-  # doesn't move meaningfully hour to hour, and the free Finnhub tier's rate
+  # Monthly, not every-4-hours like ingest.yml — a company's market cap
+  # doesn't move meaningfully day to day, and the free Finnhub tier's rate
   # limit means a full run (thousands of tickers, one request each) already
   # takes a couple of hours.
   schedule:
-    - cron: "30 5 * * 1" # Monday 05:30 UTC
+    - cron: "30 5 1 * *" # 1st of the month, 05:30 UTC
   workflow_dispatch: {}
 
 jobs:

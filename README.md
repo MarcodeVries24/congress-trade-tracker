@@ -62,7 +62,7 @@ Both chambers share the rest of the pipeline:
    enriches trades with the *current* market cap of the company traded (not
    a historical value as of the trade date — a free-tier API has no
    practical way to provide that), via [Finnhub](https://finnhub.io), on a
-   weekly schedule (market cap doesn't move meaningfully hour to hour the
+   monthly schedule (market cap doesn't move meaningfully day to day the
    way filings do). Most House OCR rows have an asset name but no ticker, so
    a one-time-per-name search step resolves a ticker from the name first —
    accepting only an exact company-name match, since a fuzzy guess here
@@ -159,7 +159,7 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
    and copy your API key from the dashboard.
 2. Add a GitHub Actions secret named `FINNHUB_API_KEY` with that key.
 3. [.github/workflows/market-caps.yml](.github/workflows/market-caps.yml)
-   runs `npm run sync-market-caps` weekly. The first run is slow (Finnhub's
+   runs `npm run sync-market-caps` monthly. The first run is slow (Finnhub's
    free tier is rate-limited to 60 calls/minute, and it has to resolve every
    existing tickerless asset name once — see how it works, above); later
    runs only resolve names new since the last run, so they're much quicker.

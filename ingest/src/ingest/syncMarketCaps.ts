@@ -5,10 +5,10 @@ import { FINNHUB } from "../config.js";
 /**
  * Enriches trades with the *current* market cap of the company traded —
  * not a historical value as of the trade date, which a free-tier API has no
- * practical way to provide. Runs weekly (see .github/workflows/market-caps.yml).
+ * practical way to provide. Runs monthly (see .github/workflows/market-caps.yml).
  *
  * Two passes, split so the (slow, fuzzy) name-resolution work is a one-time
- * cost per asset name rather than repeated every week:
+ * cost per asset name rather than repeated every month:
  *
  *  1. resolveNewAssetNames — most House OCR rows (paper filings) have an
  *     asset name but no ticker, so they'd never match a market cap looked
@@ -21,7 +21,7 @@ import { FINNHUB } from "../config.js";
  *     pass never repeats itself for a name it's already seen.
  *  2. refreshMarketCaps — (re)fetches the market cap for every ticker
  *     actually in play (directly extracted, or resolved by name above).
- *     This is the part that actually changes week to week.
+ *     This is the part that actually changes month to month.
  */
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -38,6 +38,17 @@ function sleep(ms: number): Promise<void> {
 }
 
 const LEGAL_SUFFIX = /\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLC|LP|PLC|GROUP|HOLDINGS?|TRUST|CLASS\s+[A-Z])\b/g;
+
+// Undocumented, but verified directly: Finnhub's free-tier /search rejects
+// any query over 20 characters with a 422 ("q too long") — most full
+// company names exceed that. The acceptance check below still compares
+// against the *full* original name, so truncating the query just narrows
+// the candidate pool going in; it can't turn a truncated prefix into a
+// false-positive match.
+const FINNHUB_SEARCH_MAX_LEN = 20;
+function searchQueryFor(name: string): string {
+  return name.trim().slice(0, FINNHUB_SEARCH_MAX_LEN);
+}
 
 function normalizeCompanyName(name: string): string {
   return name
@@ -92,7 +103,7 @@ async function resolveNewAssetNames(): Promise<void> {
     const name = rows[i].asset_name;
     let ticker: string | null = null;
     try {
-      const data = await finnhubGet<FinnhubSearchResult>(FINNHUB.searchUrl(name));
+      const data = await finnhubGet<FinnhubSearchResult>(FINNHUB.searchUrl(searchQueryFor(name)));
       const target = normalizeCompanyName(name);
       const match = (data.result ?? []).find((r) => normalizeCompanyName(r.description ?? "") === target);
       if (match) {

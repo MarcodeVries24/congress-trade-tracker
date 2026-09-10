@@ -559,7 +559,11 @@ export default function Home() {
               {!loading &&
                 result?.data.map((trade) => {
                   const badge = typeBadge(trade.transaction_type);
-                  const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
+                  const assetTypeLabel = trade.asset_type_code
+                    ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
+                    : trade.parse_status === "ocr"
+                      ? "Undefined"
+                      : null;
                   const late = trade.days_to_file !== null && trade.days_to_file > 45;
                   return (
                     <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
@@ -756,15 +760,34 @@ export default function Home() {
 
 // Marks a trade extracted via OCR from a scanned paper filing (Senate only,
 // currently) — meaningfully less certain than trades read directly from
-// text, since OCR can misread a checkbox column or a digit. Shown next to
-// the asset name so it travels with the row wherever it's displayed.
+// text, since OCR can misread a checkbox column or a digit. A small "i"
+// button rather than a text badge, so the row stays readable; click/tap
+// (not just hover, for touch devices) reveals the plain-language caveat.
 function OcrBadge() {
+  const [open, setOpen] = useState(false);
   return (
-    <span
-      title="Extracted via OCR from a scanned paper filing — verify against the original scan before relying on exact figures."
-      className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400"
-    >
-      OCR
+    <span className="relative inline-flex shrink-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        onBlur={() => setOpen(false)}
+        aria-label="Why this trade may not be exact"
+        aria-expanded={open}
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-semibold leading-none text-amber-600 dark:text-amber-400"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
+        >
+          Automatically read from a scanned PDF, not typed text — details here may not be exactly correct.
+        </span>
+      )}
     </span>
   );
 }

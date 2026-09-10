@@ -111,6 +111,38 @@ function nearestColumn<T extends { x: number }>(columns: T[], x: number): T {
   return best;
 }
 
+// A row's own "#" label and a trailing "(Descriptor)(TICKER)" pair (e.g.
+// "Alpha Teknova Inc (Stock)(TKNO)") — used to recover ticker/asset-type
+// fields that the printed form doesn't put in their own columns the way
+// the electronic reports do, and to anchor each row's own text (below).
+const ROW_NUMBER_PATTERN = /^\d{1,3}$/;
+const TICKER_LIKE = /^[A-Z0-9.]{1,10}$/;
+const TYPE_DESCRIPTOR_WORDS = /^(Stock|Common Stock|Non[- ]?Public Stock|Bond|Fund|ETF|Note|Warrant|Option|ADR|ADS)$/i;
+
+/** Strips trailing "(Descriptor)" / "(TICKER)" parens, recovering each as a field. */
+function extractTickerAndType(name: string): { name: string; ticker: string | null; assetTypeCode: string | null } {
+  let text = name;
+  let ticker: string | null = null;
+  let assetTypeCode: string | null = null;
+  for (let i = 0; i < 3; i++) {
+    // OCR sometimes tacks on a stray quote/apostrophe past the closing
+    // paren — strip that before matching, not just at the very end.
+    text = text.replace(/['"“”‘’]+$/, "").trim();
+    const m = text.match(/^(.*?)\s*\(([^()]{1,20})\)\s*$/);
+    if (!m) break;
+    const inner = m[2].trim();
+    if (!ticker && TICKER_LIKE.test(inner) && /[A-Z]/.test(inner)) {
+      ticker = inner;
+    } else if (!assetTypeCode && TYPE_DESCRIPTOR_WORDS.test(inner)) {
+      assetTypeCode = inner.replace(/\s+/g, " ").replace(/^./, (c) => c.toUpperCase());
+    } else {
+      break; // an unrecognized trailing paren is probably part of the real name — stop
+    }
+    text = m[1].trim();
+  }
+  return { name: text, ticker, assetTypeCode };
+}
+
 function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (!m) return null;
@@ -156,18 +188,29 @@ function parsePageWords(words: OcrWord[]): SenateTransaction[] {
     const rowCenter = (dateWord.y0 + dateWord.y1) / 2;
     const rowBand = 60; // "X" marks are a single line; stay tight to this row
 
-    // Asset text: everything left of the Date column, between the previous
-    // row's date and the *bottom* of this row's own date line — the asset
-    // name and date sit on the same printed line for a single-line entry,
-    // so the window has to include the date's own row, not stop before it.
-    // This also folds in any asset-only "header" line above (no date of its
-    // own, e.g. a parent holding entity) that precedes a sub-holding's row.
+    // Every printed row — dated or not — carries its own "#" label in the
+    // narrow column left of "Identification of Assets". An asset-only row
+    // (a holding with no transaction this period, e.g. a parent LLC listed
+    // for context) has no date of its own, so naively looking back to the
+    // *previous date* swept its text into the next dated row's name too.
+    // Anchor on the nearest row-number at/before this row's own date
+    // instead — the row-number strictly closest to it is this row's own,
+    // so nothing from an earlier asset-only row bleeds in.
+    const rowNumberMarkers = bodyWords
+      .filter((w) => w.x1 < ASSET_COLUMN_LEFT_EDGE && w.y0 >= rowTop && w.y0 <= dateWord.y1 && ROW_NUMBER_PATTERN.test(w.text.trim()))
+      .sort((a, b) => a.y0 - b.y0);
+    const effectiveRowTop = rowNumberMarkers.length > 0 ? rowNumberMarkers[rowNumberMarkers.length - 1].y0 - 5 : rowTop;
+
+    // Asset text: everything left of the Date column, from this row's own
+    // "#" marker through the *bottom* of its date line — the asset name and
+    // date sit on the same printed line for a single-line entry, so the
+    // window has to include the date's own row, not stop before it.
     const assetWords = bodyWords
       .filter(
         (w) =>
           w.x0 >= ASSET_COLUMN_LEFT_EDGE &&
           w.x1 <= ASSET_COLUMN_RIGHT_EDGE &&
-          w.y0 >= rowTop &&
+          w.y0 >= effectiveRowTop &&
           w.y0 <= dateWord.y1 &&
           // The row-number column occasionally lands just inside this x
           // range too — a bare 1-2 digit token is never real asset text.
@@ -189,6 +232,9 @@ function parsePageWords(words: OcrWord[]): SenateTransaction[] {
         assetName = assetName.slice(ownerMatch[0].length).trim();
       }
     }
+
+    const { name: strippedName, ticker, assetTypeCode } = extractTickerAndType(assetName);
+    assetName = strippedName || assetName;
 
     const xMarksThisRow = bodyWords.filter(
       (w) => w.text.trim() === "X" && Math.abs((w.y0 + w.y1) / 2 - rowCenter) <= rowBand
@@ -215,9 +261,9 @@ function parsePageWords(words: OcrWord[]): SenateTransaction[] {
       transactions.push({
         transactionDate: toIsoDateSlash(dateWord.text),
         owner,
-        ticker: null,
+        ticker,
         assetName,
-        assetTypeCode: null,
+        assetTypeCode,
         transactionType: transactionType || "P",
         amountRange: amountRange || "(unreadable)",
         amountLow,

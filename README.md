@@ -61,10 +61,20 @@ Both chambers share the rest of the pipeline:
 
 ### Known data-quality limits
 
-- A small number of House filings (older, paper-filed PTRs, e.g. `DocID`s
-  under ~10,000,000) are scanned images with no extractable text, stored with
-  `parse_status = 'empty'` rather than silently dropped — House paper filings
-  aren't OCR'd (unlike Senate's, below).
+- A meaningful share of House filings — hand-delivered paper forms, mostly,
+  not correlated with any particular `DocID`/year range — are scanned images
+  with no extractable text, stored with `parse_status = 'empty'` rather than
+  silently dropped. House paper filings aren't OCR'd yet (unlike Senate's,
+  below): a first attempt found Tesseract's default OCR struggles badly with
+  this form's dense checkbox grid (word segmentation merges adjacent
+  checkboxes into unreadable blobs, and even the plain date text nearby gets
+  garbled) — it needs a more careful multi-pass approach (isolating text
+  columns from the checkbox grid before OCR'ing each separately) than a
+  straightforward port of Senate's approach, so it's a scoped follow-up
+  rather than shipped half-working. A distinct, already-fixed bug is the
+  newer digitally-typeset House PDF template rendering its checkbox/radio
+  widgets through an icon font whose glyphs corrupt the *text* extraction of
+  the whole line they're on — see `stripCheckboxGlyphs` in `parsePtr.ts`.
 - Senate paper filings using the current form template are OCR'd
   (`parse_status = 'ocr'`); ones using the older, pre-2025-ish template are
   declined (`parse_status = 'unsupported'`) rather than extracted against a
@@ -165,7 +175,10 @@ database) does, which is what actually matters.
 
 ## Possible next steps
 
-- OCR fallback for House's own scanned/paper PTRs (Senate's are covered)
+- OCR for House's own scanned/paper PTRs — needs a multi-pass approach
+  (isolate text columns from the checkbox grid, OCR each separately) rather
+  than a direct port of Senate's single-pass technique; see the data-quality
+  note above
 - Adaptive per-filing column calibration for Senate's older paper-form
   template, so those filings stop being declined
 - Price-performance metrics (fetch a market price at transaction time vs. now)

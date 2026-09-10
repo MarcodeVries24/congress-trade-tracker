@@ -119,7 +119,13 @@ const CHECKBOX_WIDE_GAP_MIN = 0.06;
 const OWNER_INSET = 0.2;
 const OWNER_DARK_THRESHOLD = 0.05;
 const ASSET_INSET = 0.15;
-const ASSET_DARK_THRESHOLD = 0.12;
+// Calibrated against a real typed (not handwritten) filing where every row
+// was genuinely filled but measured only 0.10-0.13 — apparently a typeset
+// asset name just doesn't fill as much of its cell as handwriting does —
+// against a confirmed-blank row on that same page/template measuring 0.00.
+// 0.12 (the original threshold, tuned only against handwritten samples) was
+// silently dropping that filing's real rows one at a time.
+const ASSET_DARK_THRESHOLD = 0.095;
 // Handwriting occasionally spills outside its printed cell (verified on a
 // real filing: a wrapped two-line entry left only its second line inside
 // the detected row bounds, the rest bleeding into the row above), landing
@@ -306,15 +312,24 @@ function longestConsistentRun(lines: number[], toleranceFrac = 0.12): number[] {
 
 /**
  * Maps detected column boundaries to semantic roles. The amount grid is
- * always the last 10 non-flag columns; owner/asset are always the first
- * two; everything between asset and the date columns is Type checkboxes
- * (3 or 4 of them, depending on form era) — dates are identified as the
- * two columns immediately before the amount grid.
+ * always the last 10 columns before any trailing flag column; owner/asset
+ * are always the first two; everything between asset and the date columns
+ * is Type checkboxes (3 or 4 of them, depending on form era) — dates are
+ * identified as the two columns immediately before the amount grid.
+ *
+ * Two column-count variants are recognized: the standard template carries a
+ * trailing "K" flag column (Transaction in a Spouse/Dependent Child Asset)
+ * after the amount grid, giving 18 (3 type columns) or 19 (4, "Partial
+ * Sale" added later) total columns. An older/simpler paper template omits
+ * that flag column entirely — verified against a real filing with a fully
+ * legible table that was otherwise being declined outright — giving 17
+ * columns for its 3 type columns. The flag column's presence or absence
+ * doesn't shift anything *before* it, so this only changes which column
+ * count maps to which type count, not the index arithmetic below.
  */
 function resolveColumnRoles(cols: number[]): ColumnRoles | null {
   const colCount = cols.length - 1; // N boundaries -> N-1 columns
-  // owner(1) + asset(1) + type(3|4) + date(1) + dateNotified(1) + amount(10) + flag(1) = 18 or 19
-  const typeCount = colCount - 15;
+  const typeCount = colCount === 17 ? 3 : colCount - 15;
   if (typeCount !== 3 && typeCount !== 4) return null; // unrecognized template — decline rather than guess
 
   const ownerIdx = 0;

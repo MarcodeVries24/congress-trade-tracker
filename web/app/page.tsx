@@ -226,7 +226,11 @@ export default function Home() {
   function continueUpgrade() {
     setUpgradeModalOpen(false);
     if (isSignedIn) router.push("/upgrade");
-    else openSignUp({ redirectUrl: "/upgrade" });
+    // `redirectUrl` is deprecated in this Clerk version and gets silently
+    // ignored — forceRedirectUrl is what actually lands them on /upgrade
+    // after sign-up; signInForceRedirectUrl covers it too if they instead
+    // click "Already have an account? Sign in" inside the same modal.
+    else openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
   }
 
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");

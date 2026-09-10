@@ -4,11 +4,16 @@ import { useEffect, useRef } from "react";
 import Script from "next/script";
 import { useAuth, useUser } from "@clerk/nextjs";
 
-// Both unset until AdSense approves congtrade.com and an ad unit exists —
-// until then this renders a plain placeholder instead of asking the
-// AdSense script to fill a slot that doesn't exist yet.
+// Unset until AdSense approves congtrade.com and an ad unit exists — until
+// then this renders a plain placeholder instead of asking the AdSense
+// script to fill a slot that doesn't exist yet. NEXT_PUBLIC_ADSENSE_SLOT_ID
+// is the default/fallback slot; pass `slot` to give a specific placement
+// (e.g. the one above the stats bar vs. the one below the results table)
+// its own ad unit once you've created more than one in AdSense — Google
+// generally expects distinct ad units per placement, not the same one
+// reused twice on a page.
 const AD_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
-const AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID;
+const DEFAULT_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID;
 
 declare global {
   interface Window {
@@ -16,7 +21,8 @@ declare global {
   }
 }
 
-export function AdSlot() {
+export function AdSlot({ slot }: { slot?: string } = {}) {
+  const adSlot = slot ?? DEFAULT_AD_SLOT;
   const { isLoaded, has } = useAuth();
   const { user } = useUser();
   const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
@@ -26,18 +32,18 @@ export function AdSlot() {
   const requested = useRef(false);
 
   useEffect(() => {
-    if (noAds || !AD_CLIENT || !AD_SLOT || requested.current) return;
+    if (noAds || !AD_CLIENT || !adSlot || requested.current) return;
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
       requested.current = true;
     } catch {
       // adsbygoogle script hasn't finished loading yet — harmless, nothing to retry here.
     }
-  }, [noAds]);
+  }, [noAds, adSlot]);
 
   if (noAds) return null;
 
-  if (!AD_CLIENT || !AD_SLOT) {
+  if (!AD_CLIENT || !adSlot) {
     return (
       <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-line bg-panel-muted text-xs text-ink-faint">
         Ad space
@@ -52,7 +58,7 @@ export function AdSlot() {
         className="adsbygoogle block"
         style={{ display: "block" }}
         data-ad-client={AD_CLIENT}
-        data-ad-slot={AD_SLOT}
+        data-ad-slot={adSlot}
         data-ad-format="auto"
         data-full-width-responsive="true"
       />

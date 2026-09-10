@@ -442,6 +442,10 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="mb-4 sm:mb-6">
+          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
+        </div>
+
         {stats && (
           <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:mb-6 sm:text-sm">
             <StatItem value={stats.totalTransactions.toLocaleString()} label="Transactions" />
@@ -466,7 +470,7 @@ export default function Home() {
               className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
             >
               Filters {activeFilterCount > 0 && <span className="rounded-full bg-accent/20 px-1.5 text-xs text-accent">{activeFilterCount}</span>}
-              <span className="text-[10px] text-ink-faint">{filtersOpen ? "▴" : "▾"}</span>
+              <span className="text-lg leading-none text-ink-faint">{filtersOpen ? "▴" : "▾"}</span>
             </button>
             {activeFilterCount > 0 && (
               <button onClick={clearFilters} className="text-xs text-ink-faint underline decoration-line-strong">
@@ -586,14 +590,18 @@ export default function Home() {
                   <option value="late">Filed late (&gt;45 days)</option>
                 </Select>
               </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="flex flex-wrap items-center gap-3">
-                <span className="text-xs text-ink-faint">Filed:</span>
+              <span className="text-xs text-ink-faint">Filed:</span>
+              {/* Quick range gets its own GatedFilter (same as every other
+                  Select) so its arrow is reliably masked regardless of
+                  whether this row wraps to its own line on narrow screens —
+                  a single lock badge for the whole group only covers
+                  whichever line it's vertically centered on. */}
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
                 <Select
                   value=""
                   onChange={(e) => {
                     if (e.target.value !== "") applyDatePreset(Number(e.target.value));
                   }}
-                  className="w-full sm:w-auto"
                 >
                   <option value="">Quick range…</option>
                   <option value="0">Today</option>
@@ -604,6 +612,8 @@ export default function Home() {
                   <option value="180">Last 180 days</option>
                   <option value="365">Last year</option>
                 </Select>
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="flex flex-wrap items-center gap-3">
                 <input
                   type="date"
                   value={dateFrom}

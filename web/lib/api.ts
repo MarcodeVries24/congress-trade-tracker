@@ -49,7 +49,7 @@ export interface TradeFilters {
   ticker?: string;
   type?: string;
   owner?: string;
-  assetType?: string;
+  assetTypes?: string[];
   amountRanges?: string[];
   filedStatus?: "late" | "onTime";
   dateFrom?: string;
@@ -98,6 +98,33 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
   OL: "Ownership Interest (LLC/LLP)",
   VA: "Variable Annuity",
 };
+
+// House stores asset_type_code as its own short reference code (above);
+// Senate stores whatever free-text label its own report used instead (e.g.
+// "Stock", "Municipal Security") — see senate/parseReport.ts. Filtering by
+// one House code alone silently misses every matching Senate row, so each
+// canonical code here expands to every raw stored value (House and Senate)
+// that means the same thing.
+export const ASSET_TYPE_VALUES: Record<string, string[]> = {
+  ST: ["ST", "Stock", "Non-Public Stock"],
+  OP: ["OP", "Stock Option"],
+  OT: ["OT", "Other", "Commodities/Futures Contract"],
+  GS: ["GS", "Municipal Security"],
+  CS: ["CS", "Corporate Bond"],
+  CT: ["CT"],
+  PS: ["PS"],
+  RS: ["RS"],
+  AB: ["AB"],
+  OI: ["OI"],
+  HN: ["HN"],
+  OL: ["OL"],
+  VA: ["VA"],
+};
+
+// The site's default view: most visitors care about stock trades, not the
+// long tail of bonds/options/crypto/etc. — see ASSET_TYPE_VALUES for what
+// "Stock" actually matches across both chambers' data.
+export const DEFAULT_ASSET_TYPES = ["ST"];
 
 // Filings carry honorifics ("Hon.") as part of the disclosed name — strip
 // them only for display, never when filtering/searching against the data.

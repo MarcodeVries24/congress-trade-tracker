@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { ASSET_TYPE_VALUES } from "@/lib/api";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
 const SORT_EXPRESSIONS: Record<string, string> = {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
   const state = sp.get("state") ?? undefined;
   const type = sp.get("type") ?? undefined;
   const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
-  const assetType = sp.get("assetType") ?? undefined;
+  const assetTypes = sp.getAll("assetTypes"); // canonical codes — expanded via ASSET_TYPE_VALUES below
   const amountRanges = sp.getAll("amountRanges");
   // Defaults to House-only. Pass chamber=house&chamber=senate (repeated) to
   // include both once Senate coverage exists — never implicit/all-by-default,
@@ -64,7 +65,11 @@ export async function GET(req: NextRequest) {
   if (type) conditions.push(`t.transaction_type ILIKE ${addParam(`${type}%`)}`);
   if (owner === "self") conditions.push(`t.owner IS NULL`);
   else if (owner) conditions.push(`t.owner = ${addParam(owner)}`);
-  if (assetType) conditions.push(`t.asset_type_code = ${addParam(assetType)}`);
+  if (assetTypes.length) {
+    const rawValues = assetTypes.flatMap((code) => ASSET_TYPE_VALUES[code] ?? [code]);
+    const placeholders = rawValues.map((v) => addParam(v));
+    conditions.push(`t.asset_type_code IN (${placeholders.join(", ")})`);
+  }
   if (amountRanges.length) {
     const placeholders = amountRanges.map((r) => addParam(r));
     conditions.push(`t.amount_range IN (${placeholders.join(", ")})`);

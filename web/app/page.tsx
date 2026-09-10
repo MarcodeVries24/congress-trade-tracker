@@ -5,6 +5,7 @@ import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
   cleanAssetName,
+  DEFAULT_ASSET_TYPES,
   displayName,
   fetchStats,
   fetchTrades,
@@ -14,6 +15,7 @@ import {
   Trade,
   TradeFilters,
 } from "@/lib/api";
+import { AssetTypePills } from "@/components/AssetTypePills";
 import { MultiSelect } from "@/components/MultiSelect";
 import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
@@ -182,7 +184,7 @@ export default function Home() {
   const [ticker, setTicker] = useState("");
   const [type, setType] = useState("");
   const [owner, setOwner] = useState("");
-  const [assetType, setAssetType] = useState("");
+  const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
   const [amountRanges, setAmountRanges] = useState<string[]>([]);
   const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
   const [dateFrom, setDateFrom] = useState("");
@@ -210,7 +212,7 @@ export default function Home() {
       ticker: debouncedTicker || undefined,
       type: type || undefined,
       owner: owner || undefined,
-      assetType: assetType || undefined,
+      assetTypes: assetTypes.length ? assetTypes : undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
       filedStatus: filedStatus || undefined,
       dateFrom: dateFrom || undefined,
@@ -227,7 +229,7 @@ export default function Home() {
       debouncedTicker,
       type,
       owner,
-      assetType,
+      assetTypes,
       amountRanges,
       filedStatus,
       dateFrom,
@@ -241,7 +243,7 @@ export default function Home() {
 
   useEffect(() => {
     setPage(1);
-  }, [chamber, debouncedQ, debouncedMember, debouncedTicker, type, owner, assetType, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
+  }, [chamber, debouncedQ, debouncedMember, debouncedTicker, type, owner, assetTypes, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,17 +294,24 @@ export default function Home() {
     );
   }
 
+  // The default view is Stocks-only, not "no filter" — so the asset-type
+  // pills only count toward the active-filter badge (and "Clear filters")
+  // once they've actually been changed from that default.
+  const assetTypesAreDefault =
+    assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
+
   const activeFilterCount =
-    [type, owner, assetType, dateFrom, dateTo, member, filedStatus].filter(Boolean).length +
+    [type, owner, dateFrom, dateTo, member, filedStatus].filter(Boolean).length +
     amountRanges.length +
-    (chamber !== "both" ? 1 : 0);
+    (chamber !== "both" ? 1 : 0) +
+    (assetTypesAreDefault ? 0 : 1);
 
   function clearFilters() {
     setChamber("both");
     setMember("");
     setType("");
     setOwner("");
-    setAssetType("");
+    setAssetTypes(DEFAULT_ASSET_TYPES);
     setAmountRanges([]);
     setFiledStatus("");
     setDateFrom("");
@@ -365,6 +374,21 @@ export default function Home() {
             />
           </div>
         )}
+
+        {/* Deliberately its own, always-visible (not tucked behind the
+            mobile "Filters" toggle below) block — this is the one filter
+            most visitors care about, defaulting to Stocks only. */}
+        <div className="mb-4 rounded-lg border-2 border-accent/40 bg-accent/5 p-4 sm:mb-6">
+          <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-sm font-semibold text-ink">Asset type</span>
+            <span className="text-xs text-ink-faint">Defaults to Stocks — most trades people look for</span>
+          </div>
+          <AssetTypePills
+            options={Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+            selected={assetTypes}
+            onChange={setAssetTypes}
+          />
+        </div>
 
         <div className="mb-6 rounded-lg border border-line bg-panel p-4">
           <div className="flex items-center justify-between gap-3 sm:hidden">
@@ -446,14 +470,6 @@ export default function Home() {
               <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full sm:w-auto">
                 <option value="">All owners</option>
                 {Object.entries(OWNER_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-              <Select value={assetType} onChange={(e) => setAssetType(e.target.value)} className="w-full sm:w-auto">
-                <option value="">All asset types</option>
-                {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>

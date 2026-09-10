@@ -32,6 +32,12 @@ export const FINNHUB = {
 
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
+  // Same dataset's companion file for members no longer serving (retired,
+  // resigned, lost re-election, moved to another office, etc.) — a trade
+  // filed while they were still in office stays in the table under their
+  // old state_district/name key forever, so this is what backfills a photo
+  // for those rows once they drop out of the "current" file above.
+  legislatorsHistoricalYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-historical.yaml",
   // The Bioguide (bioguide.congress.gov) is Congress's own biographical
   // directory and covers ~99% of current members, vs. ~77% for the photo
   // congress.gov's own site CDN happens to have on file (newer members in

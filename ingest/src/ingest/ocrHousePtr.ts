@@ -357,6 +357,12 @@ function toIsoDateSlash(s: string): string | null {
   const mmN = Number(mm),
     ddN = Number(dd);
   if (mmN < 1 || mmN > 12 || ddN < 1 || ddN > 31) return null;
+  // A misread digit can drop a 4-digit year to 3 (OCR read "2026" as
+  // "261") — that's neither a real 2-digit nor 4-digit year, and silently
+  // treating it as one produced a ~1765-years-off date that made it all the
+  // way into production (e.g. "261-07-20"). Only accept the two lengths
+  // that are actually unambiguous.
+  if (yyRaw.length !== 2 && yyRaw.length !== 4) return null;
   const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }

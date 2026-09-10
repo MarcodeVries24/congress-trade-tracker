@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
 import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
 
@@ -16,23 +17,36 @@ const SORT_EXPRESSIONS: Record<string, string> = {
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
+  // The structured filters below (member, ticker, state, type, owner, trade
+  // size, market cap, filing status, date range) are a paid feature — free
+  // text search, chamber, and the default asset-type view stay free for
+  // everyone. This is the enforcement point, not just a UI nicety: the
+  // filter UI (see GatedFilter.tsx) never lets a non-pro user produce these
+  // params in the first place, but a request hitting this route directly
+  // must not be able to bypass that by sending them anyway. A non-pro
+  // caller's gated params are silently dropped (falls back to the same
+  // default view the free UI already shows) rather than erroring the whole
+  // request, since q/chamber/assetTypes are legitimately still free to mix in.
+  const { has } = await auth();
+  const canUseFilters = has({ feature: "filters" });
+
   const q = sp.get("q") ?? undefined;
-  const members = sp.getAll("members");
-  const tickers = sp.getAll("tickers");
-  const state = sp.get("state") ?? undefined;
-  const types = sp.getAll("types"); // "P" | "S" | "E" — matched as a prefix, so "S" also covers "S (partial)"
-  const owners = sp.getAll("owners"); // "self" | "JT" | "SP" | "DC"
-  const assetTypes = sp.getAll("assetTypes"); // canonical codes — expanded via ASSET_TYPE_VALUES below
-  const amountRanges = sp.getAll("amountRanges");
-  const marketCapTiers = sp.getAll("marketCapTiers");
+  const members = canUseFilters ? sp.getAll("members") : [];
+  const tickers = canUseFilters ? sp.getAll("tickers") : [];
+  const state = canUseFilters ? (sp.get("state") ?? undefined) : undefined;
+  const types = canUseFilters ? sp.getAll("types") : []; // "P" | "S" | "E" — matched as a prefix, so "S" also covers "S (partial)"
+  const owners = canUseFilters ? sp.getAll("owners") : []; // "self" | "JT" | "SP" | "DC"
+  const assetTypes = sp.getAll("assetTypes"); // canonical codes — expanded via ASSET_TYPE_VALUES below; free (default Stock view)
+  const amountRanges = canUseFilters ? sp.getAll("amountRanges") : [];
+  const marketCapTiers = canUseFilters ? sp.getAll("marketCapTiers") : [];
   // Defaults to House-only. Pass chamber=house&chamber=senate (repeated) to
   // include both once Senate coverage exists — never implicit/all-by-default,
   // so this stays safe even before Senate data is fully wired into the UI.
   const chambers = sp.getAll("chamber");
   const chamberFilter = chambers.length ? chambers : ["house"];
-  const filedStatus = sp.get("filedStatus") ?? undefined; // "late" | "onTime" | undefined
-  const dateFrom = sp.get("dateFrom") ?? undefined;
-  const dateTo = sp.get("dateTo") ?? undefined;
+  const filedStatus = canUseFilters ? (sp.get("filedStatus") ?? undefined) : undefined; // "late" | "onTime" | undefined
+  const dateFrom = canUseFilters ? (sp.get("dateFrom") ?? undefined) : undefined;
+  const dateTo = canUseFilters ? (sp.get("dateTo") ?? undefined) : undefined;
   const sortKey = sp.get("sort") ?? "";
   const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.filing_date;
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";

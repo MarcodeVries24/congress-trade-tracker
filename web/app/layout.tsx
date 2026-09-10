@@ -1,24 +1,6 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import "./globals.css";
-
-// Points Clerk's own UI (sign-in/up, user menu, billing/upgrade modals) at
-// the same CSS custom properties the rest of the site uses (globals.css) —
-// since those are plain `var(--x)` references, not baked-in colors, Clerk's
-// components stay in sync with light/dark mode automatically, the same way
-// every other themed element on the site already does.
-const CLERK_APPEARANCE = {
-  variables: {
-    colorPrimary: "rgb(var(--accent))",
-    colorBackground: "rgb(var(--panel))",
-    colorText: "rgb(var(--ink))",
-    colorTextSecondary: "rgb(var(--ink-muted))",
-    colorInputBackground: "rgb(var(--panel-muted))",
-    colorInputText: "rgb(var(--ink))",
-    colorNeutral: "rgb(var(--ink))",
-    borderRadius: "0.375rem",
-  },
-};
 
 export const metadata: Metadata = {
   title: "CongTrade — Congress Trade Tracker",
@@ -46,13 +28,13 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={CLERK_APPEARANCE}>
+    <ClerkThemeProvider>
       <html lang="en" suppressHydrationWarning>
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         </head>
         <body>{children}</body>
       </html>
-    </ClerkProvider>
+    </ClerkThemeProvider>
   );
 }

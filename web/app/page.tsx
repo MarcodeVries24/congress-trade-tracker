@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
@@ -26,6 +28,7 @@ import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
 import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { GatedFilter } from "@/components/GatedFilter";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -191,6 +194,20 @@ const inputClass =
   "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
 
 export default function Home() {
+  const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
+  const { openSignUp } = useClerk();
+  // Defaults to "unlocked" while Clerk is still loading (usually well under
+  // a second) rather than flashing every visitor's filters as locked first —
+  // this is a UX nicety only, not the security boundary. The actual
+  // enforcement is server-side in /api/trades, which never trusts the
+  // client's plan state.
+  const filtersLocked = authLoaded && !has({ feature: "filters" });
+  function promptUpgrade() {
+    if (isSignedIn) router.push("/upgrade");
+    else openSignUp({ redirectUrl: "/upgrade" });
+  }
+
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
   const [q, setQ] = useState("");
   const [members, setMembers] = useState<string[]>([]);
@@ -479,24 +496,26 @@ export default function Home() {
                 onChange={(e) => setQ(e.target.value)}
                 className={`min-w-[160px] flex-1 ${inputClass}`}
               />
-              <SearchableMultiSelect
-                placeholder="Any member"
-                searchPlaceholder="Type a member name…"
-                className="min-w-[160px] flex-1 sm:flex-none sm:w-56"
-                selected={members}
-                onChange={setMembers}
-                options={memberOptions}
-                loading={optionsLoading}
-              />
-              <SearchableMultiSelect
-                placeholder="Any ticker"
-                searchPlaceholder="Type a ticker…"
-                className="w-full sm:w-40"
-                selected={tickers}
-                onChange={setTickers}
-                options={tickerOptions}
-                loading={optionsLoading}
-              />
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="min-w-[160px] flex-1 sm:flex-none sm:w-56">
+                <SearchableMultiSelect
+                  placeholder="Any member"
+                  searchPlaceholder="Type a member name…"
+                  selected={members}
+                  onChange={setMembers}
+                  options={memberOptions}
+                  loading={optionsLoading}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-40">
+                <SearchableMultiSelect
+                  placeholder="Any ticker"
+                  searchPlaceholder="Type a ticker…"
+                  selected={tickers}
+                  onChange={setTickers}
+                  options={tickerOptions}
+                  loading={optionsLoading}
+                />
+              </GatedFilter>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <MultiSelect
@@ -517,79 +536,83 @@ export default function Home() {
                 <option value="house">House only</option>
                 <option value="senate">Senate only</option>
               </Select>
-              <MultiSelect
-                placeholder="All types"
-                className="w-full sm:w-36"
-                selected={types}
-                onChange={setTypes}
-                options={[
-                  { value: "P", label: "Purchase" },
-                  { value: "S", label: "Sale" },
-                  { value: "E", label: "Exchange" },
-                ]}
-              />
-              <MultiSelect
-                placeholder="All owners"
-                className="w-full sm:w-36"
-                selected={owners}
-                onChange={setOwners}
-                options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
-              />
-              <MultiSelect
-                placeholder="Any trade size"
-                className="w-full sm:w-48"
-                selected={amountRanges}
-                onChange={setAmountRanges}
-                options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
-              />
-              <MultiSelect
-                placeholder="Any market cap"
-                className="w-full sm:w-48"
-                selected={marketCapTiers}
-                onChange={setMarketCapTiers}
-                options={MARKET_CAP_TIERS.map((t) => ({ value: t.value, label: t.label }))}
-              />
-              <Select
-                value={filedStatus}
-                onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}
-                className="w-full sm:w-auto"
-              >
-                <option value="">Any filing status</option>
-                <option value="onTime">Filed on time (≤45 days)</option>
-                <option value="late">Filed late (&gt;45 days)</option>
-              </Select>
-              <span className="text-xs text-ink-faint">Filed:</span>
-              <Select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value !== "") applyDatePreset(Number(e.target.value));
-                }}
-                className="w-full sm:w-auto"
-              >
-                <option value="">Quick range…</option>
-                <option value="0">Today</option>
-                <option value="5">Last 5 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="45">Last 45 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="180">Last 180 days</option>
-                <option value="365">Last year</option>
-              </Select>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                title="Filed on or after"
-                className={inputClass}
-              />
-              <span className="text-ink-faint">to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                title="Filed on or before"
-                className={inputClass}
-              />
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
+                <MultiSelect
+                  placeholder="All types"
+                  selected={types}
+                  onChange={setTypes}
+                  options={[
+                    { value: "P", label: "Purchase" },
+                    { value: "S", label: "Sale" },
+                    { value: "E", label: "Exchange" },
+                  ]}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
+                <MultiSelect
+                  placeholder="All owners"
+                  selected={owners}
+                  onChange={setOwners}
+                  options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
+                <MultiSelect
+                  placeholder="Any trade size"
+                  selected={amountRanges}
+                  onChange={setAmountRanges}
+                  options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
+                <MultiSelect
+                  placeholder="Any market cap"
+                  selected={marketCapTiers}
+                  onChange={setMarketCapTiers}
+                  options={MARKET_CAP_TIERS.map((t) => ({ value: t.value, label: t.label }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
+                <Select value={filedStatus} onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}>
+                  <option value="">Any filing status</option>
+                  <option value="onTime">Filed on time (≤45 days)</option>
+                  <option value="late">Filed late (&gt;45 days)</option>
+                </Select>
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="flex flex-wrap items-center gap-3">
+                <span className="text-xs text-ink-faint">Filed:</span>
+                <Select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value !== "") applyDatePreset(Number(e.target.value));
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <option value="">Quick range…</option>
+                  <option value="0">Today</option>
+                  <option value="5">Last 5 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="45">Last 45 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="180">Last 180 days</option>
+                  <option value="365">Last year</option>
+                </Select>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  title="Filed on or after"
+                  className={inputClass}
+                />
+                <span className="text-ink-faint">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  title="Filed on or before"
+                  className={inputClass}
+                />
+              </GatedFilter>
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}

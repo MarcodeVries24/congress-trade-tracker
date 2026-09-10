@@ -91,10 +91,10 @@ function sizeTier(amountLow: number | null): number {
 }
 
 // One color per tier (not per bar) — the whole icon takes on its tier's
-// color so size reads at a glance, with larger trades standing out more:
-// small trades stay a cool, low-key blue, and only the biggest trades get
-// the warm gold treatment.
-const TIER_COLOR = ["bg-line-strong", "bg-sky-400", "bg-amber-400", "bg-[#D4AF37]"];
+// color so size reads like a medal podium: silver for small, gold for
+// medium, and the biggest trades get an icy diamond blue instead of just
+// "more gold" so they read as a distinct top tier, not just gold-plus-one-bar.
+const TIER_COLOR = ["bg-line-strong", "bg-[#C0C0C0]", "bg-[#D4AF37]", "bg-[#7DD3FC]"];
 const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"];
 
 function SizeIndicator({ amountLow }: { amountLow: number | null }) {

@@ -411,8 +411,8 @@ export default function Home() {
                 >
                   Senate eFD
                 </a>
-              )}{" "}
-              — no third-party API in between. Refreshed automatically every 4 hours.
+              )}
+              . Updated and refreshed every 4 hours.
             </p>
           </div>
         </div>

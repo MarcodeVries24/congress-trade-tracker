@@ -35,25 +35,31 @@ function Logo({ size = 28 }: { size?: number }) {
 export function Header() {
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-7xl items-start justify-between px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         {/* flex-wrap lets the tagline ride next to the wordmark whenever
             there's room, and only fall to its own line once the row
             actually can't fit it — no breakpoint guessing. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:gap-x-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="text-ink">
               <Logo />
             </div>
-            <span className="text-xl font-bold tracking-tight sm:text-2xl">
+            <span className="text-lg font-bold tracking-tight sm:text-xl md:text-2xl">
               <span className="text-ink">Cong</span>
               <span className="text-accent">Trade</span>
             </span>
           </div>
-          <span className="flex items-center gap-3 whitespace-nowrap border-l border-line pl-3">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">Track Congress trades</span>
+          {/* Sized down on narrow phones so the tagline still fits next to
+              the wordmark instead of always dropping to its own line — it
+              only wraps (via the parent's flex-wrap) once a screen is too
+              narrow even for that, e.g. the smallest phones. */}
+          <span className="flex items-center gap-2 whitespace-nowrap border-l border-line pl-2 sm:gap-3 sm:pl-3">
+            <span className="text-[9px] font-medium uppercase tracking-normal text-ink-faint sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider">
+              Track Congress trades
+            </span>
           </span>
         </div>
-        <div className="flex items-center gap-2 py-0.5">
+        <div className="flex items-center gap-2">
           <ThemeToggle />
         </div>
       </div>

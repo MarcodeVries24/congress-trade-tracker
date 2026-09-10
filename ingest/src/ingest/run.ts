@@ -21,7 +21,11 @@ async function main() {
   const ptrFilings = index.filter((f) => f.filingType === "P");
   console.log(`Found ${ptrFilings.length} Periodic Transaction Report filings for ${year}.`);
 
-  const ingestedRows = (await sql.query(`SELECT doc_id FROM filings WHERE parse_status != 'pending'`)) as {
+  // 'empty' filings are retried every run too — the text-extraction parser
+  // improves over time (e.g. the modern e-filing PDF's checkbox-glyph fix
+  // recovered ~150 previously-empty filings), and there's no successful
+  // parse to lose by re-attempting, so it's cheap and can only help.
+  const ingestedRows = (await sql.query(`SELECT doc_id FROM filings WHERE parse_status NOT IN ('pending', 'empty')`)) as {
     doc_id: string;
   }[];
   const alreadyIngested = new Set(ingestedRows.map((r) => r.doc_id));

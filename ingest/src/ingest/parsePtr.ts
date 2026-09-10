@@ -89,11 +89,22 @@ function joinWrappedAmountRanges(text: string): string {
   return text.replace(/(\$[\d,]+)\s*-\s*\r?\n\s*(\$[\d,]+)/g, "$1 - $2");
 }
 
+// The newer (modern e-filing) House PDF layout renders each row's "Cap.
+// Gains > $200?" checkbox — and the form's other checkbox/radio widgets —
+// with an icon font whose glyphs pdf-parse can't map, so they extract as a
+// run of plain lowercase letters (e.g. "g<TAB>f<TAB>e<TAB>d<TAB>c"). That
+// run lands at the end of the transaction line, right after the amount
+// range, which breaks TXN_LINE's end-of-line anchor and silently drops the
+// entire line — not just that field. Strip it before parsing.
+function stripCheckboxGlyphs(text: string): string {
+  return text.replace(/([ \t])[a-z](?:\t[a-z]){1,}[ \t]*$/gm, "");
+}
+
 export function parsePtrText(
   text: string,
   _docId: string
 ): { transactions: ParsedTransaction[]; issues: string[] } {
-  const joined = joinWrappedAmountRanges(text);
+  const joined = joinWrappedAmountRanges(stripCheckboxGlyphs(text));
   const lines = joined
     .split(/\r?\n/)
     .map((l) => l.replace(/\s+$/, ""))

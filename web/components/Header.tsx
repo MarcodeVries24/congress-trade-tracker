@@ -18,7 +18,10 @@ export function Header() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2.5">
           <Logo />
-          <span className="text-sm font-semibold tracking-tight sm:text-base">Congress Trade Tracker</span>
+          <div className="leading-tight">
+            <div className="text-sm font-semibold tracking-tight sm:text-base">CongTrade</div>
+            <div className="hidden text-[11px] text-ink-faint sm:block">Congress Trade Tracker</div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />

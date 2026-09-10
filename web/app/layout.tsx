@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Congress Trade Tracker",
-  description: "Searchable U.S. House stock trade disclosures (Periodic Transaction Reports)",
+  title: "CongTrade — Congress Trade Tracker",
+  description: "Searchable U.S. Congress (House & Senate) asset trade disclosures (Periodic Transaction Reports)",
 };
 
 // Runs before paint so there's no light/dark flash on load.

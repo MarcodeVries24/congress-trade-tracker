@@ -15,7 +15,6 @@ import {
   Trade,
   TradeFilters,
 } from "@/lib/api";
-import { AssetTypePills } from "@/components/AssetTypePills";
 import { MultiSelect } from "@/components/MultiSelect";
 import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
@@ -332,7 +331,7 @@ export default function Home() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-4 rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
           <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
-            Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} stock trade, searchable
+            Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} asset trade, searchable
           </h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
             Built directly from Periodic Transaction Reports filed with the{" "}
@@ -362,33 +361,21 @@ export default function Home() {
         </div>
 
         {stats && (
-          <div className="mb-4 grid grid-cols-3 gap-2 sm:mb-6 sm:grid-cols-5 sm:gap-3">
-            <StatCard label="Transactions" value={stats.totalTransactions.toLocaleString()} />
-            <StatCard label="Est. volume" value={compactUSD.format(stats.estimatedVolume)} />
-            <StatCard label="Filings ingested" value={stats.totalFilings.toLocaleString()} />
-            <StatCard label="Members tracked" value={stats.totalMembers.toLocaleString()} />
-            <StatCard
-              label="Last checked"
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:mb-6 sm:text-sm">
+            <StatItem value={stats.totalTransactions.toLocaleString()} label="Transactions" />
+            <StatDivider />
+            <StatItem value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" />
+            <StatDivider />
+            <StatItem value={stats.totalFilings.toLocaleString()} label="Filings" />
+            <StatDivider />
+            <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
+            <StatDivider />
+            <StatItem
               value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
-              note={formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              label={`Last checked${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt) ? ` · ${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}` : ""}`}
             />
           </div>
         )}
-
-        {/* Deliberately its own, always-visible (not tucked behind the
-            mobile "Filters" toggle below) block — this is the one filter
-            most visitors care about, defaulting to Stocks only. */}
-        <div className="mb-4 rounded-lg border-2 border-accent/40 bg-accent/5 p-4 sm:mb-6">
-          <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-sm font-semibold text-ink">Asset type</span>
-            <span className="text-xs text-ink-faint">Defaults to Stocks — most trades people look for</span>
-          </div>
-          <AssetTypePills
-            options={Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
-            selected={assetTypes}
-            onChange={setAssetTypes}
-          />
-        </div>
 
         <div className="mb-6 rounded-lg border border-line bg-panel p-4">
           <div className="flex items-center justify-between gap-3 sm:hidden">
@@ -450,6 +437,13 @@ export default function Home() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <MultiSelect
+                placeholder="All asset types"
+                className="w-full sm:w-44"
+                selected={assetTypes}
+                onChange={setAssetTypes}
+                options={Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+              />
               <Select
                 aria-label="Chamber"
                 value={chamber}
@@ -812,16 +806,14 @@ function OcrBadge() {
   );
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note?: string | null }) {
+function StatItem({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-lg border border-line bg-panel p-2 sm:p-4">
-      <div className="truncate text-[9px] uppercase tracking-wide text-ink-faint sm:overflow-visible sm:whitespace-normal sm:text-xs">
-        {label}
-      </div>
-      <div className="mt-0.5 truncate text-sm font-semibold sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-xl">
-        {value}
-      </div>
-      {note && <div className="mt-0.5 truncate text-[10px] text-ink-faint sm:text-xs">{note}</div>}
-    </div>
+    <span className="whitespace-nowrap">
+      <span className="font-semibold text-ink">{value}</span> {label}
+    </span>
   );
+}
+
+function StatDivider() {
+  return <span className="hidden text-ink-faint/50 sm:inline">·</span>;
 }

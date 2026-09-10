@@ -23,7 +23,7 @@ export function Select({
       >
         {children}
       </select>
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint">▾</span>
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg leading-none text-ink-faint">▾</span>
     </div>
   );
 }

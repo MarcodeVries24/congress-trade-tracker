@@ -78,7 +78,7 @@ export function SearchableMultiSelect({
         }`}
       >
         <span className="truncate">{summary}</span>
-        <span className="text-sm text-ink-faint">{open ? "▴" : "▾"}</span>
+        <span className="text-lg leading-none text-ink-faint">{open ? "▴" : "▾"}</span>
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-64 rounded-md border border-line bg-panel p-1.5 shadow-xl">

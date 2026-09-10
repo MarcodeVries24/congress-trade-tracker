@@ -69,6 +69,11 @@ Both chambers share the rest of the pipeline:
    would silently attach the wrong company's market cap to a trade. A trade
    whose ticker (direct or resolved) isn't found, or isn't a public company
    Finnhub has a cap for, shows as `Undefined` rather than guessed at.
+8. Once a day, [`sendDailyReport.ts`](ingest/src/ingest/sendDailyReport.ts)
+   emails a rollup (via [Resend](https://resend.com)) of everything the
+   pipeline touched in the preceding 24 hours — filings split into
+   successful (a transaction was recovered) vs. undefined (nothing could
+   be extracted), plus how many new transactions were added.
 
 ### Known data-quality limits
 
@@ -166,7 +171,29 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
    Skip this step entirely and the site still works fine — every trade's
    market cap just shows as `Undefined`.
 
-### 4. Website + API — Vercel
+### 4. Daily ingest report — Resend (free, optional)
+
+An admin-facing email summarizing everything the pipeline touched in the
+last 24 hours (all six of that day's ingest runs rolled into one) —
+distinguishing filings that were **successful** (at least one transaction
+recovered) from ones that came back **undefined** (an illegible/blank scan,
+or a processing error — nothing guessed at, same as everywhere else).
+
+1. Sign up at [resend.com](https://resend.com) (no card) and copy your API
+   key from the dashboard.
+2. Add two GitHub Actions secrets: `RESEND_API_KEY` (the key), and
+   `REPORT_EMAIL` (the address to send the report to).
+3. [.github/workflows/daily-report.yml](.github/workflows/daily-report.yml)
+   runs `npm run send-daily-report` once a day. Without a verified sending
+   domain, Resend can only deliver to the email address that owns the
+   Resend account — fine for this (an admin report to yourself), but a
+   future end-user-facing notification feature (sending to arbitrary
+   recipients) would need a verified domain; [`ingest/src/lib/email.ts`](ingest/src/lib/email.ts)
+   is written generically for that reason, so it isn't tied to just this
+   report. Skip this step entirely and everything else still works fine —
+   you just won't get the email.
+
+### 5. Website + API — Vercel
 
 1. Sign in at [vercel.com](https://vercel.com) (GitHub sign-in works) and
    import this GitHub repo as a new project.
@@ -182,15 +209,17 @@ npm install
 ```
 
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
-For `sync-market-caps`, also create `ingest/.env` with `DATABASE_URL` and
-`FINNHUB_API_KEY`.
+For `sync-market-caps` and `send-daily-report`, also create `ingest/.env`
+with `DATABASE_URL` plus `FINNHUB_API_KEY` and/or `RESEND_API_KEY` +
+`REPORT_EMAIL` as needed.
 
 ```bash
-npm run dev               # Next.js site + API at http://localhost:3000
-npm run ingest            # run the House PTR ingestion CLI once
-npm run ingest-senate     # run the Senate PTR ingestion CLI once (needs Chrome installed)
-npm run sync-members      # refresh member photos/party (House + Senate, cheap)
-npm run sync-market-caps  # refresh company market caps (needs FINNHUB_API_KEY)
+npm run dev                 # Next.js site + API at http://localhost:3000
+npm run ingest               # run the House PTR ingestion CLI once
+npm run ingest-senate        # run the Senate PTR ingestion CLI once (needs Chrome installed)
+npm run sync-members         # refresh member photos/party (House + Senate, cheap)
+npm run sync-market-caps     # refresh company market caps (needs FINNHUB_API_KEY)
+npm run send-daily-report    # send the daily ingest report now (needs RESEND_API_KEY, REPORT_EMAIL)
 ```
 
 House ingest options:

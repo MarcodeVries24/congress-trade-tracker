@@ -1,0 +1,28 @@
+name: Send daily ingest report
+
+on:
+  # Once a day, not after every 4-hourly ingest.yml run — rolls up all six
+  # of that day's runs into one email. Comfortably after the day's last
+  # ingest run (17 */4 * * * → 20:17 UTC).
+  schedule:
+    - cron: "0 22 * * *" # 22:00 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  send-daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run send-daily-report --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}

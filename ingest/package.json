@@ -8,6 +8,7 @@
     "ingest-senate": "tsx src/ingest/runSenate.ts",
     "sync-members": "tsx src/ingest/syncMembers.ts",
     "sync-market-caps": "tsx src/ingest/syncMarketCaps.ts",
+    "send-daily-report": "tsx src/ingest/sendDailyReport.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

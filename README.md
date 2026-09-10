@@ -173,11 +173,15 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
 
 ### 4. Daily ingest report — Resend (free, optional)
 
-An admin-facing email summarizing everything the pipeline touched in the
-last 24 hours (all six of that day's ingest runs rolled into one) —
+An admin-facing email summarizing every PTR actually **filed** the
+previous day (all six of that day's ingest runs rolled into one) —
 distinguishing filings that were **successful** (at least one transaction
 recovered) from ones that came back **undefined** (an illegible/blank scan,
 or a processing error — nothing guessed at, same as everywhere else).
+Scoped by filing date, not by when the pipeline happened to touch the row —
+every ingest run re-checks each chamber's entire current-year index, so an
+old filing a code improvement just recovered isn't a *new* filing and
+doesn't belong in this report.
 
 1. Sign up at [resend.com](https://resend.com) (no card) and copy your API
    key from the dashboard.

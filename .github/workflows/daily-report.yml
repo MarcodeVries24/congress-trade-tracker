@@ -2,10 +2,14 @@ name: Send daily ingest report
 
 on:
   # Once a day, not after every 4-hourly ingest.yml run — rolls up all six
-  # of that day's runs into one email. Comfortably after the day's last
-  # ingest run (17 */4 * * * → 20:17 UTC).
+  # of that day's runs into one email. Reports on *yesterday's* filings
+  # (filing_date, not when our pipeline happened to touch the row — see
+  # sendDailyReport.ts), so this runs early — just after the first ingest
+  # run of the new day (17 */4 * * * → 00:17 UTC) — rather than late in the
+  # *same* day, since by then all six of yesterday's runs already had their
+  # chance to see anything filed yesterday.
   schedule:
-    - cron: "0 22 * * *" # 22:00 UTC daily
+    - cron: "0 1 * * *" # 01:00 UTC daily
   workflow_dispatch: {}
 
 jobs:

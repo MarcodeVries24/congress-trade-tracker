@@ -3,17 +3,29 @@ import { sql } from "../db/index.js";
 import { sendEmail } from "../lib/email.js";
 
 /**
- * Daily digest of everything the ingest pipeline touched in the last 24
- * hours, sent once a day (see .github/workflows/daily-report.yml) rather
- * than after every 4-hourly ingest run — this rolls all six of those runs
- * up into one email. Every filing the pipeline touches lands in one of two
- * buckets:
+ * Daily digest of yesterday's *actually newly-filed* PTRs, sent once a day
+ * (see .github/workflows/daily-report.yml) rather than after every
+ * 4-hourly ingest run — this rolls all six of that day's runs up into one
+ * email. Every filing in the window lands in one of two buckets:
  *  - Successful: text-parsed or OCR'd with at least one real transaction
  *    recovered (parse_status 'ok' or 'ocr').
  *  - Undefined: no data could be extracted (parse_status 'empty' — a
  *    genuinely illegible/blank scan — or 'failed' — an error during
  *    processing). Reported, not hidden, same "tell me what didn't work"
  *    policy as everywhere else in this project.
+ *
+ * Scoped by filing_date (the real-world date the member filed), not by
+ * when our own pipeline happened to touch the row (ingested_at) — every
+ * ingest run re-checks each chamber's *entire* current-year index, so an
+ * ingested_at-based window doesn't distinguish "filed yesterday" from "an
+ * old filing our code just got better at reading today" (e.g. a filing
+ * from March that a House OCR improvement recovers this week — a real,
+ * valuable event, but not a *new filing*, and not what this report is
+ * for). filing_date has day-only precision, so "yesterday" is the closest
+ * a rolling 24h window can get to exact — this job runs at 01:00 UTC,
+ * after the 00:17 UTC ingest run, so by the time it runs, all six of
+ * yesterday's ingest runs have already had their chance to see anything
+ * filed yesterday.
  */
 
 const REPORT_TO: string = (() => {
@@ -30,7 +42,7 @@ interface FilingRow {
   parse_status: string;
   transaction_count: number;
   pdf_url: string;
-  ingested_at: string;
+  filing_date: string;
 }
 
 function escapeHtml(s: string): string {
@@ -52,10 +64,10 @@ function renderRows(rows: FilingRow[]): string {
 
 async function main() {
   const rows = (await sql.query(
-    `SELECT doc_id, chamber, member_name, state_district, parse_status, transaction_count, pdf_url, ingested_at
+    `SELECT doc_id, chamber, member_name, state_district, parse_status, transaction_count, pdf_url, filing_date
      FROM filings
-     WHERE ingested_at >= NOW() - INTERVAL '24 hours'
-     ORDER BY transaction_count DESC, ingested_at DESC`
+     WHERE NULLIF(filing_date, '')::date = CURRENT_DATE - 1
+     ORDER BY transaction_count DESC, filing_date DESC`
   )) as FilingRow[];
 
   const successful = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "ocr");
@@ -65,22 +77,22 @@ async function main() {
   const houseCount = rows.filter((r) => r.chamber === "house").length;
   const senateCount = rows.filter((r) => r.chamber === "senate").length;
 
-  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const reportDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const MAX_ROWS = 150;
 
   const subject =
     rows.length === 0
-      ? `CongTrade daily report — no new filings (${today})`
-      : `CongTrade daily report — ${successful.length} successful, ${undefinedRows.length} undefined (${today})`;
+      ? `CongTrade daily report — no new filings (${reportDate})`
+      : `CongTrade daily report — ${successful.length} successful, ${undefinedRows.length} undefined (${reportDate})`;
 
   const html = `
     <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111;">
       <h2 style="margin-bottom:4px;">CongTrade — daily ingest report</h2>
-      <p style="color:#666;margin-top:0;">Filings touched in the last 24 hours, as of ${today}.</p>
+      <p style="color:#666;margin-top:0;">New PTR filings filed on ${reportDate}.</p>
 
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <tr>
-          <td style="padding:10px;background:#f5f5f5;border-radius:6px 0 0 6px;"><strong style="font-size:20px;">${rows.length}</strong><br/><span style="color:#666;font-size:12px;">Filings touched</span></td>
+          <td style="padding:10px;background:#f5f5f5;border-radius:6px 0 0 6px;"><strong style="font-size:20px;">${rows.length}</strong><br/><span style="color:#666;font-size:12px;">New filings</span></td>
           <td style="padding:10px;background:#eafaf0;"><strong style="font-size:20px;color:#0a7d3c;">${successful.length}</strong><br/><span style="color:#666;font-size:12px;">Successful</span></td>
           <td style="padding:10px;background:#fbeaea;"><strong style="font-size:20px;color:#a12b2b;">${undefinedRows.length}</strong><br/><span style="color:#666;font-size:12px;">Undefined</span></td>
           <td style="padding:10px;background:#f5f5f5;border-radius:0 6px 6px 0;"><strong style="font-size:20px;">${totalNewTransactions.toLocaleString()}</strong><br/><span style="color:#666;font-size:12px;">New transactions</span></td>
@@ -90,7 +102,7 @@ async function main() {
 
       ${
         rows.length === 0
-          ? `<p>No filings were added or changed in the last 24 hours.</p>`
+          ? `<p>No new filings were filed on ${reportDate}.</p>`
           : `
       <h3 style="margin-bottom:4px;color:#0a7d3c;">Successful (${successful.length})</h3>
       <p style="color:#666;font-size:13px;margin-top:0;">At least one transaction was extracted (text-parsed or OCR'd).</p>
@@ -124,16 +136,16 @@ async function main() {
     </div>
   `;
 
-  const text = `CongTrade daily ingest report — ${today}
+  const text = `CongTrade daily ingest report — ${reportDate}
 
-Filings touched: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})
+New filings: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})
 Successful: ${successful.length}
 Undefined: ${undefinedRows.length}
 New transactions: ${totalNewTransactions}
 `;
 
   await sendEmail({ to: REPORT_TO, subject, html, text });
-  console.log(`Sent daily report to ${REPORT_TO}: ${rows.length} filings touched (${successful.length} successful, ${undefinedRows.length} undefined).`);
+  console.log(`Sent daily report to ${REPORT_TO}: ${rows.length} new filings (${successful.length} successful, ${undefinedRows.length} undefined).`);
 }
 
 main().catch((err) => {

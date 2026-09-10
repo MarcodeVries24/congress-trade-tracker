@@ -1,0 +1,32 @@
+name: Sync market caps
+
+on:
+  # Weekly, not every-4-hours like ingest.yml — a company's market cap
+  # doesn't move meaningfully hour to hour, and the free Finnhub tier's rate
+  # limit means a full run (thousands of tickers, one request each) already
+  # takes a couple of hours.
+  schedule:
+    - cron: "30 5 * * 1" # Monday 05:30 UTC
+  workflow_dispatch: {}
+
+jobs:
+  sync-market-caps:
+    runs-on: ubuntu-latest
+    # The first run resolves every existing tickerless asset name (one
+    # Finnhub search call each) on top of refreshing every ticker's cap —
+    # later runs only do that resolution for names new since the last run,
+    # so they're much faster. Generous ceiling for that first run.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run sync-market-caps --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}

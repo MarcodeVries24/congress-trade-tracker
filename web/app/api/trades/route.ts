@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { ASSET_TYPE_VALUES } from "@/lib/api";
+import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
 const SORT_EXPRESSIONS: Record<string, string> = {
@@ -11,6 +11,7 @@ const SORT_EXPRESSIONS: Record<string, string> = {
   ticker: "t.ticker",
   amount_low: "t.amount_low",
   days_to_file: "days_to_file",
+  market_cap: "cmc.market_cap",
 };
 
 export async function GET(req: NextRequest) {
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
   const owner = sp.get("owner") ?? undefined; // "self" | "JT" | "SP" | "DC"
   const assetTypes = sp.getAll("assetTypes"); // canonical codes — expanded via ASSET_TYPE_VALUES below
   const amountRanges = sp.getAll("amountRanges");
+  const marketCapTiers = sp.getAll("marketCapTiers");
   // Defaults to House-only. Pass chamber=house&chamber=senate (repeated) to
   // include both once Senate coverage exists — never implicit/all-by-default,
   // so this stays safe even before Senate data is fully wired into the UI.
@@ -74,6 +76,19 @@ export async function GET(req: NextRequest) {
     const placeholders = amountRanges.map((r) => addParam(r));
     conditions.push(`t.amount_range IN (${placeholders.join(", ")})`);
   }
+  if (marketCapTiers.length) {
+    const tierConditions = marketCapTiers
+      .map((value) => MARKET_CAP_TIERS.find((t) => t.value === value))
+      .filter((t): t is (typeof MARKET_CAP_TIERS)[number] => t !== undefined)
+      .map((tier) => {
+        if (tier.value === "undefined") return `cmc.market_cap IS NULL`;
+        const parts: string[] = [];
+        if (tier.min !== null) parts.push(`cmc.market_cap >= ${addParam(tier.min)}`);
+        if (tier.max !== null) parts.push(`cmc.market_cap < ${addParam(tier.max)}`);
+        return `(${parts.join(" AND ")})`;
+      });
+    if (tierConditions.length) conditions.push(`(${tierConditions.join(" OR ")})`);
+  }
   if (dateFrom) conditions.push(`f.filing_date >= ${addParam(dateFrom)}`);
   if (dateTo) conditions.push(`f.filing_date <= ${addParam(dateTo)}`);
   // STOCK Act requires filing within 45 days of the transaction.
@@ -89,13 +104,24 @@ export async function GET(req: NextRequest) {
   const limitPlaceholder = `$${dataParams.length - 1}`;
   const offsetPlaceholder = `$${dataParams.length}`;
 
+  // Most House OCR rows have an asset name but no ticker (see
+  // ocrHousePtr.ts) — asset_name_tickers resolves those to a ticker once
+  // (syncMarketCaps.ts) so they can still match a market cap; a row with
+  // neither a direct nor resolved ticker, or one Finnhub had no cap for,
+  // surfaces as market_cap = NULL ("Undefined" in the UI, not zero).
+  const marketCapJoin = `
+       LEFT JOIN asset_name_tickers ant ON (t.ticker IS NULL OR t.ticker = '') AND ant.asset_name = t.asset_name
+       LEFT JOIN company_market_caps cmc ON cmc.ticker = COALESCE(NULLIF(t.ticker, ''), ant.ticker)`;
+
   const [dataRows, countRows] = await Promise.all([
     sql.query(
       `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, f.parse_status, mr.photo_url, mr.party, mr.state AS member_state,
+              cmc.market_cap,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+       ${marketCapJoin}
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
@@ -105,6 +131,7 @@ export async function GET(req: NextRequest) {
       `SELECT COUNT(*)::int as count
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
+       ${marketCapJoin}
        ${where}`,
       params
     ),

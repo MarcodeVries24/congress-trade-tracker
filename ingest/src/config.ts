@@ -25,6 +25,11 @@ export const SENATE_EFD = {
   periodicTransactionsReportType: "11",
 };
 
+export const FINNHUB = {
+  profileUrl: (ticker: string) => `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(ticker)}`,
+  searchUrl: (query: string) => `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}`,
+};
+
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
   // The Bioguide (bioguide.congress.gov) is Congress's own biographical

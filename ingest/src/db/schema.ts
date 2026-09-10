@@ -69,4 +69,30 @@ export const SCHEMA_STATEMENTS = [
     failed INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT ingest_runs_singleton CHECK (id)
   )`,
+  // One row per ticker actually traded, refreshed weekly by syncMarketCaps.ts
+  // — the *current* market cap, not a historical value as of the trade date
+  // (a free-tier API has no practical way to get that, and it's not what
+  // "enrich with the current market cap" asked for anyway). A ticker that
+  // exists here but has a NULL market_cap was looked up but the provider
+  // didn't have a cap for it (e.g. a fund/ETF, not a company) — still
+  // recorded so the weekly refresh doesn't keep re-querying a known miss.
+  `CREATE TABLE IF NOT EXISTS company_market_caps (
+    ticker TEXT PRIMARY KEY,
+    market_cap BIGINT,
+    company_name TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  // Most House OCR rows (paper filings — see ocrHousePtr.ts) have an asset
+  // name but no ticker, so they'd never match company_market_caps directly.
+  // This resolves a name to a ticker *once* (via a name-search API call) and
+  // caches the result — including a confirmed "couldn't resolve this one"
+  // (ticker IS NULL) — so the weekly market-cap refresh only fetches caps by
+  // ticker and never has to repeat the expensive/fuzzy name search for a
+  // name it's already seen. A new row here is only added when a genuinely
+  // new asset_name shows up in an ingest.
+  `CREATE TABLE IF NOT EXISTS asset_name_tickers (
+    asset_name TEXT PRIMARY KEY,
+    ticker TEXT,
+    resolved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];

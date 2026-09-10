@@ -58,6 +58,17 @@ Both chambers share the rest of the pipeline:
    dataset into a `members_reference` table — House by `state_district`,
    Senate by the synthetic last-name key above. Photos are hotlinked from
    `congress.gov`'s own CDN.
+7. Also separately, [`syncMarketCaps.ts`](ingest/src/ingest/syncMarketCaps.ts)
+   enriches trades with the *current* market cap of the company traded (not
+   a historical value as of the trade date — a free-tier API has no
+   practical way to provide that), via [Finnhub](https://finnhub.io), on a
+   weekly schedule (market cap doesn't move meaningfully hour to hour the
+   way filings do). Most House OCR rows have an asset name but no ticker, so
+   a one-time-per-name search step resolves a ticker from the name first —
+   accepting only an exact company-name match, since a fuzzy guess here
+   would silently attach the wrong company's market cap to a trade. A trade
+   whose ticker (direct or resolved) isn't found, or isn't a public company
+   Finnhub has a cap for, shows as `Undefined` rather than guessed at.
 
 ### Known data-quality limits
 
@@ -142,7 +153,20 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
    Chromium gets blocked), so the workflow provisions one first via
    `npx playwright install --with-deps chrome`.
 
-### 3. Website + API — Vercel
+### 3. Market cap enrichment — Finnhub (free, optional)
+
+1. Sign up at [finnhub.io/register](https://finnhub.io/register) (no card)
+   and copy your API key from the dashboard.
+2. Add a GitHub Actions secret named `FINNHUB_API_KEY` with that key.
+3. [.github/workflows/market-caps.yml](.github/workflows/market-caps.yml)
+   runs `npm run sync-market-caps` weekly. The first run is slow (Finnhub's
+   free tier is rate-limited to 60 calls/minute, and it has to resolve every
+   existing tickerless asset name once — see how it works, above); later
+   runs only resolve names new since the last run, so they're much quicker.
+   Skip this step entirely and the site still works fine — every trade's
+   market cap just shows as `Undefined`.
+
+### 4. Website + API — Vercel
 
 1. Sign in at [vercel.com](https://vercel.com) (GitHub sign-in works) and
    import this GitHub repo as a new project.
@@ -158,12 +182,15 @@ npm install
 ```
 
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
+For `sync-market-caps`, also create `ingest/.env` with `DATABASE_URL` and
+`FINNHUB_API_KEY`.
 
 ```bash
-npm run dev             # Next.js site + API at http://localhost:3000
-npm run ingest          # run the House PTR ingestion CLI once
-npm run ingest-senate   # run the Senate PTR ingestion CLI once (needs Chrome installed)
-npm run sync-members    # refresh member photos/party (House + Senate, cheap)
+npm run dev               # Next.js site + API at http://localhost:3000
+npm run ingest            # run the House PTR ingestion CLI once
+npm run ingest-senate     # run the Senate PTR ingestion CLI once (needs Chrome installed)
+npm run sync-members      # refresh member photos/party (House + Senate, cheap)
+npm run sync-market-caps  # refresh company market caps (needs FINNHUB_API_KEY)
 ```
 
 House ingest options:

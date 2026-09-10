@@ -21,6 +21,7 @@ export interface Trade {
   chamber: "house" | "senate";
   member_state: string | null;
   parse_status: string;
+  market_cap: number | null;
 }
 
 export interface TradesResponse {
@@ -51,6 +52,7 @@ export interface TradeFilters {
   owner?: string;
   assetTypes?: string[];
   amountRanges?: string[];
+  marketCapTiers?: string[];
   filedStatus?: "late" | "onTime";
   dateFrom?: string;
   dateTo?: string;
@@ -74,6 +76,44 @@ export const AMOUNT_RANGES = [
 ];
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+
+export interface MarketCapTier {
+  value: string;
+  label: string;
+  min: number | null; // inclusive; null = no floor
+  max: number | null; // exclusive; null = no ceiling
+}
+
+// Standard industry tiers — there's no legally-defined bucketing for market
+// cap the way STOCK Act amount ranges are. "undefined" isn't a cap range at
+// all — it's every trade whose company_market_caps lookup came up empty
+// (no ticker, ticker not a public company Finnhub covers, or not yet
+// refreshed) — see syncMarketCaps.ts.
+export const MARKET_CAP_TIERS: MarketCapTier[] = [
+  { value: "mega", label: "Mega Cap (≥$200B)", min: 200_000_000_000, max: null },
+  { value: "large", label: "Large Cap ($10B–$200B)", min: 10_000_000_000, max: 200_000_000_000 },
+  { value: "mid", label: "Mid Cap ($2B–$10B)", min: 2_000_000_000, max: 10_000_000_000 },
+  { value: "small", label: "Small Cap ($300M–$2B)", min: 300_000_000, max: 2_000_000_000 },
+  { value: "micro", label: "Micro Cap (<$300M)", min: 0, max: 300_000_000 },
+  { value: "undefined", label: "Undefined", min: null, max: null },
+];
+
+export function marketCapTierLabel(marketCap: number | null): string {
+  if (marketCap === null) return "Undefined";
+  const tier = MARKET_CAP_TIERS.find((t) => t.min !== null && marketCap >= t.min && (t.max === null || marketCap < t.max));
+  return tier?.label.replace(/\s*\(.+\)$/, "") ?? "Undefined";
+}
+
+const compactUSDForCap = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export function formatMarketCap(marketCap: number | null): string | null {
+  return marketCap === null ? null : compactUSDForCap.format(marketCap);
+}
 
 export const OWNER_LABELS: Record<string, string> = {
   self: "Self",

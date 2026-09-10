@@ -9,6 +9,9 @@ import {
   displayName,
   fetchStats,
   fetchTrades,
+  formatMarketCap,
+  marketCapTierLabel,
+  MARKET_CAP_TIERS,
   OWNER_LABELS,
   PAGE_SIZE_OPTIONS,
   Stats,
@@ -160,6 +163,8 @@ const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" |
   { value: "days_to_file:asc", label: "Fewest days to file", sort: "days_to_file", order: "asc" },
   { value: "amount_low:desc", label: "Amount: high to low", sort: "amount_low", order: "desc" },
   { value: "amount_low:asc", label: "Amount: low to high", sort: "amount_low", order: "asc" },
+  { value: "market_cap:desc", label: "Market cap: high to low", sort: "market_cap", order: "desc" },
+  { value: "market_cap:asc", label: "Market cap: low to high", sort: "market_cap", order: "asc" },
   { value: "member_name:asc", label: "Member A→Z", sort: "member_name", order: "asc" },
   { value: "ticker:asc", label: "Ticker A→Z", sort: "ticker", order: "asc" },
 ];
@@ -185,6 +190,7 @@ export default function Home() {
   const [owner, setOwner] = useState("");
   const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
   const [amountRanges, setAmountRanges] = useState<string[]>([]);
+  const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
   const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -213,6 +219,7 @@ export default function Home() {
       owner: owner || undefined,
       assetTypes: assetTypes.length ? assetTypes : undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
+      marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
       filedStatus: filedStatus || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
@@ -230,6 +237,7 @@ export default function Home() {
       owner,
       assetTypes,
       amountRanges,
+      marketCapTiers,
       filedStatus,
       dateFrom,
       dateTo,
@@ -242,7 +250,23 @@ export default function Home() {
 
   useEffect(() => {
     setPage(1);
-  }, [chamber, debouncedQ, debouncedMember, debouncedTicker, type, owner, assetTypes, amountRanges, filedStatus, dateFrom, dateTo, sort, order, pageSize]);
+  }, [
+    chamber,
+    debouncedQ,
+    debouncedMember,
+    debouncedTicker,
+    type,
+    owner,
+    assetTypes,
+    amountRanges,
+    marketCapTiers,
+    filedStatus,
+    dateFrom,
+    dateTo,
+    sort,
+    order,
+    pageSize,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +326,7 @@ export default function Home() {
   const activeFilterCount =
     [type, owner, dateFrom, dateTo, member, filedStatus].filter(Boolean).length +
     amountRanges.length +
+    marketCapTiers.length +
     (chamber !== "both" ? 1 : 0) +
     (assetTypesAreDefault ? 0 : 1);
 
@@ -311,6 +336,7 @@ export default function Home() {
     setType("");
     setOwner("");
     setAssetTypes(DEFAULT_ASSET_TYPES);
+    setMarketCapTiers([]);
     setAmountRanges([]);
     setFiledStatus("");
     setDateFrom("");
@@ -476,6 +502,13 @@ export default function Home() {
                 onChange={setAmountRanges}
                 options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
               />
+              <MultiSelect
+                placeholder="Any market cap"
+                className="w-full sm:w-48"
+                selected={marketCapTiers}
+                onChange={setMarketCapTiers}
+                options={MARKET_CAP_TIERS.map((t) => ({ value: t.value, label: t.label }))}
+              />
               <Select
                 value={filedStatus}
                 onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}
@@ -608,6 +641,9 @@ export default function Home() {
                             </button>
                           )}
                           {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                          {trade.market_cap !== null && (
+                            <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -693,6 +729,9 @@ export default function Home() {
                       </button>
                     )}
                     {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                    {trade.market_cap !== null && (
+                      <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
+                    )}
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs">

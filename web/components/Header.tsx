@@ -35,21 +35,28 @@ function Logo({ size = 28 }: { size?: number }) {
 export function Header() {
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="text-ink">
-            <Logo />
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-ink">
+              <Logo />
+            </div>
+            <span className="text-xl font-bold tracking-tight sm:text-2xl">
+              <span className="text-ink">Cong</span>
+              <span className="text-accent">Trade</span>
+            </span>
+            <span className="hidden items-center gap-3 border-l border-line pl-3 md:flex">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">Track Congress trades</span>
+            </span>
           </div>
-          <span className="text-xl font-bold tracking-tight sm:text-2xl">
-            <span className="text-ink">Cong</span>
-            <span className="text-accent">Trade</span>
-          </span>
-          <span className="hidden items-center gap-3 border-l border-line pl-3 md:flex">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">Track Congress trades</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
+        {/* Same tagline, on its own line under the wordmark — the inline
+            divider version above only fits once the row has room to spare. */}
+        <div className="pl-10 pt-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-faint md:hidden">
+          Track Congress trades
         </div>
       </div>
     </header>

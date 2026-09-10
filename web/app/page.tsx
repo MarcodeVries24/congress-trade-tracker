@@ -30,6 +30,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { GatedFilter } from "@/components/GatedFilter";
 import { AdSlot } from "@/components/AdSlot";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -194,6 +195,14 @@ function useDebounced<T>(value: T, delay = 350): T {
 const inputClass =
   "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
 
+// Earliest filing_date in the dataset — the `min` attribute stops the native
+// picker from offering anything earlier, but a typed/pasted value can still
+// bypass that, so onChange also clamps to this floor.
+const EARLIEST_FILING_DATE = "2022-01-01";
+function clampToEarliestFilingDate(value: string): string {
+  return value && value < EARLIEST_FILING_DATE ? EARLIEST_FILING_DATE : value;
+}
+
 export default function Home() {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
@@ -210,7 +219,12 @@ export default function Home() {
   // enforcement is server-side in /api/trades, which never trusts the
   // client's plan state.
   const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   function promptUpgrade() {
+    setUpgradeModalOpen(true);
+  }
+  function continueUpgrade() {
+    setUpgradeModalOpen(false);
     if (isSignedIn) router.push("/upgrade");
     else openSignUp({ redirectUrl: "/upgrade" });
   }
@@ -613,20 +627,28 @@ export default function Home() {
                   <option value="365">Last year</option>
                 </Select>
               </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="flex flex-wrap items-center gap-3">
+              {/* Each date input gets its own GatedFilter (same as every
+                  other single control) rather than one lock badge for the
+                  pair — a shared badge only sits at one end, which reads as
+                  though the other input isn't gated at all. */}
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  onChange={(e) => setDateFrom(clampToEarliestFilingDate(e.target.value))}
                   title="Filed on or after"
+                  min={EARLIEST_FILING_DATE}
                   className={inputClass}
                 />
-                <span className="text-ink-faint">to</span>
+              </GatedFilter>
+              <span className="text-ink-faint">to</span>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  onChange={(e) => setDateTo(clampToEarliestFilingDate(e.target.value))}
                   title="Filed on or before"
+                  min={EARLIEST_FILING_DATE}
                   className={inputClass}
                 />
               </GatedFilter>
@@ -891,6 +913,7 @@ export default function Home() {
         </div>
       </main>
       <Footer />
+      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} />
     </>
   );
 }

@@ -20,6 +20,7 @@ import {
   Trade,
   TradeFilters,
 } from "@/lib/api";
+import { AmericanFlag } from "@/components/AmericanFlag";
 import { MultiSelect } from "@/components/MultiSelect";
 import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
 import { Select } from "@/components/Select";
@@ -375,35 +376,41 @@ export default function Home() {
     <>
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mb-4 rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
-            Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} asset trade, searchable
-          </h1>
-          <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Built directly from Periodic Transaction Reports filed with the{" "}
-            {chamber !== "senate" && (
-              <a
-                href="https://disclosures-clerk.house.gov/FinancialDisclosure"
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-              >
-                House Clerk
-              </a>
-            )}
-            {chamber === "both" && " and the "}
-            {chamber !== "house" && (
-              <a
-                href="https://efdsearch.senate.gov/search/home/"
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-              >
-                Senate eFD
-              </a>
-            )}{" "}
-            — no third-party API in between. Refreshed automatically every 4 hours.
-          </p>
+        <div className="relative mb-4 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
+          <AmericanFlag
+            className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 opacity-[0.14] sm:w-1/2"
+            style={{ maskImage: "linear-gradient(to right, transparent, black 45%)", WebkitMaskImage: "linear-gradient(to right, transparent, black 45%)" }}
+          />
+          <div className="relative">
+            <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
+              Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} asset trade, searchable
+            </h1>
+            <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
+              Built directly from Periodic Transaction Reports filed with the{" "}
+              {chamber !== "senate" && (
+                <a
+                  href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                >
+                  House Clerk
+                </a>
+              )}
+              {chamber === "both" && " and the "}
+              {chamber !== "house" && (
+                <a
+                  href="https://efdsearch.senate.gov/search/home/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                >
+                  Senate eFD
+                </a>
+              )}{" "}
+              — no third-party API in between. Refreshed automatically every 4 hours.
+            </p>
+          </div>
         </div>
 
         {stats && (

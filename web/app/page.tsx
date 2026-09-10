@@ -651,7 +651,11 @@ export default function Home() {
           {!loading &&
             result?.data.map((trade) => {
               const badge = typeBadge(trade.transaction_type);
-              const assetTypeLabel = trade.asset_type_code ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code : null;
+              const assetTypeLabel = trade.asset_type_code
+                ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
+                : trade.parse_status === "ocr"
+                  ? "Undefined"
+                  : null;
               const late = trade.days_to_file !== null && trade.days_to_file > 45;
               return (
                 <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>

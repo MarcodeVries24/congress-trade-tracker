@@ -29,6 +29,7 @@ import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { GatedFilter } from "@/components/GatedFilter";
+import { AdSlot } from "@/components/AdSlot";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -875,6 +876,9 @@ export default function Home() {
             </div>
           </div>
         )}
+        <div className="mt-6">
+          <AdSlot />
+        </div>
       </main>
       <Footer />
     </>

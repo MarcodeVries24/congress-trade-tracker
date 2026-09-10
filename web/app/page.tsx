@@ -90,16 +90,20 @@ function sizeTier(amountLow: number | null): number {
   return 3;
 }
 
+// One color per tier (not per bar) — the whole icon takes on its tier's
+// color so size reads at a glance, with larger trades standing out more:
+// small trades stay a cool, low-key blue, and only the biggest trades get
+// the warm gold treatment.
+const TIER_COLOR = ["bg-line-strong", "bg-sky-400", "bg-amber-400", "bg-[#D4AF37]"];
+const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"];
+
 function SizeIndicator({ amountLow }: { amountLow: number | null }) {
   const tier = sizeTier(amountLow);
+  const color = TIER_COLOR[tier];
   return (
-    <div className="flex items-end gap-0.5" title={tier ? `Size tier ${tier}/3` : "Unknown size"} aria-hidden>
+    <div className="flex items-end gap-0.5" title={TIER_LABEL[tier]} aria-hidden>
       {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className={`w-1 rounded-sm ${i <= tier ? "bg-amber-400" : "bg-line-strong"}`}
-          style={{ height: `${i * 4 + 3}px` }}
-        />
+        <div key={i} className={`w-1 rounded-sm ${i <= tier ? color : "bg-line-strong"}`} style={{ height: `${i * 4 + 3}px` }} />
       ))}
     </div>
   );

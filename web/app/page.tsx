@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
+  cleanAssetName,
   displayName,
   fetchStats,
   fetchTrades,
@@ -578,8 +579,8 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {trade.asset_name}
+                        <div className="flex items-center gap-1.5" title={trade.asset_name}>
+                          {cleanAssetName(trade.asset_name)}
                           {trade.parse_status === "ocr" && <OcrBadge />}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
@@ -663,8 +664,8 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-1.5 text-sm">
-                    {trade.asset_name}
+                  <div className="mt-3 flex items-center gap-1.5 text-sm" title={trade.asset_name}>
+                    {cleanAssetName(trade.asset_name)}
                     {trade.parse_status === "ocr" && <OcrBadge />}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">

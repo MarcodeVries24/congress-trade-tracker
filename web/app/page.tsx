@@ -442,10 +442,6 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mb-4 sm:mb-6">
-          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
-        </div>
-
         {stats && (
           <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:mb-6 sm:text-sm">
             <StatItem value={stats.totalTransactions.toLocaleString()} label="Transactions" />
@@ -462,6 +458,10 @@ export default function Home() {
             />
           </div>
         )}
+
+        <div className="mb-4 sm:mb-6">
+          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
+        </div>
 
         <div className="mb-6 rounded-lg border border-line bg-panel p-4">
           <div className="flex items-center justify-between gap-3 sm:hidden">

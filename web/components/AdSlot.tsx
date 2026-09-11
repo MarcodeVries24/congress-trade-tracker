@@ -34,15 +34,29 @@ export function AdSlot({ slot }: { slot?: string } = {}) {
   // pro user during the brief moment auth is still loading.
   const noAds = isLoaded && (has({ feature: "no_ads" }) || isAdmin);
   const requested = useRef(false);
+  const insRef = useRef<HTMLModElement>(null);
 
   useEffect(() => {
-    if (noAds || !AD_CLIENT || !adSlot || requested.current) return;
-    try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-      requested.current = true;
-    } catch {
-      // adsbygoogle script hasn't finished loading yet — harmless, nothing to retry here.
+    if (noAds || !AD_CLIENT || !adSlot) return;
+    if (!requested.current) {
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        requested.current = true;
+      } catch {
+        // adsbygoogle script hasn't finished loading yet — harmless, nothing to retry here.
+      }
     }
+    // The CSS rule in globals.css collapses the slot once Google sets
+    // data-ad-status="unfilled" — but an ad blocker commonly blocks
+    // adsbygoogle.js outright, so that attribute never gets set at all
+    // (there's nothing to react to). If nothing has happened after a few
+    // seconds, assume the script was blocked and hide the reserved space
+    // manually rather than leaving a permanent blank gap for those visitors.
+    const timer = setTimeout(() => {
+      const el = insRef.current;
+      if (el && !el.getAttribute("data-ad-status")) el.style.display = "none";
+    }, 4000);
+    return () => clearTimeout(timer);
   }, [noAds, adSlot]);
 
   if (noAds) return null;
@@ -66,6 +80,7 @@ export function AdSlot({ slot }: { slot?: string } = {}) {
     // wide data table) far better.
     <div className="mx-auto max-w-4xl">
       <ins
+        ref={insRef}
         className="adsbygoogle block"
         style={{ display: "block" }}
         data-ad-client={AD_CLIENT}

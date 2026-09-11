@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import "./globals.css";
 
@@ -40,12 +39,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" suppressHydrationWarning>
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+          {/* Plain native tag, not next/script — Script's afterInteractive
+              strategy injects client-side after hydration, so it never
+              appears in the raw server-rendered HTML that AdSense's
+              verification crawler actually fetches. This one does. */}
           {ADSENSE_CLIENT_ID && (
-            <Script
+            <script
               async
               src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
               crossOrigin="anonymous"
-              strategy="afterInteractive"
             />
           )}
         </head>

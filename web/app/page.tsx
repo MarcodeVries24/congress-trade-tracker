@@ -30,12 +30,16 @@ function memberLocationFromDashboard(row: { chamber: "house" | "senate"; state_d
   return row.state_district;
 }
 
-const PARTY_LABEL: Record<string, string> = { D: "Democrat", R: "Republican", I: "Independent" };
-const PARTY_COLOR: Record<string, string> = {
-  D: "bg-sky-500",
-  R: "bg-rose-500",
-  I: "bg-violet-500",
-};
+// members_reference.party stores the full party name (e.g. "Democrat"),
+// not a letter code — matched case-insensitively by prefix since a value
+// could plausibly come through as "D"/"Dem" from an unmapped source too.
+function partyColor(party: string): string {
+  const p = party.toLowerCase();
+  if (p.startsWith("d")) return "bg-sky-500";
+  if (p.startsWith("r")) return "bg-rose-500";
+  if (p.startsWith("i")) return "bg-violet-500";
+  return "bg-line-strong";
+}
 
 export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -233,11 +237,11 @@ export default function Home() {
                       return (
                         <div key={p.party}>
                           <div className="mb-0.5 flex items-center justify-between text-xs text-ink-muted">
-                            <span>{PARTY_LABEL[p.party] ?? p.party}</span>
+                            <span>{p.party}</span>
                             <span>{pct}%</span>
                           </div>
                           <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel-muted">
-                            <div className={`h-full rounded-full ${PARTY_COLOR[p.party] ?? "bg-line-strong"}`} style={{ width: `${pct}%` }} />
+                            <div className={`h-full rounded-full ${partyColor(p.party)}`} style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );

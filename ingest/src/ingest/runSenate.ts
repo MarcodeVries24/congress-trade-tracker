@@ -13,7 +13,20 @@ const startArg = args.find((a) => a.startsWith("--start="))?.split("=")[1]; // M
 const forceArg = args.includes("--force");
 
 const limit = limitArg ? Number(limitArg) : Infinity;
-const startDate = startArg ?? `01/01/${new Date().getFullYear()}`;
+// This script runs every 4 hours (see .github/workflows/ingest.yml) and,
+// unlike the House side, the search itself — not just the per-filing OCR —
+// is the expensive part (a live Playwright session against efdsearch.senate.gov).
+// Defaulting to Jan 1 re-ran that full-year search every single run even
+// though a new filing is, by construction, always within the last few days
+// of "now". Default to a rolling 1-week lookback instead; pass an explicit
+// `--start=01/01/YYYY` for a one-off wider sweep (e.g. after an OCR fix).
+function defaultStartDate(): string {
+  const d = new Date(Date.now() - 7 * 86400000);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+const startDate = startArg ?? defaultStartDate();
 
 function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);

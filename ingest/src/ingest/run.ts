@@ -10,9 +10,15 @@ const args = process.argv.slice(2);
 const yearArg = args.find((a) => a.startsWith("--year="))?.split("=")[1];
 const forceArg = args.includes("--force");
 const limitArg = args.find((a) => a.startsWith("--limit="))?.split("=")[1];
+const retryDaysArg = args.find((a) => a.startsWith("--retry-days="))?.split("=")[1];
 
 const year = yearArg ? Number(yearArg) : new Date().getFullYear();
 const limit = limitArg ? Number(limitArg) : Infinity;
+// How far back to keep retrying 'empty' filings on the routine (every-4-hours)
+// run — 0 means no cutoff, retry every 'empty' filing regardless of age (use
+// for a one-off sweep after a parser fix, e.g. `--retry-days=0 --force` isn't
+// even needed, --force reprocesses everything including 'ok' ones instead).
+const retryDays = retryDaysArg ? Number(retryDaysArg) : 7;
 
 async function main() {
   await ensureSchema();
@@ -22,17 +28,30 @@ async function main() {
   const ptrFilings = index.filter((f) => f.filingType === "P");
   console.log(`Found ${ptrFilings.length} Periodic Transaction Report filings for ${year}.`);
 
-  // 'empty' filings are retried every run too — the text-extraction parser
-  // improves over time (e.g. the modern e-filing PDF's checkbox-glyph fix
-  // recovered ~150 previously-empty filings), and there's no successful
-  // parse to lose by re-attempting, so it's cheap and can only help.
-  // 'not-a-ptr' is excluded from that retry, unlike 'empty' — it's a
-  // confirmed non-PTR document (see looksLikeNonPtrDocument), not a
-  // parsing gap that a future improvement could recover more from.
-  const ingestedRows = (await sql.query(`SELECT doc_id FROM filings WHERE parse_status NOT IN ('pending', 'empty')`)) as {
-    doc_id: string;
-  }[];
-  const alreadyIngested = new Set(ingestedRows.map((r) => r.doc_id));
+  // 'empty' filings are retried too — the text-extraction parser improves
+  // over time (e.g. the modern e-filing PDF's checkbox-glyph fix recovered
+  // ~150 previously-empty filings), and there's no successful parse to lose
+  // by re-attempting. 'not-a-ptr' is excluded from that retry, unlike
+  // 'empty' — it's a confirmed non-PTR document (see looksLikeNonPtrDocument),
+  // not a parsing gap that a future improvement could recover more from.
+  //
+  // But retrying is only cheap for a *recent* 'empty' filing — this script
+  // runs every 4 hours (see .github/workflows/ingest.yml), and without a
+  // cutoff every 'empty' filing since Jan 1 gets re-downloaded and re-OCR'd
+  // on every single run, all year, even though a parser fix that recovers
+  // an old one is rare and can be swept up manually with
+  // `--retry-days=0 --year=<that year>` when it actually happens (as this
+  // session did by hand). So the routine run only retries 'empty' filings
+  // filed within the last `retryDays` days — older ones are left alone
+  // until an explicit wider sweep asks for them.
+  const cutoffIso = retryDays > 0 ? new Date(Date.now() - retryDays * 86400000).toISOString().slice(0, 10) : null;
+  const skipRows = (await sql.query(
+    cutoffIso
+      ? `SELECT doc_id FROM filings WHERE parse_status NOT IN ('pending', 'empty') OR (parse_status = 'empty' AND filing_date < $1)`
+      : `SELECT doc_id FROM filings WHERE parse_status NOT IN ('pending', 'empty')`,
+    cutoffIso ? [cutoffIso] : []
+  )) as { doc_id: string }[];
+  const alreadyIngested = new Set(skipRows.map((r) => r.doc_id));
 
   const toProcess = forceArg ? ptrFilings : ptrFilings.filter((f) => !alreadyIngested.has(f.docId));
   const capped = toProcess.slice(0, limit);

@@ -103,12 +103,18 @@ export default function Home() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+        {/* Latest Trades sits beside a sidebar of two shorter cards, rather
+            than sharing one CSS grid row with them — a shared row forces
+            equal-height stretching (via row-span + the default grid
+            align-items: stretch), which left a large blank gap inside
+            whichever card had less content. items-start here means each
+            column simply ends where its own content ends. */}
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:gap-6">
           {/* Latest Trades */}
           <Card
             title="Latest Trades"
             href="/trades"
-            className="lg:col-span-2 lg:row-span-2"
+            className="lg:col-span-2"
             actions={
               <div className="flex items-center gap-1 text-[11px]">
                 {(["stocks", "all"] as const).map((v) => (
@@ -157,70 +163,73 @@ export default function Home() {
             )}
           </Card>
 
-          {/* Most Active Politicians */}
-          <Card title="Most Active Politicians" href="/politicians?sort=trade_count">
-            {!dashboard && <CardSkeleton rows={6} />}
-            {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
-            {dashboard && (
-              <ul className="divide-y divide-line/60">
-                {dashboard.topPoliticians.map((p, i) => {
-                  const location = memberLocationFromDashboard(p);
-                  return (
-                    <li key={`${p.member_name}-${i}`}>
-                      <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
-                        <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
-                          <div className="truncate text-xs text-ink-faint">
-                            {p.party ? `${p.party} · ` : ""}
-                            {location ?? p.chamber}
+          {/* Sidebar: Most Active Politicians + Top by Trading Volume, stacked */}
+          <div className="flex flex-col gap-4 lg:gap-6">
+            <Card title="Most Active Politicians" href="/politicians?sort=trade_count">
+              {!dashboard && <CardSkeleton rows={6} />}
+              {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
+              {dashboard && (
+                <ul className="divide-y divide-line/60">
+                  {dashboard.topPoliticians.map((p, i) => {
+                    const location = memberLocationFromDashboard(p);
+                    return (
+                      <li key={`${p.member_name}-${i}`}>
+                        <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                          <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                            <div className="truncate text-xs text-ink-faint">
+                              {p.party ? `${p.party} · ` : ""}
+                              {location ?? p.chamber}
+                            </div>
                           </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <div className="text-sm font-semibold text-ink">{p.trade_count.toLocaleString()}</div>
-                          <div className="text-[10px] uppercase tracking-wide text-ink-faint">trades</div>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+                          <div className="shrink-0 text-right">
+                            <div className="text-sm font-semibold text-ink">{p.trade_count.toLocaleString()}</div>
+                            <div className="text-[10px] uppercase tracking-wide text-ink-faint">trades</div>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
 
-          {/* Top by Trading Volume */}
-          <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum">
-            {!dashboard && <CardSkeleton rows={6} />}
-            {dashboard && dashboard.topByVolume.length === 0 && <EmptyRow />}
-            {dashboard && (
-              <ul className="divide-y divide-line/60">
-                {dashboard.topByVolume.map((p, i) => {
-                  const location = memberLocationFromDashboard(p);
-                  return (
-                    <li key={`${p.member_name}-${i}`}>
-                      <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
-                        <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
-                          <div className="truncate text-xs text-ink-faint">
-                            {p.party ? `${p.party} · ` : ""}
-                            {location ?? p.chamber}
+            <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum">
+              {!dashboard && <CardSkeleton rows={6} />}
+              {dashboard && dashboard.topByVolume.length === 0 && <EmptyRow />}
+              {dashboard && (
+                <ul className="divide-y divide-line/60">
+                  {dashboard.topByVolume.map((p, i) => {
+                    const location = memberLocationFromDashboard(p);
+                    return (
+                      <li key={`${p.member_name}-${i}`}>
+                        <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                          <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                            <div className="truncate text-xs text-ink-faint">
+                              {p.party ? `${p.party} · ` : ""}
+                              {location ?? p.chamber}
+                            </div>
                           </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <div className="text-sm font-semibold text-ink">{compactUSD.format(p.volume_sum)}</div>
-                          <div className="text-[10px] uppercase tracking-wide text-ink-faint">
-                            est. · {p.trade_count.toLocaleString()} trade{p.trade_count === 1 ? "" : "s"}
+                          <div className="shrink-0 text-right">
+                            <div className="text-sm font-semibold text-ink">{compactUSD.format(p.volume_sum)}</div>
+                            <div className="text-[10px] uppercase tracking-wide text-ink-faint">
+                              est. · {p.trade_count.toLocaleString()} trade{p.trade_count === 1 ? "" : "s"}
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </div>
 
+        <div className="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}
           <Card title="Most Traded Stocks" href="/trades">
             {!dashboard && <CardSkeleton rows={6} />}

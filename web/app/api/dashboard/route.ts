@@ -36,7 +36,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
     ORDER BY sub.filing_date DESC NULLS LAST, sub.id DESC
-    LIMIT 8`;
+    LIMIT 12`;
 }
 
 // Unlike /api/trades and /api/stats (House-only by default), the dashboard

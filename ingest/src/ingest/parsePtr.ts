@@ -87,6 +87,16 @@ function toIsoDateSlash(s: string): string | null {
 // it behaves identically to every other row in the same bracket (sorts,
 // filters, and displays the same way).
 const STOCK_ACT_BRACKETS: { range: string; low: number; high: number | null }[] = [
+  // Below the STOCK Act's own bottom bracket — the form has no checkbox for
+  // this (column A starts at $1,001), so it only ever shows up as a typed
+  // exact figure in a text-native e-filing (confirmed on real filings: Brian
+  // Mast doc 20024743, three sub-$1 purchases in a dependent child's account
+  // down to $172; Nancy Pelosi doc 20022320, $1.00 for 100 options that
+  // expired worthless). Bucketed rather than excluded — even a nominal
+  // options-expiration figure like Pelosi's can sit next to a real disclosed
+  // loss in the filer's own comments, so hiding the row entirely hides that
+  // context too.
+  { range: "$1,000 or less", low: 0, high: 1000 },
   { range: "$1,001 - $15,000", low: 1001, high: 15000 },
   { range: "$15,001 - $50,000", low: 15001, high: 50000 },
   { range: "$50,001 - $100,000", low: 50001, high: 100000 },
@@ -114,10 +124,11 @@ function parseAmountRange(range: string): { low: number | null; high: number | n
   // transaction is stored) rather than keep it as a standalone figure,
   // which wouldn't match any of the site's known amount_range strings (so
   // it'd silently fall out of the trade-size filter, and read as a
-  // one-off next to every peer row's plain bracket label). Below $1,001 or
-  // above $50,000,000 is outside the STOCK Act's own disclosure range
-  // (shouldn't happen for a figure that had to be disclosed at all) —
-  // decline rather than guess a bracket for it.
+  // one-off next to every peer row's plain bracket label). Only a figure
+  // above $50,000,000 (outside the STOCK Act's own disclosure range —
+  // shouldn't happen for something that had to be disclosed at all) falls
+  // through bracketFor and keeps the raw one-off value below; anything at
+  // or under $50,000,000, however small, lands in a real bracket now.
   if (nums.length === 1) {
     const bracket = bracketFor(nums[0]);
     if (bracket) return { low: bracket.low, high: bracket.high, displayRange: bracket.range };

@@ -150,7 +150,12 @@ export interface TradeFilters {
 }
 
 // STOCK Act disclosure bands, in the exact strings the parser stores them as.
+// "$1,000 or less" isn't one of the form's own checkbox brackets (column A
+// starts at $1,001) — it only shows up for an exact sub-$1,001 figure typed
+// into a text-native e-filing (a below-threshold purchase, or a nominal
+// options-expiration value), bucketed there by parsePtr.ts's bracketFor.
 export const AMOUNT_RANGES = [
+  "$1,000 or less",
   "$1,001 - $15,000",
   "$15,001 - $50,000",
   "$50,001 - $100,000",

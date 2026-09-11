@@ -49,6 +49,32 @@ async function fetchLegislators(url: string): Promise<Legislator[]> {
   return loadYaml(await res.text()) as Legislator[];
 }
 
+// Bioguide (see MEMBERS_REFERENCE.photoUrl) is Congress's own directory and
+// covers ~99% of current members, but a very recently seated member can
+// have no photo on file there yet — this fills that gap with a stand-in
+// until bioguide catches up. Checked against the real bioguide URL on every
+// sync (see resolvePhotoUrl) and dropped automatically the moment that
+// starts resolving, so an entry never needs to be manually removed once
+// bioguide adds the photo — safe to leave stale, though fine to delete too.
+const INTERIM_PHOTO_OVERRIDES: Record<string, string> = {
+  // Alan Armstrong (R-OK), appointed to the Senate in March 2026 to fill
+  // Markwayne Mullin's seat — bioguide had no photo for him as of Sep 2026.
+  // Official Senate portrait, public domain, via Wikimedia Commons.
+  A000383: "https://upload.wikimedia.org/wikipedia/commons/5/55/Alan_S_Armstrong_official_portrait_%28cropped_2%29.jpg",
+};
+
+async function resolvePhotoUrl(bioguideId: string): Promise<string> {
+  const official = MEMBERS_REFERENCE.photoUrl(bioguideId);
+  const override = INTERIM_PHOTO_OVERRIDES[bioguideId.toUpperCase()];
+  if (!override) return official;
+  try {
+    const res = await fetch(official, { method: "HEAD" });
+    return res.ok ? official : override;
+  } catch {
+    return override;
+  }
+}
+
 async function syncCurrentMembers(legislators: Legislator[]): Promise<void> {
   const upsert = sql.query.bind(sql);
   let houseCount = 0;
@@ -84,7 +110,7 @@ async function syncCurrentMembers(legislators: Legislator[]): Promise<void> {
          photo_url = EXCLUDED.photo_url,
          state = EXCLUDED.state,
          updated_at = NOW()`,
-      [key, bioguideId, officialName, currentTerm.party ?? null, MEMBERS_REFERENCE.photoUrl(bioguideId), currentTerm.state]
+      [key, bioguideId, officialName, currentTerm.party ?? null, await resolvePhotoUrl(bioguideId), currentTerm.state]
     );
   }
 
@@ -119,7 +145,7 @@ async function upsertMemberReference(key: string, legislator: Legislator, term: 
     `INSERT INTO members_reference (state_district, bioguide_id, official_name, party, photo_url, state, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, NOW())
      ON CONFLICT (state_district) DO NOTHING`,
-    [key, bioguideId, officialName, term?.party ?? null, MEMBERS_REFERENCE.photoUrl(bioguideId), term?.state ?? null]
+    [key, bioguideId, officialName, term?.party ?? null, await resolvePhotoUrl(bioguideId), term?.state ?? null]
   );
 }
 

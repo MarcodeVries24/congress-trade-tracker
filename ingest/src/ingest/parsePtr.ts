@@ -79,17 +79,51 @@ function toIsoDateSlash(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
-function parseAmountRange(range: string): { low: number | null; high: number | null } {
+// STOCK Act disclosure brackets, in the exact strings the site's own filter
+// UI and every other parser in this codebase already store/expect (see
+// e.g. AMOUNT_RANGES in web/lib/api.ts, and the equivalent list in
+// ocrHousePtr.ts) — an exact disclosed value gets bucketed into whichever
+// of these it falls in, rather than stored as its own one-off figure, so
+// it behaves identically to every other row in the same bracket (sorts,
+// filters, and displays the same way).
+const STOCK_ACT_BRACKETS: { range: string; low: number; high: number | null }[] = [
+  { range: "$1,001 - $15,000", low: 1001, high: 15000 },
+  { range: "$15,001 - $50,000", low: 15001, high: 50000 },
+  { range: "$50,001 - $100,000", low: 50001, high: 100000 },
+  { range: "$100,001 - $250,000", low: 100001, high: 250000 },
+  { range: "$250,001 - $500,000", low: 250001, high: 500000 },
+  { range: "$500,001 - $1,000,000", low: 500001, high: 1000000 },
+  { range: "$1,000,001 - $5,000,000", low: 1000001, high: 5000000 },
+  { range: "$5,000,001 - $25,000,000", low: 5000001, high: 25000000 },
+  { range: "$25,000,001 - $50,000,000", low: 25000001, high: 50000000 },
+  { range: "Over $50,000,000", low: 50000001, high: null },
+];
+
+function bracketFor(value: number): { range: string; low: number; high: number | null } | null {
+  return STOCK_ACT_BRACKETS.find((b) => value >= b.low && (b.high === null || value <= b.high)) ?? null;
+}
+
+function parseAmountRange(range: string): { low: number | null; high: number | null; displayRange: string } {
   const nums = [...range.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map((m) => Math.round(Number(m[1].replace(/,/g, ""))));
   const lower = range.toLowerCase();
-  if (lower.includes("or less")) return { low: 0, high: nums[0] ?? null };
-  if (lower.includes("over")) return { low: nums[0] ?? null, high: null };
+  if (lower.includes("or less")) return { low: 0, high: nums[0] ?? null, displayRange: range };
+  if (lower.includes("over")) return { low: nums[0] ?? null, high: null, displayRange: range };
   // A single figure with no "-" separator is an exact disclosed value (see
-  // TXN_LINE's comment) rather than a range — both bounds are that same
-  // figure, not "low, open-ended high" the way a lone number elsewhere in
-  // this function would otherwise read.
-  if (nums.length === 1) return { low: nums[0], high: nums[0] };
-  return { low: nums[0] ?? null, high: nums[1] ?? null };
+  // TXN_LINE's comment), not a range — bucket it into the STOCK Act
+  // bracket it actually falls in (matching how every bracket-disclosed
+  // transaction is stored) rather than keep it as a standalone figure,
+  // which wouldn't match any of the site's known amount_range strings (so
+  // it'd silently fall out of the trade-size filter, and read as a
+  // one-off next to every peer row's plain bracket label). Below $1,001 or
+  // above $50,000,000 is outside the STOCK Act's own disclosure range
+  // (shouldn't happen for a figure that had to be disclosed at all) —
+  // decline rather than guess a bracket for it.
+  if (nums.length === 1) {
+    const bracket = bracketFor(nums[0]);
+    if (bracket) return { low: bracket.low, high: bracket.high, displayRange: bracket.range };
+    return { low: nums[0], high: nums[0], displayRange: range };
+  }
+  return { low: nums[0] ?? null, high: nums[1] ?? null, displayRange: range };
 }
 
 /**
@@ -141,7 +175,7 @@ export function parsePtrText(
 
       const tickerMatch = assetText.match(TICKER_PATTERN);
       const assetTypeMatch = assetText.match(ASSET_TYPE_PATTERN);
-      const { low, high } = parseAmountRange(amountRange);
+      const { low, high, displayRange } = parseAmountRange(amountRange);
 
       if (!assetText) {
         assetText = "(unknown asset)";
@@ -156,7 +190,7 @@ export function parsePtrText(
         transactionType: txnTypeRaw.replace(/\s+/g, " ").trim(),
         transactionDate: toIsoDateSlash(date1),
         notificationDate: toIsoDateSlash(date2),
-        amountRange: amountRange.replace(/\s+/g, " ").trim(),
+        amountRange: displayRange.replace(/\s+/g, " ").trim(),
         amountLow: low,
         amountHigh: high,
       });

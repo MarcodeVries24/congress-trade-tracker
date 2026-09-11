@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -41,7 +42,7 @@ export function Header() {
             there's room, and only fall to its own line once the row
             actually can't fit it — no breakpoint guessing. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:gap-x-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3">
             <div className="text-ink">
               <Logo />
             </div>
@@ -49,7 +50,7 @@ export function Header() {
               <span className="text-ink">Cong</span>
               <span className="text-accent">Trade</span>
             </span>
-          </div>
+          </Link>
           {/* Sized down on narrow phones so the tagline still fits next to
               the wordmark instead of always dropping to its own line — it
               only wraps (via the parent's flex-wrap) once a screen is too
@@ -58,6 +59,12 @@ export function Header() {
             <span className="text-[9px] font-medium uppercase tracking-normal text-ink-faint sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider">
               Track Congress trades
             </span>
+            <Link
+              href="/trades"
+              className="text-[9px] font-medium uppercase tracking-normal text-ink-muted underline decoration-line-strong transition-colors hover:text-ink sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider"
+            >
+              All Trades
+            </Link>
           </span>
         </div>
         <div className="flex items-center gap-3">

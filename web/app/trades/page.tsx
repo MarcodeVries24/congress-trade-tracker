@@ -1,0 +1,868 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import {
+  AMOUNT_RANGES,
+  ASSET_TYPE_LABELS,
+  cleanAssetName,
+  DEFAULT_ASSET_TYPES,
+  displayName,
+  fetchMemberOptions,
+  fetchStats,
+  fetchTickerOptions,
+  fetchTrades,
+  formatMarketCap,
+  marketCapTierLabel,
+  MARKET_CAP_TIERS,
+  OWNER_LABELS,
+  PAGE_SIZE_OPTIONS,
+  Stats,
+  Trade,
+  TradeFilters,
+} from "@/lib/api";
+import { AmericanFlag } from "@/components/AmericanFlag";
+import { MultiSelect } from "@/components/MultiSelect";
+import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
+import { Select } from "@/components/Select";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { GatedFilter } from "@/components/GatedFilter";
+import { AdSlot } from "@/components/AdSlot";
+import { UpgradeModal } from "@/components/UpgradeModal";
+import { MemberPhoto } from "@/components/MemberPhoto";
+import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, memberLocation, typeBadge } from "@/lib/format";
+
+// Rough magnitude tier so the eye can scan trade size without reading text.
+function sizeTier(amountLow: number | null): number {
+  if (amountLow === null) return 0;
+  if (amountLow < 100_000) return 1;
+  if (amountLow < 1_000_000) return 2;
+  return 3;
+}
+
+// One color per tier (not per bar) — the whole icon takes on its tier's
+// color so size reads like a medal podium: silver for small, gold for
+// medium, and the biggest trades get an icy diamond blue instead of just
+// "more gold" so they read as a distinct top tier, not just gold-plus-one-bar.
+const TIER_COLOR = ["bg-line-strong", "bg-[#C0C0C0]", "bg-[#D4AF37]", "bg-[#7DD3FC]"];
+const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"];
+
+function SizeIndicator({ amountLow }: { amountLow: number | null }) {
+  const tier = sizeTier(amountLow);
+  const color = TIER_COLOR[tier];
+  return (
+    <div className="flex items-end gap-0.5" title={TIER_LABEL[tier]} aria-hidden>
+      {[1, 2, 3].map((i) => (
+        <div key={i} className={`w-1 rounded-sm ${i <= tier ? color : "bg-line-strong"}`} style={{ height: `${i * 4 + 3}px` }} />
+      ))}
+    </div>
+  );
+}
+
+// Used by the mobile sort dropdown, which has no clickable column headers
+// to sort by — same fields the desktop table's headers sort on.
+const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" | "desc" }[] = [
+  { value: "filing_date:desc", label: "Newest filed", sort: "filing_date", order: "desc" },
+  { value: "filing_date:asc", label: "Oldest filed", sort: "filing_date", order: "asc" },
+  { value: "transaction_date:desc", label: "Newest traded", sort: "transaction_date", order: "desc" },
+  { value: "transaction_date:asc", label: "Oldest traded", sort: "transaction_date", order: "asc" },
+  { value: "days_to_file:desc", label: "Most days to file", sort: "days_to_file", order: "desc" },
+  { value: "days_to_file:asc", label: "Fewest days to file", sort: "days_to_file", order: "asc" },
+  { value: "amount_low:desc", label: "Amount: high to low", sort: "amount_low", order: "desc" },
+  { value: "amount_low:asc", label: "Amount: low to high", sort: "amount_low", order: "asc" },
+  { value: "market_cap:desc", label: "Market cap: high to low", sort: "market_cap", order: "desc" },
+  { value: "market_cap:asc", label: "Market cap: low to high", sort: "market_cap", order: "asc" },
+  { value: "member_name:asc", label: "Member A→Z", sort: "member_name", order: "asc" },
+  { value: "ticker:asc", label: "Ticker A→Z", sort: "ticker", order: "asc" },
+];
+
+function useDebounced<T>(value: T, delay = 350): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+const inputClass =
+  "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
+
+// Earliest filing_date in the dataset — the `min` attribute stops the native
+// picker from offering anything earlier, but a typed/pasted value can still
+// bypass that, so onChange also clamps to this floor.
+const EARLIEST_FILING_DATE = "2022-01-01";
+function clampToEarliestFilingDate(value: string): string {
+  return value && value < EARLIEST_FILING_DATE ? EARLIEST_FILING_DATE : value;
+}
+
+export default function Home() {
+  const router = useRouter();
+  const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
+  const { user } = useUser();
+  const { openSignUp, openSignIn } = useClerk();
+  // Comp access via public metadata ({"admin": true}, set in the Clerk
+  // dashboard or Backend API) — lets a specific account use paid features
+  // without an actual subscription. Mirrors the server-side check in
+  // lib/access.ts; this one's UI-only, not the security boundary.
+  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
+  // Defaults to "unlocked" while Clerk is still loading (usually well under
+  // a second) rather than flashing every visitor's filters as locked first —
+  // this is a UX nicety only, not the security boundary. The actual
+  // enforcement is server-side in /api/trades, which never trusts the
+  // client's plan state.
+  const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  function promptUpgrade() {
+    setUpgradeModalOpen(true);
+  }
+  function continueUpgrade() {
+    setUpgradeModalOpen(false);
+    if (isSignedIn) router.push("/upgrade");
+    // `redirectUrl` is deprecated in this Clerk version and gets silently
+    // ignored — forceRedirectUrl is what actually lands them on /upgrade
+    // after sign-up; signInForceRedirectUrl covers it too if they instead
+    // click "Already have an account? Sign in" inside the same modal.
+    else openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
+  }
+  function continueSignIn() {
+    setUpgradeModalOpen(false);
+    openSignIn({ forceRedirectUrl: "/upgrade", signUpForceRedirectUrl: "/upgrade" });
+  }
+
+  const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
+  const [q, setQ] = useState("");
+  const [members, setMembers] = useState<string[]>([]);
+  const [tickers, setTickers] = useState<string[]>([]);
+  const [types, setTypes] = useState<string[]>([]);
+  const [owners, setOwners] = useState<string[]>([]);
+  const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
+  const [amountRanges, setAmountRanges] = useState<string[]>([]);
+  const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
+  const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState("filing_date");
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const [result, setResult] = useState<{ data: Trade[]; total: number; totalPages: number } | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [memberOptions, setMemberOptions] = useState<{ value: string; label: string }[]>([]);
+  const [tickerOptions, setTickerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([fetchMemberOptions(), fetchTickerOptions()])
+      .then(([memberRows, tickerRows]) => {
+        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: displayName(m.member_name) })));
+        setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
+      })
+      .catch(() => {})
+      .finally(() => setOptionsLoading(false));
+  }, []);
+
+  const debouncedQ = useDebounced(q);
+
+  const filters: TradeFilters = useMemo(
+    () => ({
+      chamber: chamber === "both" ? ["house", "senate"] : [chamber],
+      q: debouncedQ || undefined,
+      members: members.length ? members : undefined,
+      tickers: tickers.length ? tickers : undefined,
+      types: types.length ? types : undefined,
+      owners: owners.length ? owners : undefined,
+      assetTypes: assetTypes.length ? assetTypes : undefined,
+      amountRanges: amountRanges.length ? amountRanges : undefined,
+      marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
+      filedStatus: filedStatus || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      sort,
+      order,
+      page,
+      limit: pageSize,
+    }),
+    [
+      chamber,
+      debouncedQ,
+      members,
+      tickers,
+      types,
+      owners,
+      assetTypes,
+      amountRanges,
+      marketCapTiers,
+      filedStatus,
+      dateFrom,
+      dateTo,
+      sort,
+      order,
+      page,
+      pageSize,
+    ]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    chamber,
+    debouncedQ,
+    members,
+    tickers,
+    types,
+    owners,
+    assetTypes,
+    amountRanges,
+    marketCapTiers,
+    filedStatus,
+    dateFrom,
+    dateTo,
+    sort,
+    order,
+    pageSize,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchTrades(filters)
+      .then((res) => {
+        if (!cancelled) setResult(res);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message ?? "Failed to load trades");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchStats(chamber === "both" ? ["house", "senate"] : [chamber])
+      .then(setStats)
+      .catch(() => {});
+  }, [chamber]);
+
+  function toggleSort(key: string) {
+    if (sort === key) {
+      setOrder((o) => (o === "asc" ? "desc" : "asc"));
+    } else {
+      setSort(key);
+      setOrder(key === "member_name" || key === "ticker" ? "asc" : "desc");
+    }
+  }
+
+  function SortHeader({ label, sortKey, className = "" }: { label: string; sortKey: string; className?: string }) {
+    const active = sort === sortKey;
+    return (
+      <th className={`px-4 py-3 ${className}`}>
+        <button
+          onClick={() => toggleSort(sortKey)}
+          className={`flex items-center gap-1 whitespace-nowrap uppercase tracking-wide hover:text-ink ${active ? "text-ink" : ""}`}
+        >
+          {label}
+          <span className="text-[10px]">{active ? (order === "asc" ? "▲" : "▼") : ""}</span>
+        </button>
+      </th>
+    );
+  }
+
+  // The default view is Stocks-only, not "no filter" — so the asset-type
+  // pills only count toward the active-filter badge (and "Clear filters")
+  // once they've actually been changed from that default.
+  const assetTypesAreDefault =
+    assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
+
+  const activeFilterCount =
+    [dateFrom, dateTo, filedStatus].filter(Boolean).length +
+    members.length +
+    tickers.length +
+    types.length +
+    owners.length +
+    amountRanges.length +
+    marketCapTiers.length +
+    (chamber !== "both" ? 1 : 0) +
+    (assetTypesAreDefault ? 0 : 1);
+
+  function clearFilters() {
+    setChamber("both");
+    setMembers([]);
+    setTickers([]);
+    setTypes([]);
+    setOwners([]);
+    setAssetTypes(DEFAULT_ASSET_TYPES);
+    setMarketCapTiers([]);
+    setAmountRanges([]);
+    setFiledStatus("");
+    setDateFrom("");
+    setDateTo("");
+  }
+
+  function applyDatePreset(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    setDateTo(to.toISOString().slice(0, 10));
+    setDateFrom(from.toISOString().slice(0, 10));
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="relative mb-4 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
+          <AmericanFlag
+            className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 opacity-[0.14] sm:w-1/2"
+            style={{ maskImage: "linear-gradient(to right, transparent, black 45%)", WebkitMaskImage: "linear-gradient(to right, transparent, black 45%)" }}
+          />
+          <div className="relative">
+            <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
+              Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} asset trade, searchable
+            </h1>
+            <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
+              Built directly from Periodic Transaction Reports filed with the{" "}
+              {chamber !== "senate" && (
+                <a
+                  href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                >
+                  House Clerk
+                </a>
+              )}
+              {chamber === "both" && " and the "}
+              {chamber !== "house" && (
+                <a
+                  href="https://efdsearch.senate.gov/search/home/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                >
+                  Senate eFD
+                </a>
+              )}
+              . Updated and refreshed every 4 hours.
+            </p>
+          </div>
+        </div>
+
+        {stats && (
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:mb-6 sm:text-sm">
+            <StatItem value={stats.totalTransactions.toLocaleString()} label="Transactions" />
+            <StatDivider />
+            <StatItem value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" />
+            <StatDivider />
+            <StatItem value={stats.totalFilings.toLocaleString()} label="Filings" />
+            <StatDivider />
+            <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
+            <StatDivider />
+            <StatItem
+              value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              label={`Last checked${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt) ? ` · ${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}` : ""}`}
+            />
+          </div>
+        )}
+
+        <div className="mb-4 sm:mb-6">
+          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
+        </div>
+
+        <div className="mb-6 rounded-lg border border-line bg-panel p-4">
+          <div className="flex items-center justify-between gap-3 sm:hidden">
+            <button
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
+            >
+              Filters {activeFilterCount > 0 && <span className="rounded-full bg-accent/20 px-1.5 text-xs text-accent">{activeFilterCount}</span>}
+              <span className="text-lg leading-none text-ink-faint">{filtersOpen ? "▴" : "▾"}</span>
+            </button>
+            {activeFilterCount > 0 && (
+              <button onClick={clearFilters} className="text-xs text-ink-faint underline decoration-line-strong">
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 sm:hidden">
+            <Select
+              value={`${sort}:${order}`}
+              onChange={(e) => {
+                const opt = SORT_OPTIONS.find((o) => o.value === e.target.value);
+                if (opt) {
+                  setSort(opt.sort);
+                  setOrder(opt.order);
+                }
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  Sort: {opt.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className={`${filtersOpen ? "mt-3 flex" : "hidden"} flex-col gap-3 sm:mt-0 sm:flex`}>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="text"
+                placeholder="Search asset or ticker…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className={`min-w-[160px] flex-1 ${inputClass}`}
+              />
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="min-w-[160px] flex-1 sm:flex-none sm:w-56">
+                <SearchableMultiSelect
+                  placeholder="Any member"
+                  searchPlaceholder="Type a member name…"
+                  selected={members}
+                  onChange={setMembers}
+                  options={memberOptions}
+                  loading={optionsLoading}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-40">
+                <SearchableMultiSelect
+                  placeholder="Any ticker"
+                  searchPlaceholder="Type a ticker…"
+                  selected={tickers}
+                  onChange={setTickers}
+                  options={tickerOptions}
+                  loading={optionsLoading}
+                />
+              </GatedFilter>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <MultiSelect
+                placeholder="All asset types"
+                className="w-full sm:w-44"
+                selected={assetTypes}
+                onChange={setAssetTypes}
+                options={Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+              />
+              <Select
+                aria-label="Chamber"
+                value={chamber}
+                onChange={(e) => setChamber(e.target.value as "house" | "senate" | "both")}
+                active={chamber !== "both"}
+                className="w-full sm:w-auto"
+              >
+                <option value="both">Any chamber</option>
+                <option value="house">House only</option>
+                <option value="senate">Senate only</option>
+              </Select>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
+                <MultiSelect
+                  placeholder="All types"
+                  selected={types}
+                  onChange={setTypes}
+                  options={[
+                    { value: "P", label: "Purchase" },
+                    { value: "S", label: "Sale" },
+                    { value: "E", label: "Exchange" },
+                  ]}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
+                <MultiSelect
+                  placeholder="All owners"
+                  selected={owners}
+                  onChange={setOwners}
+                  options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
+                <MultiSelect
+                  placeholder="Any trade size"
+                  selected={amountRanges}
+                  onChange={setAmountRanges}
+                  options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
+                <MultiSelect
+                  placeholder="Any market cap"
+                  selected={marketCapTiers}
+                  onChange={setMarketCapTiers}
+                  options={MARKET_CAP_TIERS.map((t) => ({ value: t.value, label: t.label }))}
+                />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
+                <Select value={filedStatus} onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}>
+                  <option value="">Any filing status</option>
+                  <option value="onTime">Filed on time (≤45 days)</option>
+                  <option value="late">Filed late (&gt;45 days)</option>
+                </Select>
+              </GatedFilter>
+              <span className="text-xs text-ink-faint">Filed:</span>
+              {/* Quick range gets its own GatedFilter (same as every other
+                  Select) so its arrow is reliably masked regardless of
+                  whether this row wraps to its own line on narrow screens —
+                  a single lock badge for the whole group only covers
+                  whichever line it's vertically centered on. */}
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
+                <Select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value !== "") applyDatePreset(Number(e.target.value));
+                  }}
+                >
+                  <option value="">Quick range…</option>
+                  <option value="0">Today</option>
+                  <option value="5">Last 5 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="45">Last 45 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="180">Last 180 days</option>
+                  <option value="365">Last year</option>
+                </Select>
+              </GatedFilter>
+              {/* Each date input gets its own GatedFilter (same as every
+                  other single control) rather than one lock badge for the
+                  pair — a shared badge only sits at one end, which reads as
+                  though the other input isn't gated at all. */}
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(clampToEarliestFilingDate(e.target.value))}
+                  title="Filed on or after"
+                  min={EARLIEST_FILING_DATE}
+                  className={inputClass}
+                />
+              </GatedFilter>
+              <span className="text-ink-faint">to</span>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(clampToEarliestFilingDate(e.target.value))}
+                  title="Filed on or before"
+                  min={EARLIEST_FILING_DATE}
+                  className={inputClass}
+                />
+              </GatedFilter>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="hidden text-xs text-ink-faint underline decoration-line-strong hover:text-ink-muted hover:decoration-ink-muted sm:inline"
+                >
+                  Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
+            {error}. Check that DATABASE_URL is set and the database is reachable.
+          </div>
+        )}
+
+        {/* Desktop table */}
+        <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead>
+              <tr className="border-b border-line bg-panel-muted text-left text-xs uppercase tracking-wide text-ink-faint">
+                <SortHeader label="Member" sortKey="member_name" className="min-w-[170px]" />
+                <SortHeader label="Asset" sortKey="ticker" />
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Owner</th>
+                <SortHeader label="Amount" sortKey="amount_low" />
+                <SortHeader label="Traded" sortKey="transaction_date" />
+                <SortHeader label="Filed" sortKey="filing_date" />
+                <SortHeader label="Days to file" sortKey="days_to_file" />
+                <th className="px-4 py-3">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!loading && result?.data.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
+                    No trades match these filters.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                result?.data.map((trade) => {
+                  const badge = typeBadge(trade.transaction_type);
+                  const assetTypeLabel = trade.asset_type_code
+                    ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
+                    : trade.parse_status === "ocr"
+                      ? "Undefined"
+                      : null;
+                  const late = trade.days_to_file !== null && trade.days_to_file > 45;
+                  return (
+                    <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
+                      <td className={`min-w-[170px] border-l-2 px-4 py-3 ${badge.accent}`}>
+                        <div className="flex items-center gap-2.5">
+                          <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                          <div>
+                            <button
+                              onClick={() => setMembers([trade.member_name])}
+                              className="text-left font-medium hover:underline"
+                              title={`Filter to ${displayName(trade.member_name)}`}
+                            >
+                              {displayName(trade.member_name)}
+                            </button>
+                            {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5" title={trade.asset_name}>
+                          {cleanAssetName(trade.asset_name)}
+                          {trade.parse_status === "ocr" && <OcrBadge />}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                          {trade.ticker && (
+                            <button
+                              onClick={() => setTickers([trade.ticker as string])}
+                              className="font-mono hover:text-ink hover:underline"
+                              title={`Filter to ${trade.ticker}`}
+                            >
+                              {trade.ticker}
+                            </button>
+                          )}
+                          {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                          {trade.market_cap !== null && (
+                            <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
+                      <td className="px-4 py-3 text-ink-muted">
+                        <div className="flex items-center gap-2">
+                          <SizeIndicator amountLow={trade.amount_low} />
+                          <span className="whitespace-nowrap">{trade.amount_range}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.transaction_date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.filing_date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {trade.days_to_file !== null ? (
+                          <span className={late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}>
+                            {trade.days_to_file}d{late ? " · late" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-ink-faint">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <a
+                          href={trade.pdf_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                        >
+                          {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "PTR PDF"}
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="flex flex-col gap-3 sm:hidden">
+          {loading && <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">Loading…</div>}
+          {!loading && result?.data.length === 0 && (
+            <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">
+              No trades match these filters.
+            </div>
+          )}
+          {!loading &&
+            result?.data.map((trade) => {
+              const badge = typeBadge(trade.transaction_type);
+              const assetTypeLabel = trade.asset_type_code
+                ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
+                : trade.parse_status === "ocr"
+                  ? "Undefined"
+                  : null;
+              const late = trade.days_to_file !== null && trade.days_to_file > 45;
+              return (
+                <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <button onClick={() => setMembers([trade.member_name])} className="flex items-center gap-2.5 text-left">
+                      <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                      <div>
+                        <div className="font-medium">{displayName(trade.member_name)}</div>
+                        {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                      </div>
+                    </button>
+                    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-1.5 text-sm" title={trade.asset_name}>
+                    {cleanAssetName(trade.asset_name)}
+                    {trade.parse_status === "ocr" && <OcrBadge />}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                    {trade.ticker && (
+                      <button onClick={() => setTickers([trade.ticker as string])} className="font-mono hover:text-ink hover:underline">
+                        {trade.ticker}
+                      </button>
+                    )}
+                    {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                    {trade.market_cap !== null && (
+                      <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs">
+                    <div>
+                      <div className="text-ink-faint">Amount</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-ink-muted">
+                        <SizeIndicator amountLow={trade.amount_low} />
+                        {trade.amount_range}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Traded</div>
+                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.transaction_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Filed</div>
+                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.filing_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-ink-faint">Days to file</div>
+                      <div className={`mt-0.5 ${late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}`}>
+                        {trade.days_to_file !== null ? `${trade.days_to_file}d${late ? " · late" : ""}` : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={trade.pdf_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
+                  >
+                    {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
+                  </a>
+                </div>
+              );
+            })}
+        </div>
+
+        {result && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
+            <span>
+              Page {result.data.length ? page : 0} of {result.totalPages} · {result.total.toLocaleString()} trades
+            </span>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2">
+                Show
+                <Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="w-20">
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= result.totalPages}
+                  onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
+                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mt-6">
+          <AdSlot />
+        </div>
+      </main>
+      <Footer />
+      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} onSignIn={continueSignIn} />
+    </>
+  );
+}
+
+// Marks a trade extracted via OCR from a scanned paper filing (Senate only,
+// currently) — meaningfully less certain than trades read directly from
+// text, since OCR can misread a checkbox column or a digit. A small "i"
+// button rather than a text badge, so the row stays readable; click/tap
+// (not just hover, for touch devices) reveals the plain-language caveat.
+function OcrBadge() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex shrink-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        onBlur={() => setOpen(false)}
+        aria-label="Why this trade may not be exact"
+        aria-expanded={open}
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-semibold leading-none text-amber-600 dark:text-amber-400"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
+        >
+          Automatically read from a scanned PDF, not typed text — details here may not be exactly correct.
+        </span>
+      )}
+    </span>
+  );
+}
+
+function StatItem({ value, label }: { value: string; label: string }) {
+  return (
+    <span className="whitespace-nowrap">
+      <span className="font-semibold text-ink">{value}</span> {label}
+    </span>
+  );
+}
+
+function StatDivider() {
+  return <span className="hidden text-ink-faint/50 sm:inline">·</span>;
+}

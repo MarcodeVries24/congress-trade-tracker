@@ -1,427 +1,56 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
   cleanAssetName,
-  DEFAULT_ASSET_TYPES,
+  DashboardData,
   displayName,
-  fetchMemberOptions,
+  fetchDashboard,
   fetchStats,
-  fetchTickerOptions,
-  fetchTrades,
-  formatMarketCap,
-  marketCapTierLabel,
-  MARKET_CAP_TIERS,
-  OWNER_LABELS,
-  PAGE_SIZE_OPTIONS,
   Stats,
-  Trade,
-  TradeFilters,
 } from "@/lib/api";
 import { AmericanFlag } from "@/components/AmericanFlag";
-import { MultiSelect } from "@/components/MultiSelect";
-import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
-import { Select } from "@/components/Select";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { GatedFilter } from "@/components/GatedFilter";
 import { AdSlot } from "@/components/AdSlot";
-import { UpgradeModal } from "@/components/UpgradeModal";
+import { MemberPhoto } from "@/components/MemberPhoto";
+import { compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso + "T00:00:00");
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+// Same free, ungated search param /trades already supports (ILIKE across
+// member_name/asset_name/ticker) — deliberately not the paid member/ticker
+// filters, so every dashboard link works for anonymous visitors too.
+function tradesSearchHref(query: string): string {
+  return `/trades?q=${encodeURIComponent(query)}`;
 }
 
-// Unlike formatDate (date-only fields, no time component), these take a full
-// timestamp — used together so the date can be the prominent stat value and
-// the time+timezone a smaller note underneath, in the viewer's local zone.
-function formatDateFromTimestamp(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+function memberLocationFromDashboard(row: { chamber: "house" | "senate"; state_district: string | null; member_state: string | null }): string | null {
+  if (row.chamber === "senate") return row.member_state ?? row.state_district;
+  return row.state_district;
 }
 
-function formatTimeWithZone(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
-}
-
-// House's state_district ("MO04") is real and display-ready. Senate rows key
-// members_reference by a synthetic "SEN:lastname" (Senate filings carry no
-// district/state field) — not fit to show, so those use the joined state
-// column from members_reference instead. Falls back to state_district if the
-// state lookup hasn't matched (see README's Senate name-matching note).
-function memberLocation(trade: Trade): string | null {
-  if (trade.chamber === "senate") return trade.member_state ?? trade.state_district;
-  return trade.state_district;
-}
-
-const compactUSD = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
-function typeBadge(type: string): { label: string; className: string; accent: string } {
-  const t = type.toUpperCase();
-  if (t.startsWith("P"))
-    return { label: "Purchase", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", accent: "border-l-emerald-500" };
-  if (t.startsWith("S"))
-    return {
-      label: type.includes("partial") ? "Sale (partial)" : "Sale",
-      className: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
-      accent: "border-l-rose-500",
-    };
-  if (t.startsWith("E"))
-    return { label: "Exchange", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30", accent: "border-l-amber-500" };
-  return { label: type, className: "bg-ink-faint/10 text-ink-muted border-ink-faint/30", accent: "border-l-line-strong" };
-}
-
-// Rough magnitude tier so the eye can scan trade size without reading text.
-function sizeTier(amountLow: number | null): number {
-  if (amountLow === null) return 0;
-  if (amountLow < 100_000) return 1;
-  if (amountLow < 1_000_000) return 2;
-  return 3;
-}
-
-// One color per tier (not per bar) — the whole icon takes on its tier's
-// color so size reads like a medal podium: silver for small, gold for
-// medium, and the biggest trades get an icy diamond blue instead of just
-// "more gold" so they read as a distinct top tier, not just gold-plus-one-bar.
-const TIER_COLOR = ["bg-line-strong", "bg-[#C0C0C0]", "bg-[#D4AF37]", "bg-[#7DD3FC]"];
-const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"];
-
-function SizeIndicator({ amountLow }: { amountLow: number | null }) {
-  const tier = sizeTier(amountLow);
-  const color = TIER_COLOR[tier];
-  return (
-    <div className="flex items-end gap-0.5" title={TIER_LABEL[tier]} aria-hidden>
-      {[1, 2, 3].map((i) => (
-        <div key={i} className={`w-1 rounded-sm ${i <= tier ? color : "bg-line-strong"}`} style={{ height: `${i * 4 + 3}px` }} />
-      ))}
-    </div>
-  );
-}
-
-const AVATAR_COLORS = [
-  "bg-rose-500/20 text-rose-600 dark:text-rose-300",
-  "bg-amber-500/20 text-amber-600 dark:text-amber-300",
-  "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300",
-  "bg-sky-500/20 text-sky-600 dark:text-sky-300",
-  "bg-violet-500/20 text-violet-600 dark:text-violet-300",
-  "bg-pink-500/20 text-pink-600 dark:text-pink-300",
-  "bg-teal-500/20 text-teal-600 dark:text-teal-300",
-  "bg-indigo-500/20 text-indigo-600 dark:text-indigo-300",
-];
-
-function initials(name: string): string {
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function avatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function InitialsAvatar({ name }: { name: string }) {
-  return (
-    <div
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarColor(name)}`}
-      aria-hidden
-    >
-      {initials(name)}
-    </div>
-  );
-}
-
-// Official photos are hotlinked from congress.gov; fall back to an initials
-// avatar if one isn't mapped yet or fails to load, rather than guessing.
-function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string | null }) {
-  const [errored, setErrored] = useState(false);
-  if (!photoUrl || errored) return <InitialsAvatar name={name} />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={photoUrl}
-      alt=""
-      onError={() => setErrored(true)}
-      className="h-8 w-8 shrink-0 rounded-full bg-panel-muted object-cover"
-    />
-  );
-}
-
-// Used by the mobile sort dropdown, which has no clickable column headers
-// to sort by — same fields the desktop table's headers sort on.
-const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" | "desc" }[] = [
-  { value: "filing_date:desc", label: "Newest filed", sort: "filing_date", order: "desc" },
-  { value: "filing_date:asc", label: "Oldest filed", sort: "filing_date", order: "asc" },
-  { value: "transaction_date:desc", label: "Newest traded", sort: "transaction_date", order: "desc" },
-  { value: "transaction_date:asc", label: "Oldest traded", sort: "transaction_date", order: "asc" },
-  { value: "days_to_file:desc", label: "Most days to file", sort: "days_to_file", order: "desc" },
-  { value: "days_to_file:asc", label: "Fewest days to file", sort: "days_to_file", order: "asc" },
-  { value: "amount_low:desc", label: "Amount: high to low", sort: "amount_low", order: "desc" },
-  { value: "amount_low:asc", label: "Amount: low to high", sort: "amount_low", order: "asc" },
-  { value: "market_cap:desc", label: "Market cap: high to low", sort: "market_cap", order: "desc" },
-  { value: "market_cap:asc", label: "Market cap: low to high", sort: "market_cap", order: "asc" },
-  { value: "member_name:asc", label: "Member A→Z", sort: "member_name", order: "asc" },
-  { value: "ticker:asc", label: "Ticker A→Z", sort: "ticker", order: "asc" },
-];
-
-function useDebounced<T>(value: T, delay = 350): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
-
-const inputClass =
-  "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";
-
-// Earliest filing_date in the dataset — the `min` attribute stops the native
-// picker from offering anything earlier, but a typed/pasted value can still
-// bypass that, so onChange also clamps to this floor.
-const EARLIEST_FILING_DATE = "2022-01-01";
-function clampToEarliestFilingDate(value: string): string {
-  return value && value < EARLIEST_FILING_DATE ? EARLIEST_FILING_DATE : value;
-}
+const PARTY_LABEL: Record<string, string> = { D: "Democrat", R: "Republican", I: "Independent" };
+const PARTY_COLOR: Record<string, string> = {
+  D: "bg-sky-500",
+  R: "bg-rose-500",
+  I: "bg-violet-500",
+};
 
 export default function Home() {
-  const router = useRouter();
-  const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
-  const { user } = useUser();
-  const { openSignUp, openSignIn } = useClerk();
-  // Comp access via public metadata ({"admin": true}, set in the Clerk
-  // dashboard or Backend API) — lets a specific account use paid features
-  // without an actual subscription. Mirrors the server-side check in
-  // lib/access.ts; this one's UI-only, not the security boundary.
-  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
-  // Defaults to "unlocked" while Clerk is still loading (usually well under
-  // a second) rather than flashing every visitor's filters as locked first —
-  // this is a UX nicety only, not the security boundary. The actual
-  // enforcement is server-side in /api/trades, which never trusts the
-  // client's plan state.
-  const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  function promptUpgrade() {
-    setUpgradeModalOpen(true);
-  }
-  function continueUpgrade() {
-    setUpgradeModalOpen(false);
-    if (isSignedIn) router.push("/upgrade");
-    // `redirectUrl` is deprecated in this Clerk version and gets silently
-    // ignored — forceRedirectUrl is what actually lands them on /upgrade
-    // after sign-up; signInForceRedirectUrl covers it too if they instead
-    // click "Already have an account? Sign in" inside the same modal.
-    else openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
-  }
-  function continueSignIn() {
-    setUpgradeModalOpen(false);
-    openSignIn({ forceRedirectUrl: "/upgrade", signUpForceRedirectUrl: "/upgrade" });
-  }
-
-  const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
-  const [q, setQ] = useState("");
-  const [members, setMembers] = useState<string[]>([]);
-  const [tickers, setTickers] = useState<string[]>([]);
-  const [types, setTypes] = useState<string[]>([]);
-  const [owners, setOwners] = useState<string[]>([]);
-  const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
-  const [amountRanges, setAmountRanges] = useState<string[]>([]);
-  const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
-  const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sort, setSort] = useState("filing_date");
-  const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const [result, setResult] = useState<{ data: Trade[]; total: number; totalPages: number } | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [memberOptions, setMemberOptions] = useState<{ value: string; label: string }[]>([]);
-  const [tickerOptions, setTickerOptions] = useState<{ value: string; label: string }[]>([]);
-  const [optionsLoading, setOptionsLoading] = useState(true);
-
   useEffect(() => {
-    Promise.all([fetchMemberOptions(), fetchTickerOptions()])
-      .then(([memberRows, tickerRows]) => {
-        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: displayName(m.member_name) })));
-        setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
-      })
-      .catch(() => {})
-      .finally(() => setOptionsLoading(false));
+    fetchDashboard()
+      .then(setDashboard)
+      .catch((err) => setError(err.message ?? "Failed to load dashboard"));
+    fetchStats(["house", "senate"]).then(setStats).catch(() => {});
   }, []);
 
-  const debouncedQ = useDebounced(q);
-
-  const filters: TradeFilters = useMemo(
-    () => ({
-      chamber: chamber === "both" ? ["house", "senate"] : [chamber],
-      q: debouncedQ || undefined,
-      members: members.length ? members : undefined,
-      tickers: tickers.length ? tickers : undefined,
-      types: types.length ? types : undefined,
-      owners: owners.length ? owners : undefined,
-      assetTypes: assetTypes.length ? assetTypes : undefined,
-      amountRanges: amountRanges.length ? amountRanges : undefined,
-      marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
-      filedStatus: filedStatus || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-      sort,
-      order,
-      page,
-      limit: pageSize,
-    }),
-    [
-      chamber,
-      debouncedQ,
-      members,
-      tickers,
-      types,
-      owners,
-      assetTypes,
-      amountRanges,
-      marketCapTiers,
-      filedStatus,
-      dateFrom,
-      dateTo,
-      sort,
-      order,
-      page,
-      pageSize,
-    ]
-  );
-
-  useEffect(() => {
-    setPage(1);
-  }, [
-    chamber,
-    debouncedQ,
-    members,
-    tickers,
-    types,
-    owners,
-    assetTypes,
-    amountRanges,
-    marketCapTiers,
-    filedStatus,
-    dateFrom,
-    dateTo,
-    sort,
-    order,
-    pageSize,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchTrades(filters)
-      .then((res) => {
-        if (!cancelled) setResult(res);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message ?? "Failed to load trades");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [filters]);
-
-  useEffect(() => {
-    fetchStats(chamber === "both" ? ["house", "senate"] : [chamber])
-      .then(setStats)
-      .catch(() => {});
-  }, [chamber]);
-
-  function toggleSort(key: string) {
-    if (sort === key) {
-      setOrder((o) => (o === "asc" ? "desc" : "asc"));
-    } else {
-      setSort(key);
-      setOrder(key === "member_name" || key === "ticker" ? "asc" : "desc");
-    }
-  }
-
-  function SortHeader({ label, sortKey, className = "" }: { label: string; sortKey: string; className?: string }) {
-    const active = sort === sortKey;
-    return (
-      <th className={`px-4 py-3 ${className}`}>
-        <button
-          onClick={() => toggleSort(sortKey)}
-          className={`flex items-center gap-1 whitespace-nowrap uppercase tracking-wide hover:text-ink ${active ? "text-ink" : ""}`}
-        >
-          {label}
-          <span className="text-[10px]">{active ? (order === "asc" ? "▲" : "▼") : ""}</span>
-        </button>
-      </th>
-    );
-  }
-
-  // The default view is Stocks-only, not "no filter" — so the asset-type
-  // pills only count toward the active-filter badge (and "Clear filters")
-  // once they've actually been changed from that default.
-  const assetTypesAreDefault =
-    assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
-
-  const activeFilterCount =
-    [dateFrom, dateTo, filedStatus].filter(Boolean).length +
-    members.length +
-    tickers.length +
-    types.length +
-    owners.length +
-    amountRanges.length +
-    marketCapTiers.length +
-    (chamber !== "both" ? 1 : 0) +
-    (assetTypesAreDefault ? 0 : 1);
-
-  function clearFilters() {
-    setChamber("both");
-    setMembers([]);
-    setTickers([]);
-    setTypes([]);
-    setOwners([]);
-    setAssetTypes(DEFAULT_ASSET_TYPES);
-    setMarketCapTiers([]);
-    setAmountRanges([]);
-    setFiledStatus("");
-    setDateFrom("");
-    setDateTo("");
-  }
-
-  function applyDatePreset(days: number) {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    setDateTo(to.toISOString().slice(0, 10));
-    setDateFrom(from.toISOString().slice(0, 10));
-  }
+  const totalChamberCount = dashboard ? dashboard.chamberBreakdown.reduce((sum, c) => sum + c.count, 0) : 0;
+  const totalPartyCount = dashboard ? dashboard.partyBreakdown.reduce((sum, p) => sum + p.count, 0) : 0;
 
   return (
     <>
@@ -433,33 +62,9 @@ export default function Home() {
             style={{ maskImage: "linear-gradient(to right, transparent, black 45%)", WebkitMaskImage: "linear-gradient(to right, transparent, black 45%)" }}
           />
           <div className="relative">
-            <h1 className="text-base font-semibold tracking-tight sm:text-2xl">
-              Every disclosed {chamber === "both" ? "Congress" : chamber === "senate" ? "Senate" : "House"} asset trade, searchable
-            </h1>
+            <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Every disclosed Congress asset trade, at a glance</h1>
             <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-              Built directly from Periodic Transaction Reports filed with the{" "}
-              {chamber !== "senate" && (
-                <a
-                  href="https://disclosures-clerk.house.gov/FinancialDisclosure"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-                >
-                  House Clerk
-                </a>
-              )}
-              {chamber === "both" && " and the "}
-              {chamber !== "house" && (
-                <a
-                  href="https://efdsearch.senate.gov/search/home/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-                >
-                  Senate eFD
-                </a>
-              )}
-              . Updated and refreshed every 4 hours.
+              Built directly from Periodic Transaction Reports filed with the House Clerk and Senate eFD. Updated every 4 hours.
             </p>
           </div>
         </div>
@@ -481,483 +86,208 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-4 sm:mb-6">
-          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
-        </div>
-
-        <div className="mb-6 rounded-lg border border-line bg-panel p-4">
-          <div className="flex items-center justify-between gap-3 sm:hidden">
-            <button
-              onClick={() => setFiltersOpen((o) => !o)}
-              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
-            >
-              Filters {activeFilterCount > 0 && <span className="rounded-full bg-accent/20 px-1.5 text-xs text-accent">{activeFilterCount}</span>}
-              <span className="text-lg leading-none text-ink-faint">{filtersOpen ? "▴" : "▾"}</span>
-            </button>
-            {activeFilterCount > 0 && (
-              <button onClick={clearFilters} className="text-xs text-ink-faint underline decoration-line-strong">
-                Clear
-              </button>
-            )}
-          </div>
-
-          <div className="mt-3 sm:hidden">
-            <Select
-              value={`${sort}:${order}`}
-              onChange={(e) => {
-                const opt = SORT_OPTIONS.find((o) => o.value === e.target.value);
-                if (opt) {
-                  setSort(opt.sort);
-                  setOrder(opt.order);
-                }
-              }}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  Sort: {opt.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className={`${filtersOpen ? "mt-3 flex" : "hidden"} flex-col gap-3 sm:mt-0 sm:flex`}>
-            <div className="flex flex-wrap gap-3">
-              <input
-                type="text"
-                placeholder="Search asset or ticker…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className={`min-w-[160px] flex-1 ${inputClass}`}
-              />
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="min-w-[160px] flex-1 sm:flex-none sm:w-56">
-                <SearchableMultiSelect
-                  placeholder="Any member"
-                  searchPlaceholder="Type a member name…"
-                  selected={members}
-                  onChange={setMembers}
-                  options={memberOptions}
-                  loading={optionsLoading}
-                />
-              </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-40">
-                <SearchableMultiSelect
-                  placeholder="Any ticker"
-                  searchPlaceholder="Type a ticker…"
-                  selected={tickers}
-                  onChange={setTickers}
-                  options={tickerOptions}
-                  loading={optionsLoading}
-                />
-              </GatedFilter>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <MultiSelect
-                placeholder="All asset types"
-                className="w-full sm:w-44"
-                selected={assetTypes}
-                onChange={setAssetTypes}
-                options={Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
-              />
-              <Select
-                aria-label="Chamber"
-                value={chamber}
-                onChange={(e) => setChamber(e.target.value as "house" | "senate" | "both")}
-                active={chamber !== "both"}
-                className="w-full sm:w-auto"
-              >
-                <option value="both">Any chamber</option>
-                <option value="house">House only</option>
-                <option value="senate">Senate only</option>
-              </Select>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
-                <MultiSelect
-                  placeholder="All types"
-                  selected={types}
-                  onChange={setTypes}
-                  options={[
-                    { value: "P", label: "Purchase" },
-                    { value: "S", label: "Sale" },
-                    { value: "E", label: "Exchange" },
-                  ]}
-                />
-              </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
-                <MultiSelect
-                  placeholder="All owners"
-                  selected={owners}
-                  onChange={setOwners}
-                  options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
-                />
-              </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
-                <MultiSelect
-                  placeholder="Any trade size"
-                  selected={amountRanges}
-                  onChange={setAmountRanges}
-                  options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
-                />
-              </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
-                <MultiSelect
-                  placeholder="Any market cap"
-                  selected={marketCapTiers}
-                  onChange={setMarketCapTiers}
-                  options={MARKET_CAP_TIERS.map((t) => ({ value: t.value, label: t.label }))}
-                />
-              </GatedFilter>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
-                <Select value={filedStatus} onChange={(e) => setFiledStatus(e.target.value as "" | "onTime" | "late")}>
-                  <option value="">Any filing status</option>
-                  <option value="onTime">Filed on time (≤45 days)</option>
-                  <option value="late">Filed late (&gt;45 days)</option>
-                </Select>
-              </GatedFilter>
-              <span className="text-xs text-ink-faint">Filed:</span>
-              {/* Quick range gets its own GatedFilter (same as every other
-                  Select) so its arrow is reliably masked regardless of
-                  whether this row wraps to its own line on narrow screens —
-                  a single lock badge for the whole group only covers
-                  whichever line it's vertically centered on. */}
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
-                <Select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value !== "") applyDatePreset(Number(e.target.value));
-                  }}
-                >
-                  <option value="">Quick range…</option>
-                  <option value="0">Today</option>
-                  <option value="5">Last 5 days</option>
-                  <option value="30">Last 30 days</option>
-                  <option value="45">Last 45 days</option>
-                  <option value="90">Last 90 days</option>
-                  <option value="180">Last 180 days</option>
-                  <option value="365">Last year</option>
-                </Select>
-              </GatedFilter>
-              {/* Each date input gets its own GatedFilter (same as every
-                  other single control) rather than one lock badge for the
-                  pair — a shared badge only sits at one end, which reads as
-                  though the other input isn't gated at all. */}
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(clampToEarliestFilingDate(e.target.value))}
-                  title="Filed on or after"
-                  min={EARLIEST_FILING_DATE}
-                  className={inputClass}
-                />
-              </GatedFilter>
-              <span className="text-ink-faint">to</span>
-              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade}>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(clampToEarliestFilingDate(e.target.value))}
-                  title="Filed on or before"
-                  min={EARLIEST_FILING_DATE}
-                  className={inputClass}
-                />
-              </GatedFilter>
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="hidden text-xs text-ink-faint underline decoration-line-strong hover:text-ink-muted hover:decoration-ink-muted sm:inline"
-                >
-                  Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
-                </button>
-              )}
-            </div>
-          </div>
+        <div className="mb-6 sm:mb-8">
+          <AdSlot />
         </div>
 
         {error && (
-          <div className="mb-4 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
+          <div className="mb-6 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
             {error}. Check that DATABASE_URL is set and the database is reachable.
           </div>
         )}
 
-        {/* Desktop table */}
-        <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
-          <table className="w-full min-w-[960px] text-sm">
-            <thead>
-              <tr className="border-b border-line bg-panel-muted text-left text-xs uppercase tracking-wide text-ink-faint">
-                <SortHeader label="Member" sortKey="member_name" className="min-w-[170px]" />
-                <SortHeader label="Asset" sortKey="ticker" />
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Owner</th>
-                <SortHeader label="Amount" sortKey="amount_low" />
-                <SortHeader label="Traded" sortKey="transaction_date" />
-                <SortHeader label="Filed" sortKey="filing_date" />
-                <SortHeader label="Days to file" sortKey="days_to_file" />
-                <th className="px-4 py-3">Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!loading && result?.data.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
-                    No trades match these filters.
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                result?.data.map((trade) => {
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+          {/* Latest Trades */}
+          <Card title="Latest Trades" href="/trades" className="lg:col-span-2 lg:row-span-2">
+            {!dashboard && <CardSkeleton rows={7} />}
+            {dashboard && dashboard.latestTrades.length === 0 && <EmptyRow />}
+            {dashboard && (
+              <ul className="divide-y divide-line/60">
+                {dashboard.latestTrades.map((trade) => {
                   const badge = typeBadge(trade.transaction_type);
-                  const assetTypeLabel = trade.asset_type_code
-                    ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
-                    : trade.parse_status === "ocr"
-                      ? "Undefined"
-                      : null;
-                  const late = trade.days_to_file !== null && trade.days_to_file > 45;
                   return (
-                    <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
-                      <td className={`min-w-[170px] border-l-2 px-4 py-3 ${badge.accent}`}>
-                        <div className="flex items-center gap-2.5">
-                          <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
-                          <div>
-                            <button
-                              onClick={() => setMembers([trade.member_name])}
-                              className="text-left font-medium hover:underline"
-                              title={`Filter to ${displayName(trade.member_name)}`}
-                            >
-                              {displayName(trade.member_name)}
-                            </button>
-                            {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                    <li key={trade.id}>
+                      <Link
+                        href={tradesSearchHref(trade.member_name)}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5"
+                      >
+                        <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
+                          <div className="truncate text-xs text-ink-faint">
+                            {trade.ticker ? `${trade.ticker} · ` : ""}
+                            {cleanAssetName(trade.asset_name)}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5" title={trade.asset_name}>
-                          {cleanAssetName(trade.asset_name)}
-                          {trade.parse_status === "ocr" && <OcrBadge />}
+                        <div className="shrink-0 text-right">
+                          <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
+                          <div className="mt-1 text-xs text-ink-muted">{trade.amount_range}</div>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
-                          {trade.ticker && (
-                            <button
-                              onClick={() => setTickers([trade.ticker as string])}
-                              className="font-mono hover:text-ink hover:underline"
-                              title={`Filter to ${trade.ticker}`}
-                            >
-                              {trade.ticker}
-                            </button>
-                          )}
-                          {assetTypeLabel && <span>{assetTypeLabel}</span>}
-                          {trade.market_cap !== null && (
-                            <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
-                      <td className="px-4 py-3 text-ink-muted">
-                        <div className="flex items-center gap-2">
-                          <SizeIndicator amountLow={trade.amount_low} />
-                          <span className="whitespace-nowrap">{trade.amount_range}</span>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.transaction_date)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.filing_date)}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {trade.days_to_file !== null ? (
-                          <span className={late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}>
-                            {trade.days_to_file}d{late ? " · late" : ""}
-                          </span>
-                        ) : (
-                          <span className="text-ink-faint">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <a
-                          href={trade.pdf_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-                        >
-                          {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "PTR PDF"}
-                        </a>
-                      </td>
-                    </tr>
+                      </Link>
+                    </li>
                   );
                 })}
-            </tbody>
-          </table>
-        </div>
+              </ul>
+            )}
+          </Card>
 
-        {/* Mobile card list */}
-        <div className="flex flex-col gap-3 sm:hidden">
-          {loading && <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">Loading…</div>}
-          {!loading && result?.data.length === 0 && (
-            <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">
-              No trades match these filters.
-            </div>
-          )}
-          {!loading &&
-            result?.data.map((trade) => {
-              const badge = typeBadge(trade.transaction_type);
-              const assetTypeLabel = trade.asset_type_code
-                ? ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code
-                : trade.parse_status === "ocr"
-                  ? "Undefined"
-                  : null;
-              const late = trade.days_to_file !== null && trade.days_to_file > 45;
-              return (
-                <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <button onClick={() => setMembers([trade.member_name])} className="flex items-center gap-2.5 text-left">
+          {/* Most Active Politicians */}
+          <Card title="Most Active Politicians" href="/trades">
+            {!dashboard && <CardSkeleton rows={6} />}
+            {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
+            {dashboard && (
+              <ul className="divide-y divide-line/60">
+                {dashboard.topPoliticians.map((p, i) => {
+                  const location = memberLocationFromDashboard(p);
+                  return (
+                    <li key={`${p.member_name}-${i}`}>
+                      <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                        <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                          <div className="truncate text-xs text-ink-faint">
+                            {p.party ? `${p.party} · ` : ""}
+                            {location ?? p.chamber}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right text-sm font-semibold text-ink">{p.trade_count.toLocaleString()}</div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+
+          {/* Most Traded Stocks */}
+          <Card title="Most Traded Stocks" href="/trades">
+            {!dashboard && <CardSkeleton rows={6} />}
+            {dashboard && dashboard.topStocks.length === 0 && <EmptyRow />}
+            {dashboard && (
+              <ul className="divide-y divide-line/60">
+                {dashboard.topStocks.map((s) => (
+                  <li key={s.ticker}>
+                    <Link href={tradesSearchHref(s.ticker)} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                      <span className="text-sm font-medium text-ink">{s.ticker}</span>
+                      <span className="text-sm text-ink-muted">
+                        {s.trade_count.toLocaleString()} trade{s.trade_count === 1 ? "" : "s"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* Biggest Recent Trades */}
+          <Card title="Biggest Recent Trades" href="/trades">
+            {!dashboard && <CardSkeleton rows={5} />}
+            {dashboard && dashboard.biggestTrades.length === 0 && <EmptyRow />}
+            {dashboard && (
+              <ul className="divide-y divide-line/60">
+                {dashboard.biggestTrades.map((trade) => (
+                  <li key={trade.id}>
+                    <Link href={tradesSearchHref(trade.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
-                      <div>
-                        <div className="font-medium">{displayName(trade.member_name)}</div>
-                        {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
+                        <div className="truncate text-xs text-ink-faint">{trade.ticker ?? cleanAssetName(trade.asset_name)}</div>
                       </div>
-                    </button>
-                    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                  </div>
+                      <div className="shrink-0 text-right text-xs font-medium text-ink-muted">{trade.amount_range}</div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-                  <div className="mt-3 flex items-center gap-1.5 text-sm" title={trade.asset_name}>
-                    {cleanAssetName(trade.asset_name)}
-                    {trade.parse_status === "ocr" && <OcrBadge />}
+          {/* Activity Breakdown */}
+          <Card title="Activity Breakdown">
+            {!dashboard && <CardSkeleton rows={4} />}
+            {dashboard && (
+              <div className="space-y-5 px-4 py-4 sm:px-5">
+                <div>
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-faint">By chamber</div>
+                  <div className="space-y-1.5">
+                    {dashboard.chamberBreakdown.map((c) => {
+                      const pct = totalChamberCount > 0 ? Math.round((c.count / totalChamberCount) * 100) : 0;
+                      return (
+                        <div key={c.chamber}>
+                          <div className="mb-0.5 flex items-center justify-between text-xs text-ink-muted">
+                            <span className="capitalize">{c.chamber}</span>
+                            <span>{pct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel-muted">
+                            <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
-                    {trade.ticker && (
-                      <button onClick={() => setTickers([trade.ticker as string])} className="font-mono hover:text-ink hover:underline">
-                        {trade.ticker}
-                      </button>
-                    )}
-                    {assetTypeLabel && <span>{assetTypeLabel}</span>}
-                    {trade.market_cap !== null && (
-                      <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs">
-                    <div>
-                      <div className="text-ink-faint">Amount</div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-ink-muted">
-                        <SizeIndicator amountLow={trade.amount_low} />
-                        {trade.amount_range}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-ink-faint">Traded</div>
-                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.transaction_date)}</div>
-                    </div>
-                    <div>
-                      <div className="text-ink-faint">Filed</div>
-                      <div className="mt-0.5 text-ink-muted">{formatDate(trade.filing_date)}</div>
-                    </div>
-                    <div>
-                      <div className="text-ink-faint">Days to file</div>
-                      <div className={`mt-0.5 ${late ? "text-rose-500 dark:text-rose-400" : "text-ink-muted"}`}>
-                        {trade.days_to_file !== null ? `${trade.days_to_file}d${late ? " · late" : ""}` : "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <a
-                    href={trade.pdf_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
-                  >
-                    {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
-                  </a>
                 </div>
-              );
-            })}
-        </div>
-
-        {result && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
-            <span>
-              Page {result.data.length ? page : 0} of {result.totalPages} · {result.total.toLocaleString()} trades
-            </span>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2">
-                Show
-                <Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="w-20">
-                  {PAGE_SIZE_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <div className="flex gap-2">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={page >= result.totalPages}
-                  onClick={() => setPage((p) => Math.min(result.totalPages, p + 1))}
-                  className="rounded-md border border-line px-3 py-1.5 disabled:opacity-40"
-                >
-                  Next
-                </button>
+                <div>
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-faint">By party</div>
+                  <div className="space-y-1.5">
+                    {dashboard.partyBreakdown.map((p) => {
+                      const pct = totalPartyCount > 0 ? Math.round((p.count / totalPartyCount) * 100) : 0;
+                      return (
+                        <div key={p.party}>
+                          <div className="mb-0.5 flex items-center justify-between text-xs text-ink-muted">
+                            <span>{PARTY_LABEL[p.party] ?? p.party}</span>
+                            <span>{pct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel-muted">
+                            <div className={`h-full rounded-full ${PARTY_COLOR[p.party] ?? "bg-line-strong"}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-        <div className="mt-6">
-          <AdSlot />
+            )}
+          </Card>
         </div>
       </main>
       <Footer />
-      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} onSignIn={continueSignIn} />
     </>
   );
 }
 
-// Marks a trade extracted via OCR from a scanned paper filing (Senate only,
-// currently) — meaningfully less certain than trades read directly from
-// text, since OCR can misread a checkbox column or a digit. A small "i"
-// button rather than a text badge, so the row stays readable; click/tap
-// (not just hover, for touch devices) reveals the plain-language caveat.
-function OcrBadge() {
-  const [open, setOpen] = useState(false);
+function Card({ title, href, className = "", children }: { title: string; href?: string; className?: string; children: React.ReactNode }) {
   return (
-    <span className="relative inline-flex shrink-0">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-        onBlur={() => setOpen(false)}
-        aria-label="Why this trade may not be exact"
-        aria-expanded={open}
-        className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-semibold leading-none text-amber-600 dark:text-amber-400"
-      >
-        i
-      </button>
-      {open && (
-        <span
-          role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
-        >
-          Automatically read from a scanned PDF, not typed text — details here may not be exactly correct.
-        </span>
-      )}
-    </span>
+    <section className={`flex flex-col overflow-hidden rounded-lg border border-line bg-panel ${className}`}>
+      <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        {href && (
+          <Link href={href} className="text-xs text-accent hover:underline">
+            View all →
+          </Link>
+        )}
+      </div>
+      <div className="flex-1">{children}</div>
+    </section>
   );
+}
+
+function CardSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="animate-pulse divide-y divide-line/60">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+          <div className="h-8 w-8 shrink-0 rounded-full bg-panel-muted" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="h-3 w-2/3 rounded bg-panel-muted" />
+            <div className="h-2.5 w-1/3 rounded bg-panel-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyRow() {
+  return <div className="px-4 py-8 text-center text-sm text-ink-faint sm:px-5">No data yet.</div>;
 }
 
 function StatItem({ value, label }: { value: string; label: string }) {

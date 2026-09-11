@@ -43,6 +43,51 @@ export interface Stats {
   failedFilings: number;
 }
 
+// A trimmed-down Trade shape for the dashboard's trade cards — only the
+// fields those rows actually render (no days_to_file/pdf_url/market_cap/etc,
+// which the aggregate query doesn't join in).
+export interface DashboardTrade {
+  id: number;
+  member_name: string;
+  state_district: string | null;
+  asset_name: string;
+  ticker: string | null;
+  asset_type_code: string | null;
+  transaction_type: string;
+  amount_range: string;
+  amount_low: number | null;
+  amount_high: number | null;
+  filing_date: string | null;
+  chamber: "house" | "senate";
+  photo_url: string | null;
+  party: string | null;
+  member_state: string | null;
+}
+
+export interface DashboardPolitician {
+  member_name: string;
+  state_district: string | null;
+  party: string | null;
+  photo_url: string | null;
+  member_state: string | null;
+  chamber: "house" | "senate";
+  trade_count: number;
+}
+
+export interface DashboardStock {
+  ticker: string;
+  trade_count: number;
+}
+
+export interface DashboardData {
+  latestTrades: DashboardTrade[];
+  topPoliticians: DashboardPolitician[];
+  topStocks: DashboardStock[];
+  biggestTrades: DashboardTrade[];
+  chamberBreakdown: { chamber: "house" | "senate"; count: number }[];
+  partyBreakdown: { party: string; count: number }[];
+}
+
 export interface TradeFilters {
   chamber?: string[];
   q?: string;
@@ -300,5 +345,11 @@ export async function fetchMemberOptions(): Promise<{ member_name: string; trade
 export async function fetchTickerOptions(): Promise<{ ticker: string; trade_count: number }[]> {
   const res = await fetch("/api/tickers");
   if (!res.ok) throw new Error(`Failed to fetch tickers: ${res.status}`);
+  return (await res.json()).data;
+}
+
+export async function fetchDashboard(): Promise<DashboardData> {
+  const res = await fetch("/api/dashboard");
+  if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
   return (await res.json()).data;
 }

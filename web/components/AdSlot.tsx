@@ -49,20 +49,27 @@ export function AdSlot({ slot }: { slot?: string } = {}) {
 
   if (!AD_CLIENT || !adSlot) {
     return (
-      <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-line bg-panel-muted text-xs text-ink-faint">
+      <div className="mx-auto flex h-24 max-w-2xl items-center justify-center rounded-md border border-dashed border-line bg-panel-muted text-xs text-ink-faint">
         Ad space
       </div>
     );
   }
 
   return (
-    <ins
-      className="adsbygoogle block"
-      style={{ display: "block" }}
-      data-ad-client={AD_CLIENT}
-      data-ad-slot={adSlot}
-      data-ad-format="auto"
-      data-full-width-responsive="true"
-    />
+    // full-width-responsive picks a taller shape the wider its container
+    // is — on this page that container is the full max-w-7xl content area
+    // (up to ~1280px), which is why the reserved space was enormous before
+    // any creative even loaded. Capping the width here (matching the
+    // placeholder above) keeps it to a normal banner-sized reservation.
+    <div className="mx-auto max-w-2xl">
+      <ins
+        className="adsbygoogle block"
+        style={{ display: "block" }}
+        data-ad-client={AD_CLIENT}
+        data-ad-slot={adSlot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
   );
 }

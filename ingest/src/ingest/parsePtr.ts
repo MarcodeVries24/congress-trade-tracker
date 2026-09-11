@@ -27,8 +27,16 @@ const METADATA_LINE = new RegExp("^[A-Za-z][A-Za-z" + NUL_CHAR + "\\s]{0,40}:");
 // with cents (confirmed on a real filing, Kaptur doc 20022886: "$1,280.03",
 // no bracket at all), so the plain-dollar-amount alternative allows an
 // optional ".dd" on each figure it matches, not just on this one.
+//
+// A transaction in a spouse's or dependent child's asset can instead check
+// column K ("Transaction in a Spouse or Dependent Child Asset over
+// $1,000,000") in place of the usual bracket, and the form's own text-native
+// rendering of that cell is "Spouse/DC Over $X" (confirmed on a real filing,
+// Scott H. Peters doc 20021049: "Spouse/DC Over\n$1,000,000") — the leading
+// "Spouse/DC " is optional in the pattern below so a plain "Over $X" still
+// matches on its own.
 const TXN_LINE =
-  /^(.*?)\s*(P|S\s*\([^)]*\)|S|E)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\$[\d,]+(?:\.\d+)?(?:\s*-\s*\$[\d,]+(?:\.\d+)?)?|\$1,000 or less|Over \$[\d,]+(?:\.\d+)?)\s*$/;
+  /^(.*?)\s*(P|S\s*\([^)]*\)|S|E)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\$[\d,]+(?:\.\d+)?(?:\s*-\s*\$[\d,]+(?:\.\d+)?)?|\$1,000 or less|(?:Spouse\/DC )?Over \$[\d,]+(?:\.\d+)?)\s*$/;
 
 // A ticker only counts when it's parenthesized and starts with a letter —
 // government securities are identified by a CUSIP instead (e.g. "(91282CGH8)"),
@@ -117,7 +125,15 @@ function parseAmountRange(range: string): { low: number | null; high: number | n
   const nums = [...range.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map((m) => Math.round(Number(m[1].replace(/,/g, ""))));
   const lower = range.toLowerCase();
   if (lower.includes("or less")) return { low: 0, high: nums[0] ?? null, displayRange: range };
-  if (lower.includes("over")) return { low: nums[0] ?? null, high: null, displayRange: range };
+  if (lower.includes("over")) {
+    // Column K's "Transaction in a Spouse or Dependent Child Asset over
+    // $1,000,000" case (see TXN_LINE's comment) carries a "Spouse/DC "
+    // prefix that's redundant with the owner field already stored
+    // separately for the row — stripped here so it displays and matches
+    // the plain "Over $X" bracket text every other row of this size uses.
+    const displayRange = range.replace(/^Spouse\/DC\s+/i, "");
+    return { low: nums[0] ?? null, high: null, displayRange };
+  }
   // A single figure with no "-" separator is an exact disclosed value (see
   // TXN_LINE's comment), not a range — bucket it into the STOCK Act
   // bracket it actually falls in (matching how every bracket-disclosed
@@ -139,10 +155,14 @@ function parseAmountRange(range: string): { low: number | null; high: number | n
 
 /**
  * The PDF layout sometimes wraps an amount range across a line break, e.g.
- * "...$50,001 -" / "$100,000". Join those back into one line so TXN_LINE can match.
+ * "...$50,001 -" / "$100,000", or the column K spouse/DC-over-$1M cell's
+ * "...Over" / "$1,000,000" (confirmed on a real filing, Scott H. Peters doc
+ * 20021049). Join those back into one line so TXN_LINE can match.
  */
 function joinWrappedAmountRanges(text: string): string {
-  return text.replace(/(\$[\d,]+)\s*-\s*\r?\n\s*(\$[\d,]+)/g, "$1 - $2");
+  return text
+    .replace(/(\$[\d,]+)\s*-\s*\r?\n\s*(\$[\d,]+)/g, "$1 - $2")
+    .replace(/\bOver\s*\r?\n\s*(\$[\d,]+)/g, "Over $1");
 }
 
 // The newer (modern e-filing) House PDF layout renders each row's "Cap.

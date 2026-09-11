@@ -329,6 +329,48 @@ function longestConsistentRun(lines: number[], toleranceFrac = 0.12): number[] {
  */
 function resolveColumnRoles(cols: number[]): ColumnRoles | null {
   const colCount = cols.length - 1; // N boundaries -> N-1 columns
+
+  // A further template variant carries two extra single-purpose checkbox
+  // columns between the 3 Transaction-Type boxes and the date columns —
+  // "Capital Gains Exceed $200" and "Partial Transaction" — confirmed
+  // visually against a real filing (Khanna doc 8218940, p5, rotated
+  // upright): a ~430px-wide Asset Name column at index 1 (matching "Full
+  // Asset Name"), then six columns of ~60-120px before the two date
+  // columns, then exactly 10 Amount columns, then a trailing K flag
+  // column, for 20 total. Neither extra column is Transaction Type and
+  // neither is tracked by our schema, so both are skipped entirely (not
+  // read, not logged) rather than folded into typeIdxs.
+  //
+  // 20 columns can also appear as a coincidental false positive on a
+  // *wrong*-orientation candidate (verified against a real filing, Khanna
+  // 9116328 p3: its genuinely-upright reading is 19 columns via the
+  // existing branch below, but the same page rotated 180° also detects 20
+  // columns purely by geometric coincidence). Column *count* alone can't
+  // tell these apart, but column *shape* can: the real template's Asset
+  // Name column is always by far the widest column on the page (~430px vs
+  // a ~60-130px max elsewhere in the confirmed-correct case), which a
+  // coincidental match doesn't reproduce (the same wrong-orientation
+  // candidate measured its index-1 column at only ~90px, no wider than
+  // several others). Requiring asset to be at least 2x the next-widest
+  // column is a cheap, purely structural guard against exactly that
+  // false-positive, with no OCR involved.
+  if (colCount === 20) {
+    const widths = cols.slice(1).map((v, i) => v - cols[i]);
+    const assetWidth = widths[1];
+    const maxOtherWidth = Math.max(...widths.filter((_, i) => i !== 1));
+    if (assetWidth < maxOtherWidth * 2) return null; // doesn't look like a real Asset Name column — decline rather than guess
+
+    return {
+      ownerIdx: 0,
+      assetIdx: 1,
+      typeIdxs: [2, 3, 4], // Purchase, Sale, Exchange — 5 and 6 (Capital Gains Exceed $200, Partial Transaction) are skipped
+      typeCodes: TYPE_CODES_3COL,
+      dateIdx: 7,
+      dateNotifiedIdx: 8,
+      amountIdxs: Array.from({ length: 10 }, (_, i) => 9 + i),
+    };
+  }
+
   const typeCount = colCount === 17 ? 3 : colCount - 15;
   if (typeCount !== 3 && typeCount !== 4) return null; // unrecognized template — decline rather than guess
 
@@ -472,17 +514,44 @@ async function detectTable(pageImage: Buffer): Promise<TableStructure | null> {
   return { raw, width, height, rowLines, colLines, roles };
 }
 
-const HEADER_TEXT_PATTERN = /UNITED\s+STATES|HOUSE\s+OF\s+REPRESENTATIVES/i;
+// The full official header ("UNITED STATES HOUSE OF REPRESENTATIVES") only
+// actually appears on a filing's first/cover page — verified against a real
+// filing (Khanna 8218940): its continuation pages (e.g. p5) carry only the
+// per-page "NAME: <member>  Page X of Y" line at the top instead. Relying on
+// the official-header phrase alone meant looksUpright could never confirm a
+// continuation page as upright regardless of its actual orientation, always
+// declining the tiebreak on exactly the multi-candidate pages that need it
+// most. "PAGE \d+ OF \d+" came through fairly clean in OCR even when the
+// surrounding "NAME:" text itself garbled badly (confirmed: "Page 5 of 67"
+// read correctly apart from a misread digit, right next to "AMY:
+// Bchitihaces Pugs oF" for what should have been "NAME: Rohit Khanna Page
+// __ of __"), so it's used as a second, independent confirmation signal
+// rather than tightening/replacing the original pattern.
+//
+// A single-page filing (the whole report — header and transaction table
+// together on one page, e.g. Sarbanes doc 8219524) is neither of those
+// cases: no "Page X of Y" line at all, and "HOUSE OF REPRESENTATIVES" sits
+// low enough in the header box that it falls below looksUpright's top-15%
+// strip. That page's own title, "Periodic Transaction Report", prints at
+// the very top of every page — cover, continuation, or single-page alike —
+// and was the only thing in that strip that actually OCR'd as real text at
+// the correct rotation (confirmed: the wrong rotation's strip read as pure
+// noise, "COO O00O000000000", while the correct one read "HAND DELIVERED /
+// Periodic Transaction Report" cleanly) — added as a third, independent
+// signal for exactly this case.
+const HEADER_TEXT_PATTERN = /UNITED\s+STATES|HOUSE\s+OF\s+REPRESENTATIVES|PAGE\s*\d+\s*OF\s*\d+|PERIODIC\s+TRANSACTION\s+REPORT/i;
 
 /**
  * Checks whether a page image is right-side up by OCRing its top strip for
- * the form's own printed header ("UNITED STATES HOUSE OF REPRESENTATIVES").
- * Needed because the *grid* geometry alone can't tell a correct rotation
- * from its 180°-opposite: a rectangular grid of evenly-spaced lines looks
- * identical read forwards or backwards, so a landscape page rotated 90° and
- * the same page rotated 270° both pass grid detection with the *same*
- * column count (verified against a real filing) — only the actual header
- * text, which sits above the table, disambiguates which one is upright.
+ * the form's own printed header ("UNITED STATES HOUSE OF REPRESENTATIVES"
+ * on a cover page) or its per-page "Page X of Y" line (present on every
+ * page, cover or continuation). Needed because the *grid* geometry alone
+ * can't tell a correct rotation from its 180°-opposite: a rectangular grid
+ * of evenly-spaced lines looks identical read forwards or backwards, so a
+ * landscape page rotated 90° and the same page rotated 270° both pass grid
+ * detection with the *same* column count (verified against a real filing)
+ * — only the actual header text, which sits above the table, disambiguates
+ * which one is upright.
  */
 async function looksUpright(worker: Worker, pageImage: Buffer): Promise<boolean> {
   const meta = await sharp(pageImage).metadata();
@@ -495,35 +564,61 @@ async function looksUpright(worker: Worker, pageImage: Buffer): Promise<boolean>
 }
 
 /**
- * Most scans render upright, and the grid check on an as-is page is trusted
- * on its own when it succeeds — exactly the original, unambiguous behavior,
- * with no header OCR involved. That matters because the grid check alone
- * can't be trusted to *disambiguate* rotations: a checkbox-dense table can
- * pass column-count detection at more than one rotation by sheer geometric
- * coincidence (verified on real filings — some pages passed at 0°, 90°,
- * *and* 270° simultaneously), and the header-text tiebreaker below is
- * itself unreliable on a poor scan. Running that tiebreaker on an
- * already-upright page risked *rejecting* a page that was fine all along,
- * so it's reserved for the real failure case: a page fed into the scanner
- * sideways, where rotation 0 finds no table at all (confirmed against a
- * real filing that read entirely at 90° off). Only then are 90/180/270
- * tried, with the header-text check picking whichever is actually
- * right-side up — and if more than one of *those* claims to be upright,
- * that's a genuine ambiguity, declined rather than guessed.
+ * An as-is (0°) grid pass is trusted unconditionally *unless* a 90° or 270°
+ * candidate shows a substantially denser grid — the actual signature of a
+ * confirmed failure mode (Khanna doc 8218940 p5: 0° coincidentally read a
+ * sparse 3-row "grid" off an unrelated pixel pattern while the true
+ * orientation, 270° away, had 18 real rows) — rather than blanket-checking
+ * every page against every rotation.
+ *
+ * 180° is deliberately excluded from that comparison. It's 0°'s geometric
+ * mirror-twin: a rectangular grid of evenly-spaced lines looks identical
+ * read forwards or backwards, so whenever 0° is genuinely upright, 180°
+ * routinely passes too with the *same* row/column counts (verified — this
+ * is not rare, it's close to universal for a real table). Comparing 0°
+ * against 180° for "is this ambiguous" would treat that routine, harmless
+ * tie as a reason to distrust a page that was fine all along — confirmed by
+ * an earlier version of this fix that pooled all four rotations unconditionally
+ * and, on a real filing (Khanna 9116328), fell through to the header-text
+ * tiebreaker on nearly every page (since 0/180 tied on rows almost every
+ * time), which is unreliable on continuation pages and silently dropped six
+ * pages' worth of otherwise-correct transactions (99 → 61 total). 90°/270°
+ * don't share that structural symmetry with 0° (a sideways scan's row
+ * spacing bears no routine relationship to the upright grid's), so a large
+ * gap there is actual evidence, not routine noise.
  */
 async function detectTableWithRotation(worker: Worker, pageImage: Buffer): Promise<{ pageImage: Buffer; table: TableStructure } | null> {
   const upright = await detectTable(pageImage);
-  if (upright) return { pageImage, table: upright };
 
-  const candidates: { pageImage: Buffer; table: TableStructure }[] = [];
-  for (const rotation of [90, 180, 270] as const) {
+  const sideways: { pageImage: Buffer; table: TableStructure }[] = [];
+  for (const rotation of [90, 270] as const) {
     const candidate = await sharp(pageImage).rotate(rotation).toBuffer();
     const table = await detectTable(candidate);
-    if (table) candidates.push({ pageImage: candidate, table });
+    if (table) sideways.push({ pageImage: candidate, table });
   }
+
+  if (upright) {
+    const uprightRows = upright.rowLines.length;
+    const denser = sideways.filter((c) => c.table.rowLines.length >= Math.max(uprightRows * 2, uprightRows + 3));
+    if (denser.length === 0) return { pageImage, table: upright };
+    if (denser.length === 1) return denser[0];
+    for (const candidate of denser) {
+      if (await looksUpright(worker, candidate.pageImage)) return candidate;
+    }
+    return null; // multiple plausible sideways orientations, none confirmed — don't guess
+  }
+
+  // 0° found nothing at all — the original, proven ambiguous-page path: a
+  // page fed into the scanner sideways or upside down, where the
+  // header-text tiebreak is the only way to pick among whichever rotations
+  // do produce a grid.
+  const candidates = [...sideways];
+  const flippedImage = await sharp(pageImage).rotate(180).toBuffer();
+  const flippedTable = await detectTable(flippedImage);
+  if (flippedTable) candidates.push({ pageImage: flippedImage, table: flippedTable });
+
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
-
   for (const candidate of candidates) {
     if (await looksUpright(worker, candidate.pageImage)) return candidate;
   }

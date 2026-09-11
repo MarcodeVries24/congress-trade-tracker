@@ -16,7 +16,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AdSlot } from "@/components/AdSlot";
 import { MemberPhoto } from "@/components/MemberPhoto";
-import { compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
+import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
 
 // Same free, ungated search param /trades already supports (ILIKE across
 // member_name/asset_name/ticker) — deliberately not the paid member/ticker
@@ -123,9 +123,9 @@ export default function Home() {
                             {cleanAssetName(trade.asset_name)}
                           </div>
                         </div>
-                        <div className="shrink-0 text-right">
+                        <div className="shrink-0 whitespace-nowrap text-right">
                           <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
-                          <div className="mt-1 text-xs text-ink-muted">{trade.amount_range}</div>
+                          <div className="mt-1 text-xs text-ink-muted">{compactAmountRange(trade.amount_low, trade.amount_high, trade.amount_range)}</div>
                         </div>
                       </Link>
                     </li>
@@ -197,7 +197,9 @@ export default function Home() {
                         <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
                         <div className="truncate text-xs text-ink-faint">{trade.ticker ?? cleanAssetName(trade.asset_name)}</div>
                       </div>
-                      <div className="shrink-0 text-right text-xs font-medium text-ink-muted">{trade.amount_range}</div>
+                      <div className="shrink-0 whitespace-nowrap text-right text-xs font-medium text-ink-muted">
+                        {compactAmountRange(trade.amount_low, trade.amount_high, trade.amount_range)}
+                      </div>
                     </Link>
                   </li>
                 ))}

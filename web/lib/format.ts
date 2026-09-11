@@ -41,6 +41,16 @@ export const compactUSD = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+// The disclosed amount_range string (e.g. "$1,000,001 - $5,000,000") reads
+// fine in a table cell with room to spare, but is too wide for a narrow
+// single-line card row — this compacts it to "$1.0M-$5.0M" from the same
+// low/high bounds, falling back to the raw range if bounds are missing.
+export function compactAmountRange(amountLow: number | null, amountHigh: number | null, fallback: string): string {
+  if (amountLow === null) return fallback;
+  if (amountHigh === null || amountHigh === amountLow) return compactUSD.format(amountLow);
+  return `${compactUSD.format(amountLow)}-${compactUSD.format(amountHigh)}`;
+}
+
 export function typeBadge(type: string): { label: string; className: string; accent: string } {
   const t = type.toUpperCase();
   if (t.startsWith("P"))

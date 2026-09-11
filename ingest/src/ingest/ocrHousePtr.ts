@@ -90,6 +90,29 @@ const TYPE_CODES_4COL = ["P", "S", "S (partial)", "E"];
 
 const EXAMPLE_ASSET_DENYLIST = /\bmega\s*corp\b/i;
 
+// A scanned form's own printed "Full Asset Name" text frequently ends with
+// the ticker in parens — e.g. "Alibaba Group Holding (BABA)" — the same way
+// a text-native e-filing renders it (see TICKER_PATTERN in parsePtr.ts), but
+// nothing here was ever extracting it: every OCR row hardcoded ticker: null.
+// Confirmed on a real filing, Byron Donalds doc 8220682 (167 rows, all with
+// a real ticker sitting right there in the OCR'd text). A trailing "|" is a
+// common OCR artifact from an adjacent column's border line bleeding into
+// the cell, tolerated here the same way it's tolerated elsewhere.
+//
+// Two false positives turned up checking this against the live database
+// before shipping it: "...COMPANY (THE)" (part of a formal company name,
+// e.g. "Procter & Gamble Company (The)") and "...(NEW)" (means newly-issued
+// shares, not a ticker) — both denylisted rather than trusted blindly.
+const OCR_TICKER_PATTERN = /\(([A-Z]{1,6}(?:\.[A-Z])?)\)\s*\|?\s*$/;
+const OCR_TICKER_DENYLIST = new Set(["THE", "NEW", "OLD"]);
+
+function extractOcrTicker(assetName: string): string | null {
+  const match = assetName.match(OCR_TICKER_PATTERN);
+  if (!match) return null;
+  const ticker = match[1];
+  return OCR_TICKER_DENYLIST.has(ticker) ? null : ticker;
+}
+
 // A bold, centered printed checkmark (one real filing, printed with its own
 // small drawn checkbox square inside the cell) and a fainter, off-center
 // handwritten "X" (another filing, no inner box at all — just a mark placed
@@ -814,10 +837,16 @@ async function ocrPage(
       issues.push({ page: pageNum, row: r, field: "amountRange", reason: `Only one of two cross-checks confirmed "${amountRange}" as marked — verify against the source.`, context: assetText });
     }
 
+    const ocrTicker = extractOcrTicker(assetText);
     transactions.push({
       assetName: assetText,
-      ticker: null,
-      assetTypeCode: null,
+      ticker: ocrTicker,
+      // A ticker only ever shows up in this OCR'd text for a company/fund
+      // that's exchange-traded — see extractOcrTicker's comment. Nothing on
+      // the physical form breaks the type out further, so this is the most
+      // specific code that's actually knowable from it (matches the manual
+      // convention used for every such row fixed by hand this session).
+      assetTypeCode: ocrTicker ? "ST" : null,
       owner,
       // "(unreadable)" rather than defaulting to a real code (e.g.
       // "Purchase") when unresolved — a guess here would misrepresent an

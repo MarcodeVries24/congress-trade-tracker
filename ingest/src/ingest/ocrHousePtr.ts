@@ -486,6 +486,49 @@ interface TableStructure {
   roles: ColumnRoles;
 }
 
+// A filing whose first page is entirely the transactions table (the usual
+// case for a multi-page filing's continuation pages, and what this module
+// was originally calibrated against) has no other horizontal dividers for
+// the row-line scan below to confuse the real row grid with. A single-page
+// filing — the whole report, filer-info box and table together on one page
+// (confirmed on real filings: Sarbanes doc 8219524, San Nicolas doc
+// 8219092) — does: the info box above the table has its own irregular
+// horizontal dividers (Name/Telephone row, Member-of-Congress row, IPO
+// Yes/No row, etc.), and picking the "most evenly-spaced run" among ALL of
+// them can lock onto a few of those instead of the real (much shorter)
+// table below. The table's own printed column headers — "TYPE",
+// "TRANSACTION", "DATE", "ASSET", etc. — sit directly above the table on
+// every page that has this info-box layout, so finding the lowest one
+// anchors the row search to just the real table, without needing to
+// distinguish the two by pixel geometry alone (verified more reliable than
+// a pixel-only approach — see the full-page-width darkness heuristic this
+// replaced, which didn't cleanly separate the two on a real sample).
+const TABLE_HEADER_WORD_PATTERN = /^(ASSET|TYPE|TRANSACTION|DATE|NOTIFIED|AMOUNT)$/i;
+
+async function findTableHeaderBottom(worker: Worker, pageImage: Buffer, pageWidth: number, pageHeight: number): Promise<number | null> {
+  // The info box + table header always sit in the page's upper portion; a
+  // continuation page (no info box, table starts near the top) has no
+  // matching words up here either, and this returns null — callers fall
+  // back to the original unrestricted search in that case.
+  const searchHeight = Math.round(pageHeight * 0.7);
+  const strip = await sharp(pageImage).extract({ left: 0, top: 0, width: pageWidth, height: searchHeight }).toBuffer();
+  await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+  const { data } = await worker.recognize(strip, {}, { text: true, blocks: true });
+  let maxY1: number | null = null;
+  for (const block of data.blocks ?? []) {
+    for (const para of block.paragraphs ?? []) {
+      for (const line of para.lines ?? []) {
+        for (const word of line.words ?? []) {
+          if (TABLE_HEADER_WORD_PATTERN.test(word.text.trim()) && (maxY1 === null || word.bbox.y1 > maxY1)) {
+            maxY1 = word.bbox.y1;
+          }
+        }
+      }
+    }
+  }
+  return maxY1;
+}
+
 /**
  * Locates the transaction grid in an already-upright page image: row lines
  * (the longest evenly-spaced run, wherever the table body sits under a
@@ -494,9 +537,13 @@ interface TableStructure {
  * is present (cover/certification page, or a column count that matches
  * neither known template).
  */
-async function detectTable(pageImage: Buffer): Promise<TableStructure | null> {
+async function detectTable(pageImage: Buffer, worker?: Worker): Promise<TableStructure | null> {
   const { data: raw, width, height } = await greyscaleRaw(pageImage);
-  const allRowLines = findGridLines(raw, width, height, "row", Math.round(0.43 * width), Math.round(0.55 * width));
+  const headerBottom = worker ? await findTableHeaderBottom(worker, pageImage, width, height) : null;
+  const rowSearchStart = headerBottom ? headerBottom + 10 : 0;
+  const allRowLines = findGridLines(raw, width, height, "row", Math.round(0.43 * width), Math.round(0.55 * width)).filter(
+    (y) => y >= rowSearchStart
+  );
   const rowLines = longestConsistentRun(allRowLines);
   if (rowLines.length < 2) return null;
 
@@ -588,12 +635,12 @@ async function looksUpright(worker: Worker, pageImage: Buffer): Promise<boolean>
  * gap there is actual evidence, not routine noise.
  */
 async function detectTableWithRotation(worker: Worker, pageImage: Buffer): Promise<{ pageImage: Buffer; table: TableStructure } | null> {
-  const upright = await detectTable(pageImage);
+  const upright = await detectTable(pageImage, worker);
 
   const sideways: { pageImage: Buffer; table: TableStructure }[] = [];
   for (const rotation of [90, 270] as const) {
     const candidate = await sharp(pageImage).rotate(rotation).toBuffer();
-    const table = await detectTable(candidate);
+    const table = await detectTable(candidate, worker);
     if (table) sideways.push({ pageImage: candidate, table });
   }
 
@@ -614,7 +661,7 @@ async function detectTableWithRotation(worker: Worker, pageImage: Buffer): Promi
   // do produce a grid.
   const candidates = [...sideways];
   const flippedImage = await sharp(pageImage).rotate(180).toBuffer();
-  const flippedTable = await detectTable(flippedImage);
+  const flippedTable = await detectTable(flippedImage, worker);
   if (flippedTable) candidates.push({ pageImage: flippedImage, table: flippedTable });
 
   if (candidates.length === 0) return null;

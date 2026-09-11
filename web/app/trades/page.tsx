@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import {
   AMOUNT_RANGES,
@@ -100,6 +100,11 @@ function clampToEarliestFilingDate(value: string): string {
 
 export default function Home() {
   const router = useRouter();
+  // Dashboard cards link in as /trades?q=<name/ticker> — the free search
+  // param — so a visitor lands here already filtered instead of on the
+  // unfiltered list. Read once on mount; the search box itself just drives
+  // local state after that, same as before this param existed.
+  const searchParams = useSearchParams();
   const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
   const { user } = useUser();
   const { openSignUp, openSignIn } = useClerk();
@@ -133,7 +138,7 @@ export default function Home() {
   }
 
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [members, setMembers] = useState<string[]>([]);
   const [tickers, setTickers] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);

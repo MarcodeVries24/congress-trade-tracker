@@ -37,13 +37,41 @@ export function InitialsAvatar({ name }: { name: string }) {
   );
 }
 
-// Official photos are hotlinked from congress.gov; fall back to an initials
-// avatar if one isn't mapped yet or fails to load, rather than guessing.
+// stored photo_url points at bioguide.congress.gov, whose own photo
+// directory — despite covering ~99% of members per the ingest pipeline's
+// notes — 404s for some (newly appointed members especially, before their
+// photo is uploaded there). Extracting the bioguide ID lets us retry
+// against the community-maintained unitedstates/images mirror, which often
+// has a photo bioguide.congress.gov is still missing.
+function bioguideIdFromPhotoUrl(photoUrl: string): string | null {
+  const m = photoUrl.match(/\/([A-Za-z]\d{6})\.jpg$/);
+  return m ? m[1].toUpperCase() : null;
+}
+
+function fallbackPhotoUrl(photoUrl: string): string | null {
+  const id = bioguideIdFromPhotoUrl(photoUrl);
+  return id ? `https://raw.githubusercontent.com/unitedstates/images/gh-pages/congress/450x550/${id}.jpg` : null;
+}
+
+// Official photos are hotlinked from congress.gov, with a fallback mirror
+// tried before giving up to an initials avatar (see bioguideIdFromPhotoUrl
+// above) — only if that's unavailable or itself fails to load does this
+// guess with initials instead.
 export function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string | null }) {
-  const [errored, setErrored] = useState(false);
-  if (!photoUrl || errored) return <InitialsAvatar name={name} />;
+  const [stage, setStage] = useState<"primary" | "fallback" | "failed">("primary");
+  if (!photoUrl || stage === "failed") return <InitialsAvatar name={name} />;
+
+  const fallback = fallbackPhotoUrl(photoUrl);
+  const src = stage === "primary" ? photoUrl : fallback;
+  if (!src) return <InitialsAvatar name={name} />;
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={photoUrl} alt="" onError={() => setErrored(true)} className="h-8 w-8 shrink-0 rounded-full bg-panel-muted object-cover" />
+    <img
+      src={src}
+      alt=""
+      onError={() => setStage((s) => (s === "primary" && fallback ? "fallback" : "failed"))}
+      className="h-8 w-8 shrink-0 rounded-full bg-panel-muted object-cover"
+    />
   );
 }

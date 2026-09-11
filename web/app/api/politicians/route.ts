@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.trade_count;
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";
 
-  const limitNum = Math.min(Number(sp.get("limit")) || 25, 100);
+  const limitNum = Math.min(Number(sp.get("limit")) || 25, 200);
   const pageNum = Math.max(Number(sp.get("page")) || 1, 1);
   const offset = (pageNum - 1) * limitNum;
 

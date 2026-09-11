@@ -39,3 +39,13 @@ body {
   background-color: rgb(var(--bg));
   color: rgb(var(--ink));
 }
+
+/* Google's own documented fix for unfilled ad space — the adsbygoogle
+ * script sets data-ad-status on the <ins> once it knows whether a real ad
+ * filled it, and this attribute selector reacts live to that change (no JS
+ * needed). Collapses the reserved block to nothing rather than leaving a
+ * blank square/banner shape where no ad was won.
+ * https://support.google.com/adsense/answer/10762946 */
+ins.adsbygoogle[data-ad-status="unfilled"] {
+  display: none !important;
+}

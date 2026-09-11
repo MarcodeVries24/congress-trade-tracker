@@ -21,8 +21,14 @@ const METADATA_LINE = new RegExp("^[A-Za-z][A-Za-z" + NUL_CHAR + "\\s]{0,40}:");
 
 // Matches a transaction detail line: [asset text] TxnType Date Date AmountRange
 // The asset text is only present when the whole record sits on one line.
+// The amount is usually one of the STOCK Act's fixed brackets ("$X - $Y",
+// "$1,000 or less", "Over $X"), all of which are whole dollars — but a
+// divested/inherited asset can instead disclose an exact appraised value
+// with cents (confirmed on a real filing, Kaptur doc 20022886: "$1,280.03",
+// no bracket at all), so the plain-dollar-amount alternative allows an
+// optional ".dd" on each figure it matches, not just on this one.
 const TXN_LINE =
-  /^(.*?)\s*(P|S\s*\([^)]*\)|S|E)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\$[\d,]+(?:\s*-\s*\$[\d,]+)?|\$1,000 or less|Over \$[\d,]+)\s*$/;
+  /^(.*?)\s*(P|S\s*\([^)]*\)|S|E)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\$[\d,]+(?:\.\d+)?(?:\s*-\s*\$[\d,]+(?:\.\d+)?)?|\$1,000 or less|Over \$[\d,]+(?:\.\d+)?)\s*$/;
 
 // A ticker only counts when it's parenthesized and starts with a letter —
 // government securities are identified by a CUSIP instead (e.g. "(91282CGH8)"),
@@ -74,10 +80,15 @@ function toIsoDateSlash(s: string): string | null {
 }
 
 function parseAmountRange(range: string): { low: number | null; high: number | null } {
-  const nums = [...range.matchAll(/\$([\d,]+)/g)].map((m) => Number(m[1].replace(/,/g, "")));
+  const nums = [...range.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map((m) => Math.round(Number(m[1].replace(/,/g, ""))));
   const lower = range.toLowerCase();
   if (lower.includes("or less")) return { low: 0, high: nums[0] ?? null };
   if (lower.includes("over")) return { low: nums[0] ?? null, high: null };
+  // A single figure with no "-" separator is an exact disclosed value (see
+  // TXN_LINE's comment) rather than a range — both bounds are that same
+  // figure, not "low, open-ended high" the way a lone number elsewhere in
+  // this function would otherwise read.
+  if (nums.length === 1) return { low: nums[0], high: nums[0] };
   return { low: nums[0] ?? null, high: nums[1] ?? null };
 }
 

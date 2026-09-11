@@ -125,15 +125,22 @@ function parseAmountRange(range: string): { low: number | null; high: number | n
   const nums = [...range.matchAll(/\$([\d,]+(?:\.\d+)?)/g)].map((m) => Math.round(Number(m[1].replace(/,/g, ""))));
   const lower = range.toLowerCase();
   if (lower.includes("or less")) return { low: 0, high: nums[0] ?? null, displayRange: range };
-  if (lower.includes("over")) {
-    // Column K's "Transaction in a Spouse or Dependent Child Asset over
-    // $1,000,000" case (see TXN_LINE's comment) carries a "Spouse/DC "
-    // prefix that's redundant with the owner field already stored
-    // separately for the row — stripped here so it displays and matches
-    // the plain "Over $X" bracket text every other row of this size uses.
-    const displayRange = range.replace(/^Spouse\/DC\s+/i, "");
-    return { low: nums[0] ?? null, high: null, displayRange };
+  if (lower.startsWith("spouse/dc")) {
+    // Column K ("Transaction in a Spouse or Dependent Child Asset over
+    // $1,000,000") isn't its own amount bracket — on the real form it's a
+    // flag checked *alongside* whichever of the 10 real brackets (A-J)
+    // actually applies (see resolveColumnRoles in ocrHousePtr.ts, which
+    // reads the real bracket and ignores this flag entirely). But a
+    // text-native e-filing can render just "Spouse/DC Over $1,000,000"
+    // with no further bracket given (confirmed on a real filing, Scott H.
+    // Peters doc 20021049) — with no more precise figure disclosed, bucket
+    // it into the STOCK Act bracket that starts just above $1,000,000
+    // rather than inventing a one-off "Over $1,000,000" label that
+    // wouldn't match any real bracket or filter.
+    const bracket = bracketFor(1_000_001)!;
+    return { low: bracket.low, high: bracket.high, displayRange: bracket.range };
   }
+  if (lower.includes("over")) return { low: nums[0] ?? null, high: null, displayRange: range };
   // A single figure with no "-" separator is an exact disclosed value (see
   // TXN_LINE's comment), not a range — bucket it into the STOCK Act
   // bracket it actually falls in (matching how every bracket-disclosed

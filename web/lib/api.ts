@@ -74,18 +74,60 @@ export interface DashboardPolitician {
   trade_count: number;
 }
 
+export interface DashboardVolumeLeader {
+  member_name: string;
+  state_district: string | null;
+  party: string | null;
+  photo_url: string | null;
+  member_state: string | null;
+  chamber: "house" | "senate";
+  volume_sum: number;
+  trade_count: number;
+}
+
 export interface DashboardStock {
   ticker: string;
   trade_count: number;
 }
 
 export interface DashboardData {
-  latestTrades: DashboardTrade[];
+  latestTradesStocks: DashboardTrade[];
+  latestTradesAll: DashboardTrade[];
   topPoliticians: DashboardPolitician[];
+  topByVolume: DashboardVolumeLeader[];
   topStocks: DashboardStock[];
   biggestTrades: DashboardTrade[];
   chamberBreakdown: { chamber: "house" | "senate"; count: number }[];
   partyBreakdown: { party: string; count: number }[];
+}
+
+export interface PoliticianRow {
+  member_name: string;
+  state_district: string | null;
+  party: string | null;
+  photo_url: string | null;
+  member_state: string | null;
+  chamber: "house" | "senate";
+  trade_count: number;
+  volume_sum: number;
+  last_filed: string | null;
+}
+
+export interface PoliticiansResponse {
+  data: PoliticianRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PoliticianFilters {
+  q?: string;
+  chamber?: string[];
+  sort?: "trade_count" | "volume_sum" | "last_filed";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
 }
 
 export interface TradeFilters {
@@ -352,4 +394,19 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const res = await fetch("/api/dashboard");
   if (!res.ok) throw new Error(`Failed to fetch dashboard: ${res.status}`);
   return (await res.json()).data;
+}
+
+export async function fetchPoliticians(filters: PoliticianFilters): Promise<PoliticiansResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const v of value) params.append(key, v);
+    } else {
+      params.set(key, String(value));
+    }
+  }
+  const res = await fetch(`/api/politicians?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to fetch politicians: ${res.status}`);
+  return res.json();
 }

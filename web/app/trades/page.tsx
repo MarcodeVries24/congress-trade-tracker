@@ -33,6 +33,7 @@ import { AdSlot } from "@/components/AdSlot";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, memberLocation, typeBadge } from "@/lib/format";
+import { useDebounced } from "@/lib/useDebounced";
 
 // Rough magnitude tier so the eye can scan trade size without reading text.
 function sizeTier(amountLow: number | null): number {
@@ -77,15 +78,6 @@ const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" |
   { value: "member_name:asc", label: "Member A→Z", sort: "member_name", order: "asc" },
   { value: "ticker:asc", label: "Ticker A→Z", sort: "ticker", order: "asc" },
 ];
-
-function useDebounced<T>(value: T, delay = 350): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
 
 const inputClass =
   "rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong transition-colors";

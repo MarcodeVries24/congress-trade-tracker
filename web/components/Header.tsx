@@ -65,6 +65,12 @@ export function Header() {
             >
               All Trades
             </Link>
+            <Link
+              href="/politicians"
+              className="text-[9px] font-medium uppercase tracking-normal text-ink-muted underline decoration-line-strong transition-colors hover:text-ink sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider"
+            >
+              Politicians
+            </Link>
           </span>
         </div>
         <div className="flex items-center gap-3">

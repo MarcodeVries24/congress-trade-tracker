@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ASSET_TYPE_LABELS,
   cleanAssetName,
   DashboardData,
   displayName,
@@ -45,6 +44,9 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Toggles between the two lists the API already computed server-side —
+  // no refetch needed, just swaps which array the Latest Trades card reads.
+  const [assetFilter, setAssetFilter] = useState<"stocks" | "all">("stocks");
 
   useEffect(() => {
     fetchDashboard()
@@ -55,6 +57,7 @@ export default function Home() {
 
   const totalChamberCount = dashboard ? dashboard.chamberBreakdown.reduce((sum, c) => sum + c.count, 0) : 0;
   const totalPartyCount = dashboard ? dashboard.partyBreakdown.reduce((sum, p) => sum + p.count, 0) : 0;
+  const latestTrades = dashboard ? (assetFilter === "stocks" ? dashboard.latestTradesStocks : dashboard.latestTradesAll) : [];
 
   return (
     <>
@@ -102,12 +105,31 @@ export default function Home() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {/* Latest Trades */}
-          <Card title="Latest Trades" href="/trades" className="lg:col-span-2 lg:row-span-2">
+          <Card
+            title="Latest Trades"
+            href="/trades"
+            className="lg:col-span-2 lg:row-span-2"
+            actions={
+              <div className="flex items-center gap-1 text-[11px]">
+                {(["stocks", "all"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setAssetFilter(v)}
+                    className={`rounded-full border px-2.5 py-1 font-medium transition-colors ${
+                      assetFilter === v ? "border-accent/40 bg-accent/15 text-accent" : "border-line text-ink-faint hover:text-ink-muted"
+                    }`}
+                  >
+                    {v === "stocks" ? "Stocks" : "All assets"}
+                  </button>
+                ))}
+              </div>
+            }
+          >
             {!dashboard && <CardSkeleton rows={7} />}
-            {dashboard && dashboard.latestTrades.length === 0 && <EmptyRow />}
+            {dashboard && latestTrades.length === 0 && <EmptyRow />}
             {dashboard && (
               <ul className="divide-y divide-line/60">
-                {dashboard.latestTrades.map((trade) => {
+                {latestTrades.map((trade) => {
                   const badge = typeBadge(trade.transaction_type);
                   return (
                     <li key={trade.id}>
@@ -136,7 +158,7 @@ export default function Home() {
           </Card>
 
           {/* Most Active Politicians */}
-          <Card title="Most Active Politicians" href="/trades">
+          <Card title="Most Active Politicians" href="/politicians?sort=trade_count">
             {!dashboard && <CardSkeleton rows={6} />}
             {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
             {dashboard && (
@@ -154,7 +176,43 @@ export default function Home() {
                             {location ?? p.chamber}
                           </div>
                         </div>
-                        <div className="shrink-0 text-right text-sm font-semibold text-ink">{p.trade_count.toLocaleString()}</div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-sm font-semibold text-ink">{p.trade_count.toLocaleString()}</div>
+                          <div className="text-[10px] uppercase tracking-wide text-ink-faint">trades</div>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+
+          {/* Top by Trading Volume */}
+          <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum">
+            {!dashboard && <CardSkeleton rows={6} />}
+            {dashboard && dashboard.topByVolume.length === 0 && <EmptyRow />}
+            {dashboard && (
+              <ul className="divide-y divide-line/60">
+                {dashboard.topByVolume.map((p, i) => {
+                  const location = memberLocationFromDashboard(p);
+                  return (
+                    <li key={`${p.member_name}-${i}`}>
+                      <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                        <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                          <div className="truncate text-xs text-ink-faint">
+                            {p.party ? `${p.party} · ` : ""}
+                            {location ?? p.chamber}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-sm font-semibold text-ink">{compactUSD.format(p.volume_sum)}</div>
+                          <div className="text-[10px] uppercase tracking-wide text-ink-faint">
+                            est. · {p.trade_count.toLocaleString()} trade{p.trade_count === 1 ? "" : "s"}
+                          </div>
+                        </div>
                       </Link>
                     </li>
                   );
@@ -260,16 +318,31 @@ export default function Home() {
   );
 }
 
-function Card({ title, href, className = "", children }: { title: string; href?: string; className?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  href,
+  actions,
+  className = "",
+  children,
+}: {
+  title: string;
+  href?: string;
+  actions?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className={`flex flex-col overflow-hidden rounded-lg border border-line bg-panel ${className}`}>
-      <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {href && (
-          <Link href={href} className="text-xs text-accent hover:underline">
-            View all →
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          {actions}
+          {href && (
+            <Link href={href} className="shrink-0 text-xs text-accent hover:underline">
+              View all →
+            </Link>
+          )}
+        </div>
       </div>
       <div className="flex-1">{children}</div>
     </section>

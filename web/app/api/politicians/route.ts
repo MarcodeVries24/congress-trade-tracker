@@ -54,13 +54,15 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state AS member_state, f.chamber,
-              COUNT(*)::int as trade_count, ${VOLUME_EXPR}::float8 as volume_sum, MAX(f.filing_date) as last_filed
+      `SELECT t.member_name, mr.state_district,
+              COALESCE(mh.party, mr.party) AS party, COALESCE(mh.photo_url, mr.photo_url) AS photo_url, COALESCE(mh.state, mr.state) AS member_state,
+              f.chamber, COUNT(*)::int as trade_count, ${VOLUME_EXPR}::float8 as volume_sum, MAX(f.filing_date) as last_filed
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
        ${where}
-       GROUP BY t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state, f.chamber
+       GROUP BY t.member_name, mr.state_district, mh.party, mr.party, mh.photo_url, mr.photo_url, mh.state, mr.state, f.chamber
        ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams

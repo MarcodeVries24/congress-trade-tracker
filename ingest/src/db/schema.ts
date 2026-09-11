@@ -12,6 +12,15 @@ export const SCHEMA_STATEMENTS = [
     transaction_count INTEGER NOT NULL DEFAULT 0,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // Resolves *which specific person* filed this, as opposed to state_district
+  // alone (a district/Senate-seat key gets reused by whoever holds it next —
+  // see members_history/member_terms below). NULL until resolveFilingBioguideIds
+  // in syncMembers.ts matches it against member_terms by filing_date; every
+  // query that shows a member's party/photo falls back to the old
+  // members_reference-by-state_district join when this is NULL, so an
+  // unresolved filing is never worse off than before this column existed.
+  `ALTER TABLE filings ADD COLUMN IF NOT EXISTS bioguide_id TEXT`,
+  `CREATE INDEX IF NOT EXISTS idx_filings_bioguide_id ON filings(bioguide_id)`,
   `CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,
     doc_id TEXT NOT NULL REFERENCES filings(doc_id) ON DELETE CASCADE,
@@ -56,6 +65,41 @@ export const SCHEMA_STATEMENTS = [
   // field to key on) — not fit to show a user. This column holds the actual
   // 2-letter state for both chambers, for display.
   `ALTER TABLE members_reference ADD COLUMN IF NOT EXISTS state TEXT`,
+  // members_reference has exactly one row per state_district — the *current*
+  // occupant — because that's what every trade used to be shown with,
+  // including trades filed years earlier by whoever held that seat before
+  // them (confirmed on real data: Fred Upton's MI06 trades were showing
+  // Debbie Dingell's party, Pete Sessions' TX32 trades were showing Julie
+  // Johnson's — neither has ever served alongside the other). One row per
+  // bioguide_id instead, so every person who's ever held a seat keeps their
+  // own party/photo regardless of who holds that seat now. party/photo_url
+  // reflect that person's most recent known term (a mid-career party switch
+  // like Joe Manchin's is a known, accepted simplification — same as
+  // members_reference already only ever tracked one "current" party).
+  `CREATE TABLE IF NOT EXISTS members_history (
+    bioguide_id TEXT PRIMARY KEY,
+    official_name TEXT NOT NULL,
+    party TEXT,
+    photo_url TEXT NOT NULL,
+    state TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  // Every term (current + historical) any legislator has held, keyed by the
+  // same state_district join key filings/transactions already use — this is
+  // what lets a filing be resolved to the *specific* person who held that
+  // seat on its filing_date, not just whoever holds it today. A seat with no
+  // gap in coverage has back-to-back terms (one ends the day the next
+  // starts), so a filing_date is expected to fall inside exactly one row;
+  // resolveFilingBioguideIds in syncMembers.ts only acts when it does.
+  `CREATE TABLE IF NOT EXISTS member_terms (
+    id SERIAL PRIMARY KEY,
+    state_district TEXT NOT NULL,
+    bioguide_id TEXT NOT NULL,
+    term_start DATE NOT NULL,
+    term_end DATE,
+    UNIQUE (state_district, bioguide_id, term_start)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_member_terms_district ON member_terms(state_district)`,
   // Single-row heartbeat, updated at the end of every ingest run whether or
   // not it found anything new. Distinct from filings.ingested_at (which only
   // moves when a filing is actually inserted/updated) — this is what proves

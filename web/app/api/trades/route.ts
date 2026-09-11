@@ -139,12 +139,16 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, f.parse_status, mr.photo_url, mr.party, mr.state AS member_state,
+      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
+              COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
+              COALESCE(mh.party, mr.party) AS party,
+              COALESCE(mh.state, mr.state) AS member_state,
               cmc.market_cap,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
        ${marketCapJoin}
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST

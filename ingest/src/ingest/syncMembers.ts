@@ -9,6 +9,8 @@ interface LegislatorTerm {
   state: string;
   district?: number;
   party?: string;
+  start?: string;
+  end?: string;
 }
 
 interface Legislator {
@@ -164,7 +166,7 @@ async function upsertMemberReference(key: string, legislator: Legislator, term: 
 // avatar) rather than risk attaching the wrong person's photo, since
 // state_district keys get reused by different people across different
 // Congresses.
-async function backfillFormerMembers(currentLegislators: Legislator[]): Promise<void> {
+async function backfillFormerMembers(currentLegislators: Legislator[], historicalLegislators: Legislator[]): Promise<void> {
   const missing = await sql`
     SELECT DISTINCT t.member_name, t.state_district
     FROM transactions t
@@ -191,8 +193,7 @@ async function backfillFormerMembers(currentLegislators: Legislator[]): Promise<
     else currentByState.set(currentTerm.state, [legislator]);
   }
 
-  const historical = await fetchLegislators(MEMBERS_REFERENCE.legislatorsHistoricalYamlUrl);
-  const { houseIndex, senateIndex } = indexByKey(historical);
+  const { houseIndex, senateIndex } = indexByKey(historicalLegislators);
 
   let resolved = 0;
   let skipped = 0;
@@ -232,14 +233,172 @@ async function backfillFormerMembers(currentLegislators: Legislator[]): Promise<
   console.log(`Backfilled ${resolved} former/renumbered member(s); ${skipped} left unmatched (no confident single match).`);
 }
 
+// Only terms that could plausibly overlap a filing in this database are
+// worth storing — legislators-historical.yaml goes back to 1789, and the
+// vast majority of it (everyone whose last term ended well before our
+// earliest filing) would just be dead weight in member_terms. 2015 gives a
+// comfortable margin before this app's actual filing range.
+const EARLIEST_RELEVANT_TERM_END = "2015-01-01";
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// One row per person (by bioguide_id) in members_history, and one row per
+// term of theirs (recent enough to matter — see EARLIEST_RELEVANT_TERM_END)
+// in member_terms. Building both from the *same* combined current+historical
+// legislator list keeps a person who appears in both files (elected again
+// after a gap, e.g.) to a single members_history row — last-write-wins on
+// whichever list entry is processed later, which is fine since a person's
+// bioguide-derived photo/name don't depend on which file supplied them.
+async function syncMembersHistoryAndTerms(allLegislators: Legislator[]): Promise<void> {
+  const historyRows: { bioguideId: string; officialName: string; party: string | null; photoUrl: string; state: string | null }[] = [];
+  const termRows: { stateDistrict: string; bioguideId: string; start: string; end: string | null }[] = [];
+
+  for (const legislator of allLegislators) {
+    const bioguideId = legislator.id.bioguide;
+    const relevantTerms = legislator.terms.filter((t) => t.start && (!t.end || t.end >= EARLIEST_RELEVANT_TERM_END));
+    if (relevantTerms.length === 0) continue;
+
+    const latestTerm = relevantTerms.at(-1)!;
+    const officialName = legislator.name.official_full ?? `${legislator.name.first} ${legislator.name.last}`;
+    historyRows.push({
+      bioguideId,
+      officialName,
+      party: latestTerm.party ?? null,
+      photoUrl: await resolvePhotoUrl(bioguideId),
+      state: latestTerm.state ?? null,
+    });
+
+    const seenKeys = new Set<string>();
+    for (const term of relevantTerms) {
+      const key = term.type === "rep" ? houseKey(term.state, term.district) : term.type === "sen" ? senateMemberKey(legislator.name.last) : null;
+      // A person can hold the same key across non-contiguous terms (elected,
+      // lost re-election, elected again later) — de-duped per (key, start)
+      // by the UNIQUE constraint itself, not needed here; seenKeys instead
+      // guards the much more common case of a >2-year single continuous
+      // term appearing to repeat because YAML lists Congresses separately.
+      const dedupeKey = `${key}|${term.start}`;
+      if (!key || seenKeys.has(dedupeKey)) continue;
+      seenKeys.add(dedupeKey);
+      termRows.push({ stateDistrict: key, bioguideId, start: term.start!, end: term.end ?? null });
+    }
+  }
+
+  for (const batch of chunk(historyRows, 200)) {
+    const values: string[] = [];
+    const params: unknown[] = [];
+    for (const row of batch) {
+      const base = params.length;
+      values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, NOW())`);
+      params.push(row.bioguideId, row.officialName, row.party, row.photoUrl, row.state);
+    }
+    await sql.query(
+      `INSERT INTO members_history (bioguide_id, official_name, party, photo_url, state, updated_at)
+       VALUES ${values.join(", ")}
+       ON CONFLICT (bioguide_id) DO UPDATE SET
+         official_name = EXCLUDED.official_name,
+         party = EXCLUDED.party,
+         photo_url = EXCLUDED.photo_url,
+         state = EXCLUDED.state,
+         updated_at = NOW()`,
+      params
+    );
+  }
+
+  for (const batch of chunk(termRows, 200)) {
+    const values: string[] = [];
+    const params: unknown[] = [];
+    for (const row of batch) {
+      const base = params.length;
+      values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+      params.push(row.stateDistrict, row.bioguideId, row.start, row.end);
+    }
+    await sql.query(
+      `INSERT INTO member_terms (state_district, bioguide_id, term_start, term_end)
+       VALUES ${values.join(", ")}
+       ON CONFLICT (state_district, bioguide_id, term_start) DO UPDATE SET term_end = EXCLUDED.term_end`,
+      params
+    );
+  }
+
+  console.log(`Synced ${historyRows.length} people into members_history and ${termRows.length} terms into member_terms.`);
+}
+
+// A filing's state_district key alone can't say *which* of possibly several
+// people who've held that seat actually filed it (see members_history's own
+// comment for the Upton/Dingell, Sessions/Johnson examples this was written
+// to fix) — this resolves the specific person for every filing, by name
+// first and district+date only as a tie-breaker.
+//
+// Name first, not district+date first, because the House Clerk's own
+// state_district field is occasionally stale: confirmed on a real filing,
+// Pete Sessions doc 20020443 (Feb 2022, tagged TX32 — the district he lost
+// re-election in back in 2018, not TX17 where he'd already been serving for
+// over a year by then). An earlier version of this function matched
+// district+date alone and got it wrong in exactly the way this whole fix
+// was meant to prevent: it found the term that legitimately covers "TX32 in
+// Feb 2022" and silently attached that (unrelated) person's party to
+// Sessions' own filing. member_name is far more reliable than
+// state_district turned out to be, so it's trusted first; district+date
+// only steps in to break a genuine same-name tie.
+//
+// Reprocesses every filing (not just unresolved ones) each run — cheap
+// (comparing a few thousand filings against ~1000 candidates is trivial),
+// and it's what lets a bad resolution from an earlier, less careful version
+// of this logic self-correct instead of staying wrong forever.
+async function resolveFilingBioguideIds(allLegislators: Legislator[]): Promise<void> {
+  const recentLegislators = allLegislators.filter((l) => l.terms.some((t) => t.start && (!t.end || t.end >= EARLIEST_RELEVANT_TERM_END)));
+
+  const filings = await sql.query(
+    `SELECT doc_id, member_name, state_district, filing_date, bioguide_id FROM filings WHERE member_name IS NOT NULL AND member_name != ''`
+  );
+
+  let changed = 0;
+  for (const row of filings as { doc_id: string; member_name: string; state_district: string | null; filing_date: string | null; bioguide_id: string | null }[]) {
+    const nameMatches = matchByName(recentLegislators, row.member_name);
+
+    let resolvedId: string | null = null;
+    if (nameMatches.length === 1) {
+      resolvedId = nameMatches[0].id.bioguide;
+    } else if (nameMatches.length > 1 && row.state_district && row.filing_date) {
+      // Genuine same-name ambiguity — narrow by whoever actually held this
+      // exact key on this exact date.
+      const districtMatches = nameMatches.filter((c) =>
+        c.terms.some(
+          (t) =>
+            t.start &&
+            row.filing_date! >= t.start &&
+            (!t.end || row.filing_date! <= t.end) &&
+            (t.type === "rep" ? houseKey(t.state, t.district) === row.state_district : t.type === "sen" ? senateMemberKey(c.name.last) === row.state_district : false)
+        )
+      );
+      if (districtMatches.length === 1) resolvedId = districtMatches[0].id.bioguide;
+    }
+
+    if (resolvedId && resolvedId !== row.bioguide_id) {
+      await sql.query(`UPDATE filings SET bioguide_id = $1 WHERE doc_id = $2`, [resolvedId, row.doc_id]);
+      changed++;
+    }
+  }
+  console.log(`Resolved/corrected bioguide_id for ${changed} filing(s) (name match, district+date as tie-break only).`);
+}
+
 async function main() {
   await ensureSchema();
 
   console.log("Fetching current members of Congress...");
   const currentLegislators = await fetchLegislators(MEMBERS_REFERENCE.legislatorsYamlUrl);
+  console.log("Fetching historical members of Congress...");
+  const historicalLegislators = await fetchLegislators(MEMBERS_REFERENCE.legislatorsHistoricalYamlUrl);
+  const allLegislators = [...currentLegislators, ...historicalLegislators];
 
   await syncCurrentMembers(currentLegislators);
-  await backfillFormerMembers(currentLegislators);
+  await backfillFormerMembers(currentLegislators, historicalLegislators);
+  await syncMembersHistoryAndTerms(allLegislators);
+  await resolveFilingBioguideIds(allLegislators);
 }
 
 main().catch((err) => {

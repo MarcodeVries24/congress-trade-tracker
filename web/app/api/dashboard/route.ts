@@ -16,8 +16,17 @@ const VALID_DATE_ORDER = `(
 // volume is shown on the site.
 const VOLUME_EXPR = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
 
+// members_history/member_terms resolve which specific person filed a trade
+// (state_district alone is just the seat, reused by whoever holds it next —
+// see members_history's own comment in schema.ts); mr is the older,
+// current-occupant-only fallback for a filing that hasn't been resolved.
+const MEMBER_JOIN = `
+       LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id`;
+const MEMBER_COLUMNS = `COALESCE(mh.photo_url, mr.photo_url) AS photo_url, COALESCE(mh.party, mr.party) AS party, COALESCE(mh.state, mr.state) AS member_state`;
+
 const TRADE_COLUMNS = `t.id, t.member_name, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
-              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, mr.photo_url, mr.party, mr.state AS member_state`;
+              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, ${MEMBER_COLUMNS}`;
 
 // One row per member (their single most recent trade), rather than raw
 // "last N rows" — a member who filed a dozen trades on the same day would
@@ -31,7 +40,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       SELECT DISTINCT ON (t.member_name) ${TRADE_COLUMNS}
       FROM transactions t
       JOIN filings f ON f.doc_id = t.doc_id
-      LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+      ${MEMBER_JOIN}
       WHERE ${VALID_DATE_ORDER} ${assetTypeFilter}
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
@@ -51,23 +60,23 @@ export async function GET() {
       sql.query(latestUniqueQuery(`AND t.asset_type_code IN (${stockPlaceholders})`), stockValues),
       sql.query(latestUniqueQuery("")),
       sql.query(
-        `SELECT t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state AS member_state, f.chamber, COUNT(*)::int as trade_count
+        `SELECT t.member_name, mr.state_district, ${MEMBER_COLUMNS}, f.chamber, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+         ${MEMBER_JOIN}
          WHERE ${VALID_DATE_ORDER}
-         GROUP BY t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state, f.chamber
+         GROUP BY t.member_name, mr.state_district, mh.photo_url, mr.photo_url, mh.party, mr.party, mh.state, mr.state, f.chamber
          ORDER BY trade_count DESC
          LIMIT 8`
       ),
       sql.query(
-        `SELECT t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state AS member_state, f.chamber,
+        `SELECT t.member_name, mr.state_district, ${MEMBER_COLUMNS}, f.chamber,
                 ${VOLUME_EXPR}::float8 as volume_sum, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+         ${MEMBER_JOIN}
          WHERE ${VALID_DATE_ORDER}
-         GROUP BY t.member_name, mr.state_district, mr.party, mr.photo_url, mr.state, f.chamber
+         GROUP BY t.member_name, mr.state_district, mh.photo_url, mr.photo_url, mh.party, mr.party, mh.state, mr.state, f.chamber
          ORDER BY volume_sum DESC
          LIMIT 8`
       ),
@@ -86,7 +95,7 @@ export async function GET() {
         `SELECT ${TRADE_COLUMNS}
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+         ${MEMBER_JOIN}
          WHERE ${VALID_DATE_ORDER} AND t.amount_low IS NOT NULL
            AND (NULLIF(f.filing_date, '')::date) >= (CURRENT_DATE - INTERVAL '30 days')
          ORDER BY t.amount_low DESC
@@ -100,12 +109,12 @@ export async function GET() {
          GROUP BY f.chamber`
       ),
       sql.query(
-        `SELECT mr.party, COUNT(*)::int as count
+        `SELECT COALESCE(mh.party, mr.party) AS party, COUNT(*)::int as count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         LEFT JOIN members_reference mr ON mr.state_district = t.state_district
-         WHERE ${VALID_DATE_ORDER} AND mr.party IS NOT NULL
-         GROUP BY mr.party`
+         ${MEMBER_JOIN}
+         WHERE ${VALID_DATE_ORDER} AND COALESCE(mh.party, mr.party) IS NOT NULL
+         GROUP BY COALESCE(mh.party, mr.party)`
       ),
     ]);
 

@@ -59,6 +59,12 @@ export interface HouseOcrIssue {
 export interface HouseOcrResult {
   transactions: ParsedTransaction[];
   issues: HouseOcrIssue[];
+  // True when every page that declined to produce a grid was confirmed to
+  // be a non-PTR document (a Campaign Notice disclosure exemption, so far
+  // — see looksLikeNonPtrDocument) rather than a genuinely unread PTR page.
+  // Callers should record this distinctly from a real parse failure: zero
+  // transactions here is correct, not a gap.
+  notAPtr: boolean;
 }
 
 const OWNER_VALUES = new Set(["SP", "DC", "JT"]);
@@ -529,6 +535,27 @@ async function findTableHeaderBottom(worker: Worker, pageImage: Buffer, pageWidt
   return maxY1;
 }
 
+// A doc_id filed under the House Clerk's PTR filing-type code isn't always
+// an actual trade report — a House candidate who hasn't raised or spent
+// over $5,000 (and so is exempt from any financial disclosure) files a
+// one-page "Campaign Notice" instead, and the Clerk's own index doesn't
+// distinguish it from a real PTR (confirmed on a real filing: Richard B.
+// Reisdorf, doc 8218652 — a signed notice titled "CAMPAIGN NOTICE
+// REGARDING FINANCIAL DISCLOSURE REQUIREMENT", zero trades, by design,
+// not by a reading failure). No recognizable transaction grid on such a
+// page isn't a declined read the way a genuine hard-to-scan PTR is — it's
+// confirmation there was never a table here to find. Checked only once
+// every other page in the PDF has already failed detectTableWithRotation
+// (this document type never has a real table, so there's nothing lost by
+// checking last rather than first).
+const NON_PTR_DOCUMENT_MARKER = /CAMPAIGN\s+NOTICE|WITHDRAWAL\s+OF\s+CANDIDACY|THRESHOLD\s+NOT\s+EXCEEDED/i;
+
+async function looksLikeNonPtrDocument(worker: Worker, pageImage: Buffer): Promise<boolean> {
+  await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+  const { data } = await worker.recognize(pageImage, {}, { text: true });
+  return NON_PTR_DOCUMENT_MARKER.test(data.text);
+}
+
 /**
  * Locates the transaction grid in an already-upright page image: row lines
  * (the longest evenly-spaced run, wherever the table body sits under a
@@ -677,18 +704,20 @@ async function ocrPage(
   pageImageIn: Buffer,
   pageNum: number,
   issues: HouseOcrIssue[]
-): Promise<ParsedTransaction[]> {
+): Promise<{ transactions: ParsedTransaction[]; notAPtr: boolean }> {
   const found = await detectTableWithRotation(worker, pageImageIn);
   if (!found) {
+    const notAPtr = await looksLikeNonPtrDocument(worker, pageImageIn);
     issues.push({
       page: pageNum,
       row: 0,
       field: "template",
-      reason:
-        "No recognizable transaction grid found on this page in any orientation (or its orientation couldn't be confirmed) — page declined rather than misread.",
+      reason: notAPtr
+        ? "This page is a Campaign Notice / disclosure-exemption document, not a Periodic Transaction Report — correctly has no transaction grid."
+        : "No recognizable transaction grid found on this page in any orientation (or its orientation couldn't be confirmed) — page declined rather than misread.",
       context: "",
     });
-    return [];
+    return { transactions: [], notAPtr };
   }
   const pageImage = found.pageImage;
   const { raw, width, height, rowLines, colLines, roles } = found.table;
@@ -802,7 +831,7 @@ async function ocrPage(
     });
   }
 
-  return transactions;
+  return { transactions, notAPtr: false };
 }
 
 /**
@@ -821,16 +850,29 @@ export async function ocrHousePtr(pdfBuffer: Buffer): Promise<HouseOcrResult | n
     let sawTable = false;
     let pageNum = 0;
 
+    let sawNonPtrPage = false;
+
     for await (const pageImage of pages) {
       pageNum++;
       const before = issues.length;
-      const pageTxns = await ocrPage(worker, pageImage, pageNum, issues);
-      if (pageTxns.length > 0 || issues.length > before) sawTable = true;
+      const { transactions: pageTxns, notAPtr } = await ocrPage(worker, pageImage, pageNum, issues);
+      if (notAPtr) {
+        // Its own issue (an informational note, not a declined-read
+        // warning) shouldn't count as "found something" the way a real
+        // page's issues do — a confirmed non-PTR page has nothing to sawTable.
+        sawNonPtrPage = true;
+      } else if (pageTxns.length > 0 || issues.length > before) {
+        sawTable = true;
+      }
       allTransactions.push(...pageTxns);
     }
 
-    if (!sawTable) return null;
-    return { transactions: allTransactions, issues };
+    // A confirmed non-PTR page (see looksLikeNonPtrDocument) only overrides
+    // the "declined, nothing usable" null return — if a real transaction
+    // grid was also found somewhere in this same PDF, that's the correct
+    // result regardless of what any other page turned out to be.
+    if (!sawTable) return sawNonPtrPage ? { transactions: [], issues: [], notAPtr: true } : null;
+    return { transactions: allTransactions, issues, notAPtr: false };
   } finally {
     await worker.terminate();
   }

@@ -26,6 +26,9 @@ async function main() {
   // improves over time (e.g. the modern e-filing PDF's checkbox-glyph fix
   // recovered ~150 previously-empty filings), and there's no successful
   // parse to lose by re-attempting, so it's cheap and can only help.
+  // 'not-a-ptr' is excluded from that retry, unlike 'empty' — it's a
+  // confirmed non-PTR document (see looksLikeNonPtrDocument), not a
+  // parsing gap that a future improvement could recover more from.
   const ingestedRows = (await sql.query(`SELECT doc_id FROM filings WHERE parse_status NOT IN ('pending', 'empty')`)) as {
     doc_id: string;
   }[];
@@ -76,6 +79,15 @@ async function main() {
             transactions = ocrResult.transactions;
             parseStatus = "ocr";
             ocrCount++;
+          } else if (ocrResult.notAPtr) {
+            // Filed under the PTR filing-type code but not actually a
+            // trade report — a candidate disclosure-exemption notice, so
+            // far (see looksLikeNonPtrDocument). Zero transactions here is
+            // correct, not a parsing gap, so it gets its own status rather
+            // than sitting alongside genuinely-unread filings under
+            // 'empty' — and isn't worth ever retrying (see the retry
+            // filter below), unlike a real 'empty' filing.
+            parseStatus = "not-a-ptr";
           }
         }
       }

@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import "./globals.css";
+
+// The AdSense account script (no ad slot, just the client ID) needs to be
+// present on every page for Google to verify site ownership and review the
+// account — not just wherever an <AdSlot> happens to render. Individual ad
+// placements (components/AdSlot.tsx) only add the <ins> unit + a request
+// push, assuming this script is already loaded.
+const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export const metadata: Metadata = {
   title: "CongTrade — Congress Trade Tracker",
@@ -32,6 +40,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" suppressHydrationWarning>
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+          {ADSENSE_CLIENT_ID && (
+            <Script
+              async
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+              crossOrigin="anonymous"
+              strategy="afterInteractive"
+            />
+          )}
         </head>
         <body>{children}</body>
       </html>

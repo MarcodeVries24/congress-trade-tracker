@@ -40,8 +40,15 @@ const TXN_LINE =
 
 // A ticker only counts when it's parenthesized and starts with a letter —
 // government securities are identified by a CUSIP instead (e.g. "(91282CGH8)"),
-// which must NOT be mistaken for a ticker.
-const TICKER_PATTERN = /\(([A-Z][A-Z0-9.\/]{0,6})\)\s*\[([A-Za-z]{1,3})\]/;
+// which must NOT be mistaken for a ticker. Matched case-insensitively and
+// uppercased at use: the same broken-font letter substitution that corrupts
+// header labels (see LEADING_HEADER_TOKENS above) also hits letters inside
+// real tickers, so a case-sensitive match was silently dropping a real,
+// identifiable ticker to null (confirmed on real filings, Thomas Suozzi docs
+// 20020253/20020552: "Dollar general Corporation (Dg) [ST]" and "blackRock,
+// Inc. (bLK) [ST]" -- tickers are always uppercase in reality, so uppercasing
+// what's captured here is always correct, never a guess).
+const TICKER_PATTERN = /\(([A-Za-z][A-Za-z0-9.\/]{0,6})\)\s*\[([A-Za-z]{1,3})\]/;
 // The asset type code ("[ST]", "[GS]", ...) is always the trailing bracketed
 // tag regardless of what precedes it, so it's extracted separately from the
 // ticker — otherwise CUSIP-identified assets (bonds, treasuries) silently lose
@@ -286,7 +293,7 @@ export function parsePtrText(
 
       transactions.push({
         assetName: assetText,
-        ticker: tickerMatch ? tickerMatch[1] : null,
+        ticker: tickerMatch ? tickerMatch[1].toUpperCase() : null,
         assetTypeCode: tickerMatch ? tickerMatch[2] : assetTypeMatch ? assetTypeMatch[1] : null,
         owner,
         transactionType: txnTypeRaw.replace(/\s+/g, " ").trim(),

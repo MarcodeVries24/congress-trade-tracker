@@ -52,18 +52,34 @@ const ASSET_TYPE_PATTERN = /\[([A-Za-z]{1,3})\]\s*$/;
 // Amount Cap. Gains > $200?") repeats at the top of every page, and can leak
 // into the window before the first asset name on a page. Strip any run of
 // these tokens off the front, in whatever partial combination survived.
+// Case-insensitive throughout: some filings render these header labels with
+// certain capital letters substituted for their lowercase form by a broken
+// font subset (confirmed on a real filing, Thomas Suozzi doc 20020195,
+// where the header prints as "amount \tcap." / "gains >" / "$200?" — compare
+// "FILINg STATUS" and "SUbHOLDINg OF" a few lines later in the same
+// document), so a case-sensitive match silently let the header bleed into
+// the first asset name on the page.
 const LEADING_HEADER_TOKENS = [
-  /^ID\s+/,
-  /^Owner Asset\s+/,
-  /^Transaction\s+/,
-  /^Type\s+/,
-  /^Notification\s+/,
-  /^Date\s+/,
-  /^Amount\s+/,
-  /^Cap\.\s+/,
+  /^ID\s+/i,
+  /^Owner Asset\s+/i,
+  /^Transaction\s+/i,
+  /^Type\s+/i,
+  /^Notification\s+/i,
+  /^Date\s+/i,
+  /^Amount\s+/i,
+  /^Cap\.\s+/i,
   /^Gains\s*>\s*/i,
   /^\$200\?\s*/,
 ];
+
+// The rendered page prints "Filing ID #<docId>" and a "-- N of M --" page
+// marker between pages (also used elsewhere to detect total page count),
+// with no metadata-style label to recognize them by. Undetected, they sit
+// between one record's last metadata line and the next page's first asset
+// name and get collected as if they were part of that asset name (confirmed
+// on a real filing, Thomas Suozzi doc 20020253: "Filing ID #20020253 -- 1 of
+// 2 -- TJX Companies, Inc. (TJX) [ST]").
+const PAGE_BREAK_MARKER = /^(?:Filing ID #\d+|--\s*\d+\s*of\s*\d+\s*--)$/;
 
 function stripLeadingHeaderJunk(text: string): string {
   let changed = true;
@@ -301,6 +317,7 @@ export function parsePtrText(
     // rather than let them pollute the next asset name.
     if (/@\s*\$[\d,.]+\s*\/\s*share/.test(line)) continue;
     if (/^\*/.test(line)) continue;
+    if (PAGE_BREAK_MARKER.test(line)) continue;
 
     windowLines.push(line.trim());
     if (windowLines.length > 4) windowLines.shift();

@@ -80,6 +80,53 @@ function stripLeadingHeaderJunk(text: string): string {
   return text;
 }
 
+// A metadata field's value (most commonly "Description:", which is free
+// prose) routinely wraps across several physical lines with no blank line
+// separating it from the next record's asset name (confirmed on a real
+// filing, Brad Sherman doc 20021945: a description ending "...(4th asset
+// listed on" / "page)." is followed immediately, on the very next line, by
+// the next transaction's asset name "US Treasury Inflation Protected
+// Note"). METADATA_LINE only recognizes the line that starts a field, so a
+// wrapped continuation line was falling through into windowLines and
+// polluting the following asset name.
+//
+// Terminal punctuation alone doesn't reliably mark the end of a field's
+// text: some fields are short label-like phrases with no trailing period at
+// all (confirmed on a real filing, Christopher L. Jacobs doc 20021398:
+// "Description: Municipal Bond" and "Sub Holding Of: CL TRUST > LDJ FAM INV
+// LLC > Parametric" both end a complete field on one line with no
+// punctuation). What both of those share, though, is that their last word
+// is a normal content word — never a short function word a real sentence
+// wouldn't end on (an article, preposition, conjunction, etc.), which is
+// exactly what every confirmed genuine wrap point (Sherman's "...listed on",
+// "...Under the", "...This bond was") ends with instead. So: keep
+// consuming continuation lines only while the line ends on one of those.
+const MID_SENTENCE_END_WORDS = new Set([
+  "a", "an", "the", "of", "on", "in", "at", "to", "by", "for", "and", "or",
+  "but", "nor", "with", "from", "as", "is", "was", "are", "were", "be",
+  "been", "being", "this", "that", "these", "those", "its", "their", "his",
+  "her", "our", "your", "my", "per", "via", "not", "no", "so", "than",
+  "then", "if", "when", "while", "because", "into", "onto", "over", "under",
+  "between", "among", "about", "above", "below", "after", "before",
+  "during", "through", "until", "upon", "within", "without",
+]);
+
+function endsMidSentence(line: string): boolean {
+  const words = line.trim().replace(/[.,;:!?)"'\]]+$/, "").split(/\s+/);
+  const lastRaw = words[words.length - 1] ?? "";
+  // A lone uppercase letter is a share-class/series suffix ("Class A", "Series
+  // B"), not the article "a" (confirmed on a real filing, doc 20020354: "sale
+  // of 115 units Estee Lauder Companies Class A" is a complete description
+  // that happens to end in "A"). A bare trailing number is likewise usually
+  // an account/CUSIP suffix (confirmed on a real filing, doc 20030338:
+  // "Sub Holding Of: Morgan Stanley - Select UMA Account # 1" is a complete
+  // field that happens to end in "1"), not a year or figure awaiting its
+  // qualifier — so neither is treated as a sign of a field that needs
+  // continuing.
+  if (/^[A-Z]$/.test(lastRaw) || /^\d+$/.test(lastRaw)) return false;
+  return MID_SENTENCE_END_WORDS.has(lastRaw.toLowerCase());
+}
+
 function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
@@ -196,6 +243,7 @@ export function parsePtrText(
   const transactions: ParsedTransaction[] = [];
   const issues: string[] = [];
   let windowLines: string[] = [];
+  let inMetadataBlock = false;
 
   for (const line of lines) {
     const m = line.match(TXN_LINE);
@@ -234,11 +282,18 @@ export function parsePtrText(
       });
 
       windowLines = [];
+      inMetadataBlock = false;
       continue;
     }
 
     if (METADATA_LINE.test(line)) {
       windowLines = [];
+      inMetadataBlock = endsMidSentence(line);
+      continue;
+    }
+
+    if (inMetadataBlock) {
+      inMetadataBlock = endsMidSentence(line);
       continue;
     }
 

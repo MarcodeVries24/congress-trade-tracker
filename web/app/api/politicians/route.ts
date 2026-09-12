@@ -18,10 +18,18 @@ const SORT_EXPRESSIONS: Record<string, string> = {
 };
 
 // A politician leaderboard — free/ungated, like /api/members and
-// /api/dashboard. Grouped the same way /api/dashboard's topPoliticians/
-// topByVolume queries are (member_name + state_district + chamber): a
-// member who changed districts or chambers shows as more than one row,
-// same known tradeoff as those queries.
+// /api/dashboard. Grouped by (member_name, bioguide_id, chamber) rather than
+// state_district: a redistricted member's older and newer filings carry two
+// different state_district values for the same real person (confirmed on
+// real data — e.g. Nancy Pelosi's CA11 vs CA12 filings both resolve to
+// bioguide P000197), so grouping on state_district split 17 real members
+// into two rows apiece and inflated this leaderboard's count past /api/stats'
+// true distinct-member count. bioguide_id is stable across a member's own
+// filings regardless of district, so it collapses these back into one row;
+// the displayed state_district is simply whichever the member's most recent
+// filing reported, picked via the ordered ARRAY_AGG below. A chamber change
+// (House <-> Senate) still produces two rows deliberately, since that's a
+// real distinguishable phase of a career rather than a district-code split.
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const q = sp.get("q") ?? undefined;
@@ -54,15 +62,18 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.member_name, mr.state_district,
-              COALESCE(mh.party, mr.party) AS party, COALESCE(mh.photo_url, mr.photo_url) AS photo_url, COALESCE(mh.state, mr.state) AS member_state,
+      `SELECT t.member_name,
+              (ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district,
+              COALESCE(mh.party, (ARRAY_AGG(mr.party ORDER BY f.filing_date DESC NULLS LAST))[1]) AS party,
+              COALESCE(mh.photo_url, (ARRAY_AGG(mr.photo_url ORDER BY f.filing_date DESC NULLS LAST))[1]) AS photo_url,
+              COALESCE(mh.state, (ARRAY_AGG(mr.state ORDER BY f.filing_date DESC NULLS LAST))[1]) AS member_state,
               f.chamber, COUNT(*)::int as trade_count, ${VOLUME_EXPR}::float8 as volume_sum, MAX(f.filing_date) as last_filed
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
        LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
        ${where}
-       GROUP BY t.member_name, mr.state_district, mh.party, mr.party, mh.photo_url, mr.photo_url, mh.state, mr.state, f.chamber
+       GROUP BY t.member_name, f.bioguide_id, mh.party, mh.photo_url, mh.state, f.chamber
        ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams
@@ -72,9 +83,8 @@ export async function GET(req: NextRequest) {
          SELECT 1
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         LEFT JOIN members_reference mr ON mr.state_district = t.state_district
          ${where}
-         GROUP BY t.member_name, mr.state_district, f.chamber
+         GROUP BY t.member_name, f.bioguide_id, f.chamber
        ) sub`,
       params
     ),

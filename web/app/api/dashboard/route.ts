@@ -25,6 +25,20 @@ const MEMBER_JOIN = `
        LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id`;
 const MEMBER_COLUMNS = `COALESCE(mh.photo_url, mr.photo_url) AS photo_url, COALESCE(mh.party, mr.party) AS party, COALESCE(mh.state, mr.state) AS member_state`;
 
+// For queries that GROUP BY person (topPoliticians, topByVolume) rather than
+// selecting one row at a time: mr varies per state_district, which itself
+// varies across a redistricted member's own filings, so it can't be a bare
+// GROUP BY key without splitting one real person into two rows (same bug
+// fixed in /api/politicians — see that route's comment for the full story).
+// Group by the stable f.bioguide_id instead, and take whichever mr-sourced
+// value belongs to the member's most recent filing as the displayed one.
+const MEMBER_COLUMNS_GROUPED = `
+              COALESCE(mh.photo_url, (ARRAY_AGG(mr.photo_url ORDER BY f.filing_date DESC NULLS LAST))[1]) AS photo_url,
+              COALESCE(mh.party, (ARRAY_AGG(mr.party ORDER BY f.filing_date DESC NULLS LAST))[1]) AS party,
+              COALESCE(mh.state, (ARRAY_AGG(mr.state ORDER BY f.filing_date DESC NULLS LAST))[1]) AS member_state`;
+const STATE_DISTRICT_GROUPED = `(ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district`;
+const GROUPED_BY_PERSON = `t.member_name, f.bioguide_id, mh.photo_url, mh.party, mh.state, f.chamber`;
+
 const TRADE_COLUMNS = `t.id, t.member_name, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
               t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, ${MEMBER_COLUMNS}`;
 
@@ -60,23 +74,23 @@ export async function GET() {
       sql.query(latestUniqueQuery(`AND t.asset_type_code IN (${stockPlaceholders})`), stockValues),
       sql.query(latestUniqueQuery("")),
       sql.query(
-        `SELECT t.member_name, mr.state_district, ${MEMBER_COLUMNS}, f.chamber, COUNT(*)::int as trade_count
+        `SELECT t.member_name, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
          WHERE ${VALID_DATE_ORDER}
-         GROUP BY t.member_name, mr.state_district, mh.photo_url, mr.photo_url, mh.party, mr.party, mh.state, mr.state, f.chamber
+         GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY trade_count DESC
          LIMIT 8`
       ),
       sql.query(
-        `SELECT t.member_name, mr.state_district, ${MEMBER_COLUMNS}, f.chamber,
+        `SELECT t.member_name, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber,
                 ${VOLUME_EXPR}::float8 as volume_sum, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
          WHERE ${VALID_DATE_ORDER}
-         GROUP BY t.member_name, mr.state_district, mh.photo_url, mr.photo_url, mh.party, mr.party, mh.state, mr.state, f.chamber
+         GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY volume_sum DESC
          LIMIT 8`
       ),

@@ -274,6 +274,16 @@ export function parsePtrText(
       const [, prefix, txnTypeRaw, date1, date2, amountRange] = m;
       const candidateLines = prefix.trim() ? [...windowLines, prefix.trim()] : windowLines;
       let assetText = stripLeadingHeaderJunk(candidateLines.join(" ").replace(/\s+/g, " ").trim());
+      // The "ID" column is usually blank, but some filings (typically an
+      // amendment) populate it with the House Clerk's internal 10-digit
+      // transaction id ("2000######"), which then bleeds into the asset
+      // name exactly like the table header does — with or without an owner
+      // code after it (confirmed on real filings across 62 distinct
+      // doc_ids, e.g. Debbie Wasserman Schultz doc 20021405: "2000078650 DC
+      // EMCORE Corporation (EMKR) [ST]", and doc 20020080: "2000052768
+      // Vaisala Oy Ordinary Shares -A- (VAIAF) [ST]" with no owner code at
+      // all). Strip it before the owner check so both shapes end up clean.
+      assetText = assetText.replace(/^2000\d{6}\s+/, "");
 
       let owner: string | null = null;
       const ownerMatch = assetText.match(/^(SP|JT|DC)\s+/);

@@ -4,7 +4,7 @@ const YEAR = new Date().getFullYear();
 
 const COMPANY_LINKS = [
   { label: "About", href: "/about" },
-  { label: "Contact", href: "mailto:contact@congtrade.com" },
+  { label: "Contact", href: "/about#contact" },
 ];
 
 const RESOURCE_LINKS = [

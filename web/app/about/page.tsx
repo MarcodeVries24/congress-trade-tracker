@@ -191,7 +191,7 @@ export default function AboutPage() {
             </div>
           </Section>
 
-          <Section title="Contact">
+          <Section title="Contact" id="contact">
             <p>
               Questions, corrections, or feedback — about a specific trade, the data pipeline, or anything else — can
               be sent to{" "}
@@ -216,9 +216,9 @@ export default function AboutPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section>
+    <section id={id} className={id ? "scroll-mt-20" : undefined}>
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
       <div className="mt-2 space-y-2.5 text-sm leading-relaxed text-ink-muted">{children}</div>
     </section>

@@ -2,6 +2,11 @@ import Link from "next/link";
 
 const YEAR = new Date().getFullYear();
 
+const COMPANY_LINKS = [
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "mailto:contact@congtrade.com" },
+];
+
 const RESOURCE_LINKS = [
   { label: "House Clerk filings", href: "https://disclosures-clerk.house.gov/FinancialDisclosure" },
   { label: "Senate eFD filings", href: "https://efdsearch.senate.gov/search/home/" },
@@ -29,6 +34,26 @@ export function Footer() {
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-4 text-xs">
+            <div>
+              <div className="font-semibold uppercase tracking-wider text-ink-faint">Company</div>
+              <ul className="mt-2 space-y-1.5">
+                {COMPANY_LINKS.map((link) =>
+                  link.href.startsWith("/") ? (
+                    <li key={link.href}>
+                      <Link href={link.href} className="text-ink-muted underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ) : (
+                    <li key={link.href}>
+                      <a href={link.href} className="text-ink-muted underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+                        {link.label}
+                      </a>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
             <div>
               <div className="font-semibold uppercase tracking-wider text-ink-faint">Data sources</div>
               <ul className="mt-2 space-y-1.5">

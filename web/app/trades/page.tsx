@@ -672,14 +672,17 @@ export default function Home() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <a
-                          href={trade.pdf_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
-                        >
-                          {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "PTR PDF"}
-                        </a>
+                        <span className="inline-flex items-center gap-1">
+                          <a
+                            href={trade.pdf_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                          >
+                            {trade.chamber === "senate" ? "View Source" : trade.parse_status === "ocr" ? "View Scan" : "PTR PDF"}
+                          </a>
+                          {trade.chamber === "senate" && <SenateSourceInfo />}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -760,14 +763,17 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <a
-                    href={trade.pdf_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-block text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
-                  >
-                    {trade.parse_status === "ocr" ? "View Scan" : trade.chamber === "senate" ? "View Report" : "View PTR PDF"}
-                  </a>
+                  <span className="mt-3 inline-flex items-center gap-1">
+                    <a
+                      href={trade.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
+                    >
+                      {trade.chamber === "senate" ? "View Source" : trade.parse_status === "ocr" ? "View Scan" : "View PTR PDF"}
+                    </a>
+                    {trade.chamber === "senate" && <SenateSourceInfo />}
+                  </span>
                 </div>
               );
             })}
@@ -846,6 +852,43 @@ function OcrBadge() {
           className="absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
         >
           Automatically read from a scanned PDF, not typed text — details here may not be exactly correct.
+        </span>
+      )}
+    </span>
+  );
+}
+
+// The Senate's own disclosure site (efdsearch.senate.gov) gates every report
+// — paper and electronic alike — behind a one-time click-through agreement,
+// and in practice that agreement doesn't reliably stick across visits, so a
+// direct link can bounce a visitor back to that gate instead of the report
+// they wanted. Same click-to-reveal "i" pattern as OcrBadge, so it works on
+// touch devices too, not just hover.
+function SenateSourceInfo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex shrink-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        onBlur={() => setOpen(false)}
+        aria-label="Why this link might not go straight to the report"
+        aria-expanded={open}
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-line-strong bg-panel-muted text-[10px] font-semibold leading-none text-ink-faint"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 top-full z-20 mt-1.5 w-60 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
+        >
+          The Senate&rsquo;s site requires accepting a one-time notice before showing a report, and may ask again on later
+          visits. If this link lands you back on that notice instead of the report, search for this filer by name and
+          filing date on the Senate&rsquo;s disclosure site instead.
         </span>
       )}
     </span>

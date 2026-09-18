@@ -677,11 +677,11 @@ export default function Home() {
                             href={trade.pdf_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
+                            className="whitespace-nowrap text-xs text-ink-faint underline decoration-line-strong hover:text-ink hover:decoration-ink-muted"
                           >
                             {trade.chamber === "senate" ? "View Source" : trade.parse_status === "ocr" ? "View Scan" : "PTR PDF"}
                           </a>
-                          {trade.chamber === "senate" && <SenateSourceInfo />}
+                          {trade.chamber === "senate" && <SenateSourceInfo align="right" />}
                         </span>
                       </td>
                     </tr>
@@ -768,7 +768,7 @@ export default function Home() {
                       href={trade.pdf_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
+                      className="whitespace-nowrap text-xs text-ink-faint underline decoration-line-strong hover:text-ink"
                     >
                       {trade.chamber === "senate" ? "View Source" : trade.parse_status === "ocr" ? "View Scan" : "View PTR PDF"}
                     </a>
@@ -864,7 +864,14 @@ function OcrBadge() {
 // direct link can bounce a visitor back to that gate instead of the report
 // they wanted. Same click-to-reveal "i" pattern as OcrBadge, so it works on
 // touch devices too, not just hover.
-function SenateSourceInfo() {
+//
+// align="right" anchors the panel to the button's right edge so it opens
+// leftward. The desktop table needs that: it scrolls horizontally, and an
+// overflow-x container clips absolutely-positioned children, so a centred
+// panel on this last-column button gets cut off mid-word. The mobile card
+// isn't inside that container and its link sits at the left edge, where
+// opening leftward would run off-screen instead — so it stays centred.
+function SenateSourceInfo({ align = "center" }: { align?: "center" | "right" }) {
   const [open, setOpen] = useState(false);
   return (
     <span className="relative inline-flex shrink-0">
@@ -884,7 +891,9 @@ function SenateSourceInfo() {
       {open && (
         <span
           role="tooltip"
-          className="absolute left-1/2 top-full z-20 mt-1.5 w-60 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
+          className={`absolute top-full z-20 mt-1.5 w-60 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg ${
+            align === "right" ? "right-0" : "left-1/2 -translate-x-1/2"
+          }`}
         >
           The Senate&rsquo;s site requires accepting a one-time notice before showing a report, and may ask again on later
           visits. If this link lands you back on that notice instead of the report, search for this filer by name and

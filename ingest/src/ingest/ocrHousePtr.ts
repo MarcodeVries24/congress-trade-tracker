@@ -147,6 +147,18 @@ const CHECKBOX_WIDE_FLOOR = 0.15;
 const CHECKBOX_WIDE_GAP_MIN = 0.06;
 const OWNER_INSET = 0.2;
 const OWNER_DARK_THRESHOLD = 0.05;
+// The owner cell is by far the narrowest text cell on the form (~120px wide
+// against ~430px for Asset Name), so its printed gridlines take up a large
+// fraction of the crop. Handing Tesseract the raw gridline-to-gridline
+// rectangle made it lock onto those heavy borders instead of the code
+// inside: a cell containing a perfectly legible "JT" came back as "E3",
+// "E23", "[or]" or "Ks", none of which survive VALIDATE_OWNER, so a real
+// owner was silently dropped to NULL (confirmed on Fleischmann doc 8218565,
+// where 8 of 10 rows carry a visible JT and only 1 was recorded). Crop the
+// borders off before OCR. Deliberately smaller than OWNER_INSET — that one
+// only has to sample ink for a yes/no darkness test and can afford to be
+// aggressive, whereas this must not clip the glyphs themselves.
+const OWNER_OCR_INSET = 0.12;
 const ASSET_INSET = 0.15;
 // Calibrated against a real typed (not handwritten) filing where every row
 // was genuinely filled but measured only 0.10-0.13 — apparently a typeset
@@ -808,7 +820,14 @@ async function ocrPage(
     if (ownerCellDarkness > OWNER_DARK_THRESHOLD) {
       // Cell has real ink (not a blank "self" row) — try to read it, but
       // don't guess if OCR can't confirm one of SP/DC/JT.
-      const ownerResult = await ocrCellChecked(worker, pageImage, { x0: ownerX.x0, y0, x1: ownerX.x1, y1 }, VALIDATE_OWNER);
+      const ownerInsetX = (ownerX.x1 - ownerX.x0) * OWNER_OCR_INSET;
+      const ownerInsetY = (y1 - y0) * OWNER_OCR_INSET;
+      const ownerResult = await ocrCellChecked(
+        worker,
+        pageImage,
+        { x0: ownerX.x0 + ownerInsetX, y0: y0 + ownerInsetY, x1: ownerX.x1 - ownerInsetX, y1: y1 - ownerInsetY },
+        VALIDATE_OWNER
+      );
       owner = ownerResult.value;
       if (!owner) {
         issues.push({ page: pageNum, row: r, field: "owner", reason: "Owner cell has content but couldn't be confidently read as SP/DC/JT.", context: assetText });

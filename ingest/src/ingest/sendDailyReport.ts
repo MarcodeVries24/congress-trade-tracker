@@ -70,7 +70,7 @@ async function main() {
      ORDER BY transaction_count DESC, filing_date DESC`
   )) as FilingRow[];
 
-  const successful = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "ocr");
+  const successful = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "ocr" || r.parse_status === "manual");
   const undefinedRows = rows.filter((r) => r.parse_status === "empty" || r.parse_status === "failed");
 
   const totalNewTransactions = successful.reduce((sum, r) => sum + r.transaction_count, 0);

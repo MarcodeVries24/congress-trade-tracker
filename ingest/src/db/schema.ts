@@ -8,6 +8,15 @@ export const SCHEMA_STATEMENTS = [
     filing_date TEXT,
     year INTEGER NOT NULL,
     pdf_url TEXT NOT NULL,
+    -- 'pending' (not yet attempted) | 'ok' (native text parse succeeded) |
+    -- 'ocr' (no text layer — scanned doc, OCR fallback found transactions,
+    -- lower confidence than 'ok') | 'empty' (nothing extractable) |
+    -- 'failed' (download/parse error) | 'unsupported' | 'not-a-ptr' |
+    -- 'manual' (automated parse was wrong/undercounted — a human
+    -- pixel-by-pixel verified the scan against the transactions table by
+    -- hand; treat as MORE trustworthy than 'ok', not just equivalent to it,
+    -- and never let a routine/forced re-ingest run overwrite it without
+    -- deliberately re-auditing first).
     parse_status TEXT NOT NULL DEFAULT 'pending',
     transaction_count INTEGER NOT NULL DEFAULT 0,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
+import { MobileNav } from "./MobileNav";
 
 // A U.S. Capitol dome — colonnade base, pediment, ringed dome, spire —
 // rendered in the page's own ink color (currentColor) rather than the
@@ -36,17 +37,17 @@ function Logo({ size = 28 }: { size?: number }) {
 
 export function Header() {
   return (
-    <header className="border-b border-line">
-      {/* One wrapping row rather than two fixed layouts. Source order is
-          brand, tagline, nav, account; the `order-*` utilities only change
-          where the nav sits relative to the account controls, so the nav
-          can drop to its own full-width line on a phone and rejoin the top
-          row as soon as there's space. Previously everything fought for a
-          single 375px row: the account cluster was pushed 6px past the
-          header (the page scrolled sideways) and "Sign in" wrapped onto
-          two lines inside its own pill. */}
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">
-        <Link href="/" className="order-1 flex shrink-0 items-center gap-2 sm:gap-3">
+    // `relative` anchors the mobile menu panel, which hangs off the bottom
+    // edge rather than pushing the page down.
+    <header className="relative border-b border-line">
+      {/* A single row at every width. On a phone the secondary nav collapses
+          into MobileNav's disclosure; Sign in stays in this row, outside the
+          menu, so it's on screen whether the menu is open or shut. Before
+          this, brand + tagline + both links + account all fought for one
+          375px row: scrollWidth hit 381 against a 375 viewport, so the page
+          scrolled sideways, and "Sign in" wrapped onto two lines. */}
+      <div className="mx-auto flex max-w-7xl items-center gap-x-3 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">
+        <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3">
           <div className="text-ink">
             <Logo />
           </div>
@@ -57,16 +58,34 @@ export function Header() {
         </Link>
 
         {/* Decoration, not navigation — it costs exactly the width the nav
-            and the sign-in button need on a phone, so it only appears once
-            the viewport can spare it. */}
-        <span className="order-2 hidden whitespace-nowrap border-l border-line pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-faint md:inline md:text-[11px] md:tracking-wider">
+            and the sign-in button need, so it only appears once the viewport
+            can spare it. */}
+        <span className="hidden whitespace-nowrap border-l border-line pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-faint md:inline md:text-[11px] md:tracking-wider">
           Track Congress trades
         </span>
 
-        {/* `ml-auto` keeps these at the end of whichever line they're on, so
-            they're never squeezed by the nav. `shrink-0` + `whitespace-nowrap`
-            stop the button collapsing into a two-line pill. */}
-        <div className="order-3 ml-auto flex shrink-0 items-center gap-2 sm:order-4 sm:gap-3">
+        {/* Inline nav from `sm` up; below that these same links live in
+            MobileNav's panel. */}
+        <nav className="hidden items-center gap-1 sm:flex">
+          <Link
+            href="/trades"
+            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
+          >
+            All Trades
+          </Link>
+          <Link
+            href="/politicians"
+            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
+          >
+            Politicians
+          </Link>
+        </nav>
+
+        {/* `ml-auto` pins these right; `shrink-0` + `whitespace-nowrap` stop
+            the button collapsing into a two-line pill when space is tight.
+            Sign in is outside MobileNav on purpose — it must stay visible at
+            every width, open menu or not. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           <SignedOut>
             <SignInButton mode="modal">
               <button className="whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink">
@@ -77,29 +96,12 @@ export function Header() {
           <SignedIn>
             <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }} />
           </SignedIn>
-          <ThemeToggle />
+          {/* On phones this sits inside the menu instead — see MobileNav. */}
+          <div className="hidden sm:block">
+            <ThemeToggle />
+          </div>
+          <MobileNav />
         </div>
-
-        {/* `w-full` is what forces the wrap on a phone; from `sm` up it's
-            `w-auto` and sits inline between the tagline and the account
-            controls. Links are padded pills rather than 9px underlined text,
-            with extra vertical padding on touch sizes only (py-2.5 -> ~37px
-            tall) so they're a real tap target; a mouse doesn't need it, so
-            `sm:py-1.5` takes it back on desktop. */}
-        <nav className="order-4 -ml-2 flex w-full items-center gap-0.5 sm:order-3 sm:ml-0 sm:w-auto sm:gap-1">
-          <Link
-            href="/trades"
-            className="rounded-md px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel hover:text-ink sm:py-1.5 sm:text-[10px] sm:font-medium md:text-[11px] md:tracking-wider"
-          >
-            All Trades
-          </Link>
-          <Link
-            href="/politicians"
-            className="rounded-md px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel hover:text-ink sm:py-1.5 sm:text-[10px] sm:font-medium md:text-[11px] md:tracking-wider"
-          >
-            Politicians
-          </Link>
-        </nav>
       </div>
     </header>
   );

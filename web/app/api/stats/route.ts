@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
 
 // A transaction dated after its own filing date is impossible (a source
 // document typo) — excluded here too, so stats match what the trade list
@@ -20,14 +20,14 @@ export async function GET(req: NextRequest) {
     sql.query(
       `SELECT COUNT(*)::int as transactions
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter}`,
+       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
       chambers
     ),
     sql.query(`SELECT COUNT(*)::int as filings FROM filings f WHERE ${chamberFilter}`, chambers),
     sql.query(
       `SELECT COUNT(DISTINCT t.member_name)::int as members
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${chamberFilter}`,
+       WHERE ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
       chambers
     ),
     // Amount is disclosed as a range, not an exact figure — this is the sum of
@@ -35,13 +35,13 @@ export async function GET(req: NextRequest) {
     sql.query(
       `SELECT SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)::float8 as volume
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter}`,
+       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
       chambers
     ),
     sql.query(
       `SELECT t.ticker, COUNT(*)::int as count
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER} AND ${chamberFilter}
+       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}
        GROUP BY t.ticker ORDER BY count DESC LIMIT 10`,
       chambers
     ),

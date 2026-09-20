@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
 import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
 import { hasFeatureServer } from "@/lib/access";
 
@@ -122,7 +122,10 @@ export async function GET(req: NextRequest) {
     conditions.push(`(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) <= 45`);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  // Unreviewed OCR drafts are never shown — see PUBLISHED_FILING_SQL.
+  conditions.push(PUBLISHED_FILING_SQL);
+
+  const where = `WHERE ${conditions.join(" AND ")}`;
 
   const dataParams = [...params, limitNum, offset];
   const limitPlaceholder = `$${dataParams.length - 1}`;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
 
 export async function GET() {
   // Grouped by (member_name, bioguide_id) rather than state_district: a
@@ -15,6 +15,7 @@ export async function GET() {
             COUNT(*) as trade_count, MAX(t.transaction_date) as last_trade_date
      FROM transactions t
      JOIN filings f ON f.doc_id = t.doc_id
+     WHERE ${PUBLISHED_FILING_SQL}
      GROUP BY t.member_name, f.bioguide_id
      ORDER BY trade_count DESC`
   );

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
 import { ASSET_TYPE_VALUES } from "@/lib/api";
 
 // Same impossible-date guard as /api/trades and /api/stats — a transaction
@@ -55,7 +55,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       FROM transactions t
       JOIN filings f ON f.doc_id = t.doc_id
       ${MEMBER_JOIN}
-      WHERE ${VALID_DATE_ORDER} ${assetTypeFilter}
+      WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} ${assetTypeFilter}
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
     ORDER BY sub.filing_date DESC NULLS LAST, sub.id DESC
@@ -78,7 +78,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
          GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY trade_count DESC
          LIMIT 8`
@@ -89,7 +89,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
          GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY volume_sum DESC
          LIMIT 8`
@@ -98,7 +98,7 @@ export async function GET() {
         `SELECT t.ticker, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         WHERE t.ticker IS NOT NULL AND t.ticker != '' AND ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND t.ticker IS NOT NULL AND t.ticker != '' AND ${VALID_DATE_ORDER}
          GROUP BY t.ticker
          ORDER BY trade_count DESC
          LIMIT 8`
@@ -110,7 +110,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${VALID_DATE_ORDER} AND t.amount_low IS NOT NULL
+         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} AND t.amount_low IS NOT NULL
            AND (NULLIF(f.filing_date, '')::date) >= (CURRENT_DATE - INTERVAL '30 days')
          ORDER BY t.amount_low DESC
          LIMIT 5`
@@ -119,7 +119,7 @@ export async function GET() {
         `SELECT f.chamber, COUNT(*)::int as count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         WHERE ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
          GROUP BY f.chamber`
       ),
       sql.query(
@@ -127,7 +127,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${VALID_DATE_ORDER} AND COALESCE(mh.party, mr.party) IS NOT NULL
+         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} AND COALESCE(mh.party, mr.party) IS NOT NULL
          GROUP BY COALESCE(mh.party, mr.party)`
       ),
     ]);

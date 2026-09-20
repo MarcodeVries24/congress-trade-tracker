@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
 
 // Same impossible-date guard used across /api/trades, /api/stats, /api/dashboard.
 const VALID_DATE_ORDER = `(
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     const placeholders = chambers.map((c) => addParam(c));
     conditions.push(`f.chamber IN (${placeholders.join(", ")})`);
   }
+  conditions.push(PUBLISHED_FILING_SQL);
   const where = `WHERE ${conditions.join(" AND ")}`;
 
   const dataParams = [...params, limitNum, offset];

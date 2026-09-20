@@ -9,6 +9,8 @@
     "sync-members": "tsx src/ingest/syncMembers.ts",
     "sync-market-caps": "tsx src/ingest/syncMarketCaps.ts",
     "send-daily-report": "tsx src/ingest/sendDailyReport.ts",
+    "review:queue": "tsx src/ingest/reviewQueue.ts",
+    "review:approve": "tsx src/ingest/approveFiling.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

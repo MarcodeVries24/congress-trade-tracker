@@ -37,46 +37,39 @@ function Logo({ size = 28 }: { size?: number }) {
 export function Header() {
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        {/* flex-wrap lets the tagline ride next to the wordmark whenever
-            there's room, and only fall to its own line once the row
-            actually can't fit it — no breakpoint guessing. */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:gap-x-3">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3">
-            <div className="text-ink">
-              <Logo />
-            </div>
-            <span className="text-lg font-bold tracking-tight sm:text-xl md:text-2xl">
-              <span className="text-ink">Cong</span>
-              <span className="text-accent">Trade</span>
-            </span>
-          </Link>
-          {/* Sized down on narrow phones so the tagline still fits next to
-              the wordmark instead of always dropping to its own line — it
-              only wraps (via the parent's flex-wrap) once a screen is too
-              narrow even for that, e.g. the smallest phones. */}
-          <span className="flex items-center gap-2 whitespace-nowrap border-l border-line pl-2 sm:gap-3 sm:pl-3">
-            <span className="text-[9px] font-medium uppercase tracking-normal text-ink-faint sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider">
-              Track Congress trades
-            </span>
-            <Link
-              href="/trades"
-              className="text-[9px] font-medium uppercase tracking-normal text-ink-muted underline decoration-line-strong transition-colors hover:text-ink sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider"
-            >
-              All Trades
-            </Link>
-            <Link
-              href="/politicians"
-              className="text-[9px] font-medium uppercase tracking-normal text-ink-muted underline decoration-line-strong transition-colors hover:text-ink sm:text-[10px] sm:tracking-wide md:text-[11px] md:tracking-wider"
-            >
-              Politicians
-            </Link>
+      {/* One wrapping row rather than two fixed layouts. Source order is
+          brand, tagline, nav, account; the `order-*` utilities only change
+          where the nav sits relative to the account controls, so the nav
+          can drop to its own full-width line on a phone and rejoin the top
+          row as soon as there's space. Previously everything fought for a
+          single 375px row: the account cluster was pushed 6px past the
+          header (the page scrolled sideways) and "Sign in" wrapped onto
+          two lines inside its own pill. */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">
+        <Link href="/" className="order-1 flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="text-ink">
+            <Logo />
+          </div>
+          <span className="text-lg font-bold tracking-tight sm:text-xl md:text-2xl">
+            <span className="text-ink">Cong</span>
+            <span className="text-accent">Trade</span>
           </span>
-        </div>
-        <div className="flex items-center gap-3">
+        </Link>
+
+        {/* Decoration, not navigation — it costs exactly the width the nav
+            and the sign-in button need on a phone, so it only appears once
+            the viewport can spare it. */}
+        <span className="order-2 hidden whitespace-nowrap border-l border-line pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-faint md:inline md:text-[11px] md:tracking-wider">
+          Track Congress trades
+        </span>
+
+        {/* `ml-auto` keeps these at the end of whichever line they're on, so
+            they're never squeezed by the nav. `shrink-0` + `whitespace-nowrap`
+            stop the button collapsing into a two-line pill. */}
+        <div className="order-3 ml-auto flex shrink-0 items-center gap-2 sm:order-4 sm:gap-3">
           <SignedOut>
             <SignInButton mode="modal">
-              <button className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink">
+              <button className="whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink">
                 Sign in
               </button>
             </SignInButton>
@@ -86,6 +79,27 @@ export function Header() {
           </SignedIn>
           <ThemeToggle />
         </div>
+
+        {/* `w-full` is what forces the wrap on a phone; from `sm` up it's
+            `w-auto` and sits inline between the tagline and the account
+            controls. Links are padded pills rather than 9px underlined text,
+            with extra vertical padding on touch sizes only (py-2.5 -> ~37px
+            tall) so they're a real tap target; a mouse doesn't need it, so
+            `sm:py-1.5` takes it back on desktop. */}
+        <nav className="order-4 -ml-2 flex w-full items-center gap-0.5 sm:order-3 sm:ml-0 sm:w-auto sm:gap-1">
+          <Link
+            href="/trades"
+            className="rounded-md px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel hover:text-ink sm:py-1.5 sm:text-[10px] sm:font-medium md:text-[11px] md:tracking-wider"
+          >
+            All Trades
+          </Link>
+          <Link
+            href="/politicians"
+            className="rounded-md px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel hover:text-ink sm:py-1.5 sm:text-[10px] sm:font-medium md:text-[11px] md:tracking-wider"
+          >
+            Politicians
+          </Link>
+        </nav>
       </div>
     </header>
   );

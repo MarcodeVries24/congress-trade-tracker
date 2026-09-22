@@ -133,9 +133,9 @@ export default function PrivacyPage() {
 
         <LegalSection title="12. Contact">
           <p>
-            Questions about this policy can be sent to{" "}
-            <a href="mailto:privacy@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-              privacy@congtrade.com
+            Questions about this policy, or a request to access or delete your data, can be sent to{" "}
+            <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+              contact@congtrade.com
             </a>
             .
           </p>

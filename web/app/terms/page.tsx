@@ -148,8 +148,8 @@ export default function TermsPage() {
         <LegalSection title="12. Contact">
           <p>
             Questions about these terms can be sent to{" "}
-            <a href="mailto:legal@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-              legal@congtrade.com
+            <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+              contact@congtrade.com
             </a>
             .
           </p>

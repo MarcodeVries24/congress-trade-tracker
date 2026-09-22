@@ -193,20 +193,12 @@ export default function AboutPage() {
 
           <Section title="Contact" id="contact">
             <p>
-              Questions, corrections, or feedback — about a specific trade, the data pipeline, or anything else — can
-              be sent to{" "}
+              Questions, corrections, or feedback — about a specific trade, the data pipeline, legal or privacy
+              matters, or anything else — can be sent to{" "}
               <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
                 contact@congtrade.com
               </a>
-              . Legal or privacy-specific questions go to{" "}
-              <a href="mailto:legal@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-                legal@congtrade.com
-              </a>{" "}
-              and{" "}
-              <a href="mailto:privacy@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-                privacy@congtrade.com
-              </a>{" "}
-              respectively.
+              .
             </p>
           </Section>
         </div>

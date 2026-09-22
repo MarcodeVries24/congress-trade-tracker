@@ -200,4 +200,36 @@ export const SCHEMA_STATEMENTS = [
     PRIMARY KEY (alert_id, match_key)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_alert_matches_sent_at ON alert_matches(sent_at)`,
+  // Why an alert stopped sending on its own, when it did: NULL for an alert
+  // the owner paused by hand, 'subscription-ended' when the sender found the
+  // account no longer holds CongTrade Pro. The account screen turns this into
+  // an explanation and an upgrade link rather than leaving someone staring at
+  // an alert that says Active and never fires.
+  `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS paused_reason TEXT`,
+  // Cached answer to "does this account still hold CongTrade Pro?", so the
+  // alert sender can stop emailing someone whose subscription has ended.
+  //
+  // It has to be cached because the sender runs in GitHub Actions, outside any
+  // request, and Clerk is the only authority on this — one HTTP call per user
+  // per run would otherwise be wasted work on every quiet cycle. The web app
+  // also writes here whenever the owner opens /account, where it already knows
+  // the answer for free, so most cron runs never have to ask Clerk at all.
+  //
+  // is_pro DEFAULTS TO TRUE and checked_at is NULLable on purpose: a row that
+  // exists but was never successfully checked means "we don't know", and not
+  // knowing must never silence a paying subscriber. See entitlements.ts.
+  `CREATE TABLE IF NOT EXISTS user_entitlements (
+    user_id TEXT PRIMARY KEY,
+    is_pro BOOLEAN NOT NULL DEFAULT TRUE,
+    plan_slug TEXT,
+    -- 'billing' (a paid plan's features) | 'admin' (comped via public
+    -- metadata) | 'web' (recorded by the site from a signed-in session)
+    source TEXT,
+    -- NULL = never successfully checked. Not bumped on a failed lookup, so a
+    -- Clerk outage retries next run instead of being cached as an answer.
+    checked_at TIMESTAMPTZ,
+    last_error TEXT,
+    last_error_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];

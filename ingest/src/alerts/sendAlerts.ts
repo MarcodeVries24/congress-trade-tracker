@@ -11,6 +11,7 @@ import {
 } from "../../../web/lib/alertFilters";
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { alertEmailHtml, alertEmailSubject, alertEmailText } from "./renderAlertEmail.js";
+import { resolveEntitlements } from "./entitlements.js";
 
 /**
  * Sends CongTrade Pro email alerts. Runs after every ingest
@@ -23,6 +24,12 @@ import { alertEmailHtml, alertEmailSubject, alertEmailText } from "./renderAlert
  * it. That's deliberate — a preview that promised 12 matches and an email
  * that delivered a different 12 would be an invisible bug, so there is only
  * one implementation.
+ *
+ * Before sending, each owner's CongTrade Pro status is re-checked against
+ * Clerk (see entitlements.ts) and an alert belonging to a lapsed subscriber
+ * is paused with a reason rather than quietly skipped — an alert that says
+ * "Active" on the account screen while sending nothing is worse than one that
+ * explains itself. An inconclusive check always sends.
  *
  * Usage:
  *   npm run alerts:send                  # send everything due
@@ -183,6 +190,20 @@ async function recordSent(alert: DueAlert, matches: MatchRow[]): Promise<void> {
   );
 }
 
+/**
+ * Stops an alert whose owner no longer holds CongTrade Pro, and records why.
+ *
+ * Paused, never deleted: the filter they built is the valuable part, and
+ * re-subscribing should bring it back in one click rather than asking them to
+ * rebuild it from memory.
+ */
+async function pauseForLapsedSubscription(alert: DueAlert): Promise<void> {
+  await sql.query(
+    `UPDATE alerts SET active = FALSE, paused_reason = 'subscription-ended', updated_at = NOW() WHERE id = $1::bigint`,
+    [alert.id]
+  );
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
@@ -205,12 +226,30 @@ async function main() {
 
   console.log(`${alerts.length} alert(s) due${dryRun ? " (dry run — nothing will be sent)" : ""}.`);
 
+  // One lookup per distinct owner, cached for hours — not one per alert.
+  const entitlements = await resolveEntitlements(alerts.map((a) => a.user_id));
+
   let sent = 0;
   let matchedTotal = 0;
+  let paused = 0;
+  let unverified = 0;
   const failures: string[] = [];
 
   for (const alert of alerts) {
     try {
+      const entitlement = entitlements.get(alert.user_id) ?? { status: "unknown" as const, reason: "not resolved" };
+      if (entitlement.status === "lapsed") {
+        if (!dryRun) await pauseForLapsedSubscription(alert);
+        paused++;
+        console.log(`  #${alert.id} ${alert.name} — owner no longer has Pro; alert paused${dryRun ? " (dry run: not actually paused)" : ""}.`);
+        continue;
+      }
+      if (entitlement.status === "unknown") {
+        // Fail open, loudly. See entitlements.ts.
+        unverified++;
+        console.warn(`  #${alert.id} ${alert.name} — could not verify subscription (${entitlement.reason}); sending anyway.`);
+      }
+
       const matches = await findNewMatches(alert);
       if (matches.length === 0) {
         console.log(`  #${alert.id} ${alert.name} — nothing new.`);
@@ -265,7 +304,11 @@ async function main() {
     }
   }
 
-  console.log(`\n${sent} email(s) ${dryRun ? "would be sent" : "sent"}, ${matchedTotal} trade(s) matched.`);
+  console.log(
+    `\n${sent} email(s) ${dryRun ? "would be sent" : "sent"}, ${matchedTotal} trade(s) matched` +
+      `${paused ? `, ${paused} alert(s) paused (subscription ended)` : ""}` +
+      `${unverified ? `, ${unverified} sent without a verified subscription` : ""}.`
+  );
   if (failures.length) {
     console.error(`\n${failures.length} alert(s) failed:\n  ${failures.join("\n  ")}`);
     process.exit(1);

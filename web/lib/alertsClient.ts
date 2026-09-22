@@ -19,6 +19,7 @@ export interface SavedAlert {
   last_sent_at: string | null;
   sent_count: number;
   matched_count: number;
+  paused_reason: string | null;
 }
 
 export interface AlertsResponse {

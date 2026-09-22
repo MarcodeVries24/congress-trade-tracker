@@ -2,6 +2,7 @@ import "../loadEnv.js";
 import { sql } from "../db/index.js";
 import { sendEmail } from "../lib/email.js";
 import { getReviewQueue, reviewSectionHtml, reviewTextLines } from "./reviewQueue.js";
+import { countEntitlementErrors } from "../alerts/entitlements.js";
 
 /**
  * Daily digest of yesterday's *actually newly-filed* PTRs, sent once a day
@@ -91,6 +92,12 @@ async function main() {
   const needsReviewToday = await getReviewQueue(yesterdayIso());
   const backlog = await getReviewQueue();
 
+  // Alert sending fails *open* when Clerk can't be reached — a paying
+  // subscriber must never be cut off by our own outage — which means a broken
+  // entitlement check is otherwise completely silent. This is where it stops
+  // being silent.
+  const entitlementErrors = await countEntitlementErrors();
+
   const totalNewTransactions = successful.reduce((sum, r) => sum + r.transaction_count, 0);
   const houseCount = rows.filter((r) => r.chamber === "house").length;
   const senateCount = rows.filter((r) => r.chamber === "senate").length;
@@ -154,6 +161,18 @@ async function main() {
 
       ${reviewSectionHtml(backlog, needsReviewToday, reportDate, MAX_ROWS)}
 
+      ${
+        entitlementErrors > 0
+          ? `<h3 style="margin-bottom:4px;margin-top:28px;color:#a12b2b;">Subscription checks failing (${entitlementErrors})</h3>
+             <p style="color:#666;font-size:13px;margin-top:0;">
+               The alert sender couldn't confirm CongTrade Pro for ${entitlementErrors} account(s) in the last two days,
+               so it kept sending to them rather than risk cutting off a paying subscriber. Check
+               <code>CLERK_SECRET_KEY</code> and Clerk's Backend API — <code>last_error</code> in the
+               <code>user_entitlements</code> table has the detail.
+             </p>`
+          : ""
+      }
+
       <p style="margin-top:24px;"><a href="https://congress-trade-tracker-rose.vercel.app" style="color:#0070f3;">View CongTrade</a></p>
     </div>
   `;
@@ -170,7 +189,7 @@ These are NOT on the site until reviewed.
 ${reviewTextLines(backlog, MAX_ROWS)}
 
 Publish a reviewed filing with:  npm run review:approve -- <docId>
-`;
+${entitlementErrors > 0 ? `\nWARNING: subscription checks failed for ${entitlementErrors} account(s) in the last 2 days — alerts kept sending. See user_entitlements.last_error.\n` : ""}`;
 
   await sendEmail({ to: REPORT_TO, subject, html, text });
   console.log(`Sent daily report to ${REPORT_TO}: ${rows.length} new filings (${successful.length} successful, ${undefinedRows.length} undefined).`);

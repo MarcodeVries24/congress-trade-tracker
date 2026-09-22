@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters } from "@/lib/alertFilters";
-import { countAlerts, createAlert, listAlerts, MAX_ALERTS_PER_USER, syncAlertEmails } from "@/lib/alerts";
+import { countAlerts, createAlert, listAlerts, MAX_ALERTS_PER_USER, recordEntitlement, syncAlertEmails } from "@/lib/alerts";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
 const MAX_NAME_LENGTH = 80;
@@ -32,6 +32,9 @@ export async function GET() {
   if (email) await syncAlertEmails(userId, email);
 
   const [alerts, isPro] = await Promise.all([listAlerts(userId), hasProServer()]);
+  // Cheap gift to the cron: it needs this same answer and has to pay a Clerk
+  // round trip for it, whereas here it's already in the session.
+  await recordEntitlement(userId, isPro);
   return NextResponse.json({ alerts, isPro, email, maxAlerts: MAX_ALERTS_PER_USER });
 }
 

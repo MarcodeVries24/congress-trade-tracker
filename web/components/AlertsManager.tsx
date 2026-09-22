@@ -147,7 +147,7 @@ export function AlertsManager() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-sm font-semibold text-ink">{alert.name}</h3>
-                    {!alert.active && <Chip>Paused</Chip>}
+                    {!alert.active && <Chip>{alert.paused_reason === "subscription-ended" ? "Paused — Pro ended" : "Paused"}</Chip>}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {describeAlert(alert.filters).map((chip) => (
@@ -156,14 +156,26 @@ export function AlertsManager() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={busyId === alert.id}
-                    onClick={() => toggleActive(alert)}
-                    className="rounded-full border border-line px-3 py-1.5 text-xs text-ink-muted hover:border-line-strong hover:text-ink disabled:opacity-50"
-                  >
-                    {alert.active ? "Pause" : "Resume"}
-                  </button>
+                  {/* Resuming needs Pro (the server enforces it too) — offering
+                      a Resume button that can only ever 403 would be a worse
+                      answer than pointing at the thing that fixes it. */}
+                  {alert.active || state.isPro ? (
+                    <button
+                      type="button"
+                      disabled={busyId === alert.id}
+                      onClick={() => toggleActive(alert)}
+                      className="rounded-full border border-line px-3 py-1.5 text-xs text-ink-muted hover:border-line-strong hover:text-ink disabled:opacity-50"
+                    >
+                      {alert.active ? "Pause" : "Resume"}
+                    </button>
+                  ) : (
+                    <Link
+                      href="/upgrade"
+                      className="rounded-full border border-accent/50 px-3 py-1.5 text-xs text-accent hover:border-accent"
+                    >
+                      Resubscribe to resume
+                    </Link>
+                  )}
                   {state.isPro && (
                     <button
                       type="button"
@@ -186,6 +198,13 @@ export function AlertsManager() {
                   </button>
                 </div>
               </div>
+
+              {alert.paused_reason === "subscription-ended" && (
+                <p className="mt-3 rounded-md border border-line bg-panel-muted px-3 py-2 text-xs leading-relaxed text-ink-muted">
+                  This stopped because your CongTrade Pro subscription ended. Nothing has been lost — the filter is
+                  exactly as you left it, and resubscribing turns it straight back on.
+                </p>
+              )}
 
               <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-xs text-ink-faint">
                 <div className="flex gap-1.5">

@@ -242,12 +242,43 @@ headers and a footer link, both pointing at `/api/alerts/unsubscribe`, which
 pauses (never deletes) that one alert without a login. Mailbox providers
 increasingly penalize bulk senders that don't offer this.
 
-**Not yet wired: subscription cancellation.** Alerts are gated on CongTrade
-Pro when they're created or edited, but the sender runs in GitHub Actions
-with no Clerk credentials and doesn't re-check entitlement at send time. If
-someone cancels, their existing alerts keep sending until they pause or
-delete them. Closing that needs a Clerk webhook writing the subscription
-state somewhere the cron can read.
+4. Add a GitHub Actions secret `CLERK_SECRET_KEY` so the sender can re-check
+   that each alert's owner still holds Pro. **It must be the secret key for
+   the same Clerk instance the live site signs users in with** — the
+   production `sk_live_…` key, not a development one. Optional: without it
+   every alert is treated as entitled and the job says so.
+
+#### When a subscription ends
+
+Before each send, the owner's plan is re-checked against Clerk
+([`entitlements.ts`](ingest/src/alerts/entitlements.ts)) and a lapsed
+subscriber's alerts are **paused with a reason**, not silently skipped — the
+account screen then explains why and offers to resubscribe, and the filter
+they built is kept intact so it comes straight back. Answers are cached for
+12 hours, and the site writes the same cache whenever the owner opens
+`/account` (where it knows for free), so most runs never call Clerk at all.
+
+Three things about this are worth knowing before touching it:
+
+- **`subscription.status` is not an entitlement check.** Clerk Billing puts
+  everyone on a subscription, free users included, and a free account's
+  subscription reads `status: "active"`. Entitlement is in the features the
+  subscribed *plan* grants — `notifications` / `filters` on `pro_congtrade` —
+  which is what `has({ feature })` reads on the web side too.
+- **A cancellation isn't instant, and shouldn't be.** Clerk keeps the
+  subscription item active until the paid period ends, so someone who
+  cancels mid-month keeps their alerts for the month they paid for. A
+  `past_due` item also still counts — a declined renewal is usually one retry
+  from succeeding, and cutting alerts the moment a card expires punishes a
+  customer who hasn't gone anywhere.
+- **Every uncertain answer sends.** No key, a network error, Clerk down, an
+  unrecognized response — all fail open, because one extra email to a lapsed
+  subscriber is a rounding error next to silently cutting off paying ones.
+  There's a specific guard for the worst version of this: if *no* account in
+  a run exists in the instance the key points at, that's read as a
+  wrong-instance key (a test key in place of a live one) rather than as every
+  subscriber deleting their account at once, and nothing is paused. Failed
+  checks are counted in the daily report so a broken check can't stay quiet.
 
 ## Local development
 

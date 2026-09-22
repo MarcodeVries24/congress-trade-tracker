@@ -30,13 +30,19 @@ export interface AlertRecord {
   last_sent_at: string | null;
   sent_count: number;
   matched_count: number;
+  /**
+   * Why this alert stopped on its own. NULL when the owner paused it by hand;
+   * 'subscription-ended' when the sender found the account no longer holds
+   * CongTrade Pro. The account screen turns it into an explanation.
+   */
+  paused_reason: string | null;
 }
 
 // id is a bigint: node-postgres (and Neon's driver) hand those back as
 // strings to avoid silently losing precision, so it is selected as text
 // explicitly and treated as a string all the way to the client.
 const ALERT_COLUMNS = `id::text AS id, name, email, filters, frequency, active,
-  created_at, updated_at, last_sent_at, sent_count, matched_count`;
+  created_at, updated_at, last_sent_at, sent_count, matched_count, paused_reason`;
 
 export async function listAlerts(userId: string): Promise<AlertRecord[]> {
   return (await sql.query(
@@ -81,7 +87,13 @@ export async function updateAlert(
   if (patch.name !== undefined) sets.push(`name = ${addParam(patch.name)}`);
   if (patch.filters !== undefined) sets.push(`filters = ${addParam(JSON.stringify(patch.filters))}::jsonb`);
   if (patch.frequency !== undefined) sets.push(`frequency = ${addParam(patch.frequency)}`);
-  if (patch.active !== undefined) sets.push(`active = ${addParam(patch.active)}`);
+  if (patch.active !== undefined) {
+    sets.push(`active = ${addParam(patch.active)}`);
+    // Switching it back on clears the sender's explanation for switching it
+    // off — the route only allows this once the caller holds Pro again, so
+    // leaving a stale "subscription ended" note would just be wrong.
+    if (patch.active) sets.push(`paused_reason = NULL`);
+  }
 
   const idParam = addParam(id);
   const userParam = addParam(userId);
@@ -104,6 +116,26 @@ export async function deleteAlert(userId: string, id: string): Promise<boolean> 
  * authenticated read of the account screen, so changing your email in Clerk
  * takes effect the next time you look at your alerts.
  */
+/**
+ * Records what the site already knows for free: the signed-in owner's plan
+ * status. The alert sender runs in GitHub Actions and would otherwise have to
+ * ask Clerk on every cycle; because this writes on every visit to /account,
+ * most cron runs find a fresh answer waiting and never call out at all.
+ *
+ * Also keeps the two sides from disagreeing: both are now recording the same
+ * verdict into the same row.
+ */
+export async function recordEntitlement(userId: string, isPro: boolean): Promise<void> {
+  await sql.query(
+    `INSERT INTO user_entitlements (user_id, is_pro, source, checked_at, last_error, last_error_at, updated_at)
+     VALUES ($1, $2, 'web', NOW(), NULL, NULL, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       is_pro = EXCLUDED.is_pro, source = 'web', checked_at = NOW(),
+       last_error = NULL, last_error_at = NULL, updated_at = NOW()`,
+    [userId, isPro]
+  );
+}
+
 export async function syncAlertEmails(userId: string, email: string): Promise<void> {
   await sql.query(`UPDATE alerts SET email = $1 WHERE user_id = $2 AND email IS DISTINCT FROM $1`, [email, userId]);
 }

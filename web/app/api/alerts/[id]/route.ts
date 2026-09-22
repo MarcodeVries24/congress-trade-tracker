@@ -27,9 +27,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Pausing or deleting an alert stays available after a subscription lapses
   // — it would be hostile to keep sending emails someone can no longer turn
-  // off. Changing what an alert *watches* is the paid part.
-  const changesContent = raw.name !== undefined || raw.filters !== undefined || raw.frequency !== undefined;
-  if (changesContent && !(await hasProServer())) {
+  // off. Everything else is the paid part, including *resuming*: the sender
+  // pauses a lapsed subscriber's alerts, and without this they could simply
+  // switch them back on.
+  const needsPro =
+    raw.name !== undefined || raw.filters !== undefined || raw.frequency !== undefined || raw.active === true;
+  if (needsPro && !(await hasProServer())) {
     return NextResponse.json({ error: "Email alerts are a CongTrade Pro feature." }, { status: 403 });
   }
 

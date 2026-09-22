@@ -14,14 +14,16 @@ export async function hasFeatureServer(feature: string): Promise<boolean> {
   return (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
 }
 
-// Every feature key that means "this account has CongTrade Pro".
+// Every feature slug that means "this account has CongTrade Pro".
 //
-// "filters" is the key the live plan was configured with; "alerts" is here so
-// that if the plan later gains its own alerts feature in the Clerk dashboard,
-// accounts holding it are recognized immediately — and, crucially, so that
-// *not* adding it doesn't lock today's paying subscribers out of the alerts
-// screen. Either one grants Pro.
-const PRO_FEATURES = ["filters", "alerts"];
+// These are the real slugs on the `pro_congtrade` plan in Clerk Billing,
+// which grants `notifications`, `filters` and `no_ads` together. Both are
+// listed rather than just one so that a future plan split (an alerts-only
+// tier, say) doesn't silently lock anyone out — holding either grants Pro.
+//
+// Must stay in step with PRO_FEATURE_SLUGS in ingest/src/alerts/entitlements.ts,
+// which asks Clerk the same question from outside a request context.
+const PRO_FEATURES = ["notifications", "filters"];
 
 /**
  * Whether the caller may use paid features. Same comp-access escape hatch as

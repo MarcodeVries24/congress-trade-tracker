@@ -74,6 +74,17 @@ Both chambers share the rest of the pipeline:
    pipeline touched in the preceding 24 hours — filings split into
    successful (a transaction was recovered) vs. undefined (nothing could
    be extracted), plus how many new transactions were added.
+9. After every ingest run, [`sendAlerts.ts`](ingest/src/alerts/sendAlerts.ts)
+   emails CongTrade Pro subscribers whose saved alerts match anything that
+   just arrived. The matching SQL is not written there: it comes from
+   [`web/lib/alertFilters.ts`](web/lib/alertFilters.ts), the same module the
+   account screen uses to *preview* an alert before it's saved — one
+   implementation, so a preview that promised 12 matches can't quietly
+   deliver a different 12. Each alert keeps a ledger of what it has already
+   sent, keyed on a hash of the trade's content rather than its row id,
+   because re-ingesting a filing deletes and reinserts all of its rows: an
+   id-keyed ledger would re-send a member's entire filing every time its
+   parse improved.
 
 ### Known data-quality limits
 
@@ -190,11 +201,9 @@ doesn't belong in this report.
 3. [.github/workflows/daily-report.yml](.github/workflows/daily-report.yml)
    runs `npm run send-daily-report` once a day. Without a verified sending
    domain, Resend can only deliver to the email address that owns the
-   Resend account — fine for this (an admin report to yourself), but a
-   future end-user-facing notification feature (sending to arbitrary
-   recipients) would need a verified domain; [`ingest/src/lib/email.ts`](ingest/src/lib/email.ts)
-   is written generically for that reason, so it isn't tied to just this
-   report. Skip this step entirely and everything else still works fine —
+   Resend account — fine for this (an admin report to yourself). Sending to
+   actual users needs a verified domain: see **CongTrade Pro email alerts**
+   below. Skip this step entirely and everything else still works fine —
    you just won't get the email.
 
 ### 5. Website + API — Vercel
@@ -206,6 +215,40 @@ doesn't belong in this report.
    string.
 4. Deploy. Every push to the repo redeploys automatically.
 
+### 6. CongTrade Pro email alerts — needs a verified sending domain
+
+A paid subscriber can save up to 25 alerts on `/account`: a filter over
+chamber, party, state, member, ticker, asset type, buy/sell, owner, trade
+size, market cap, filing punctuality and free text, delivered as it happens
+(checked every ingest run, so at most ~4 hours), daily, or weekly.
+
+Unlike the admin report above, these go to **other people's** addresses, so
+Resend's sandbox sender won't do — it can only deliver to the address that
+owns the Resend account.
+
+1. In Resend, add and verify your domain (DNS records for SPF/DKIM). This is
+   the only manual step; everything else is already wired up.
+2. Add a GitHub Actions secret `ALERT_FROM_EMAIL` with a from-address on
+   that domain, e.g. `CongTrade <alerts@congtrade.com>`.
+3. Optionally add `SITE_URL` (defaults to `https://www.congtrade.com`) — it's
+   what the links in the emails point at.
+
+Until `ALERT_FROM_EMAIL` is set the job runs, says so, and sends nothing, so
+the workflow step is safe to have in place beforehand. Alerts themselves can
+still be created and previewed on the site meanwhile; they simply queue up.
+
+Every alert email carries `List-Unsubscribe` / `List-Unsubscribe-Post`
+headers and a footer link, both pointing at `/api/alerts/unsubscribe`, which
+pauses (never deletes) that one alert without a login. Mailbox providers
+increasingly penalize bulk senders that don't offer this.
+
+**Not yet wired: subscription cancellation.** Alerts are gated on CongTrade
+Pro when they're created or edited, but the sender runs in GitHub Actions
+with no Clerk credentials and doesn't re-check entitlement at send time. If
+someone cancels, their existing alerts keep sending until they pause or
+delete them. Closing that needs a Clerk webhook writing the subscription
+state somewhere the cron can read.
+
 ## Local development
 
 ```bash
@@ -215,7 +258,7 @@ npm install
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
 For `sync-market-caps` and `send-daily-report`, also create `ingest/.env`
 with `DATABASE_URL` plus `FINNHUB_API_KEY` and/or `RESEND_API_KEY` +
-`REPORT_EMAIL` as needed.
+`REPORT_EMAIL` as needed. `alerts:send --dry-run` needs only `DATABASE_URL`.
 
 ```bash
 npm run dev                 # Next.js site + API at http://localhost:3000
@@ -224,6 +267,9 @@ npm run ingest-senate        # run the Senate PTR ingestion CLI once (needs Chro
 npm run sync-members         # refresh member photos/party (House + Senate, cheap)
 npm run sync-market-caps     # refresh company market caps (needs FINNHUB_API_KEY)
 npm run send-daily-report    # send the daily ingest report now (needs RESEND_API_KEY, REPORT_EMAIL)
+npm run alerts:send          # send due Pro alerts now (needs RESEND_API_KEY, ALERT_FROM_EMAIL)
+npm run alerts:send -- --dry-run      # print what would go out, send nothing
+npm run alerts:send -- --alert=42     # just that one alert, ignoring its schedule
 ```
 
 House ingest options:

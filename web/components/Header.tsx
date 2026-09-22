@@ -35,6 +35,16 @@ function Logo({ size = 28 }: { size?: number }) {
   );
 }
 
+// Sized to match Clerk's own menu-item icons (16px, stroked, currentColor).
+function BellIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 export function Header() {
   return (
     // `relative` anchors the mobile menu panel, which hangs off the bottom
@@ -94,7 +104,16 @@ export function Header() {
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }} />
+            {/* The account screen (plan + email alerts) is reachable from the
+                avatar menu rather than the nav row — it's only meaningful
+                once you're signed in, and the row is already tight on
+                phones. Clerk renders this item above its own Manage/Sign out
+                entries. */}
+            <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }}>
+              <UserButton.MenuItems>
+                <UserButton.Link label="Email alerts" labelIcon={<BellIcon />} href="/account" />
+              </UserButton.MenuItems>
+            </UserButton>
           </SignedIn>
           {/* On phones this sits inside the menu instead — see MobileNav. */}
           <div className="hidden sm:block">

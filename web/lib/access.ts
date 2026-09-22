@@ -13,3 +13,23 @@ export async function hasFeatureServer(feature: string): Promise<boolean> {
   const user = await currentUser();
   return (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
 }
+
+// Every feature key that means "this account has CongTrade Pro".
+//
+// "filters" is the key the live plan was configured with; "alerts" is here so
+// that if the plan later gains its own alerts feature in the Clerk dashboard,
+// accounts holding it are recognized immediately — and, crucially, so that
+// *not* adding it doesn't lock today's paying subscribers out of the alerts
+// screen. Either one grants Pro.
+const PRO_FEATURES = ["filters", "alerts"];
+
+/**
+ * Whether the caller may use paid features. Same comp-access escape hatch as
+ * hasFeatureServer (public metadata {"admin": true}).
+ */
+export async function hasProServer(): Promise<boolean> {
+  const { has } = await auth();
+  if (PRO_FEATURES.some((feature) => has({ feature }))) return true;
+  const user = await currentUser();
+  return (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
+}

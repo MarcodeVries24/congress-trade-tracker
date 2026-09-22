@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "How CongTrade handles data.",
 };
 
-const LAST_UPDATED = "September 11, 2026";
+const LAST_UPDATED = "September 22, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -19,9 +19,11 @@ export default function PrivacyPage() {
           <p>
             All of the trading data shown on the Site is public government filing data, not personal data about
             visitors. Browsing and searching the Site doesn&rsquo;t require an account. If you create an account to
-            use paid features, we collect the minimum needed to run that account and subscription — handled by our
-            providers (Clerk for accounts, Stripe for payment) rather than stored by us directly. The sections below
-            cover what that involves, plus the ordinary technical data inherent to running a website with ads.
+            use paid features, we collect the minimum needed to run that account and subscription — mostly handled by
+            our providers (Clerk for accounts, Stripe for payment) rather than stored by us directly. The one
+            exception is email alerts, which need your address and your saved criteria in our own database in order
+            to send anything. The sections below cover what that involves, plus the ordinary technical data
+            inherent to running a website with ads.
           </p>
         </LegalSection>
 
@@ -38,7 +40,24 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="3. Payments">
+        <LegalSection title="3. Email alerts">
+          <p>
+            CongTrade Pro subscribers can save alerts &mdash; a saved set of filter criteria &mdash; and be emailed
+            when a new public filing matches. To send those emails we store, in our own database: the criteria you
+            chose, your Clerk account ID, and a copy of your account&rsquo;s email address (kept in step with
+            whatever address Clerk holds, so that the sending job, which runs outside Clerk, has somewhere to
+            deliver to). We also record which filings each alert has already told you about, so the same trade
+            isn&rsquo;t emailed twice.
+          </p>
+          <p>
+            Every alert email includes a one-click unsubscribe link that switches that alert off without signing in.
+            Deleting an alert deletes its criteria and its sent-history with it. Alerts are the only thing we use
+            your email address for &mdash; we don&rsquo;t send marketing, and we don&rsquo;t share the address with
+            anyone beyond our email delivery provider, Resend, which transmits the message.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="4. Payments">
           <p>
             Subscription payments are processed by Stripe through Clerk&rsquo;s billing integration. We never see or
             store your full card details — Stripe handles that directly. We do retain a record that your account has
@@ -46,7 +65,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="4. Cookies and local storage">
+        <LegalSection title="5. Cookies and local storage">
           <p>Depending on how you use the Site, it can set:</p>
           <ul>
             <li>An authentication session cookie (Clerk), if you create an account — keeps you signed in.</li>
@@ -55,7 +74,7 @@ export default function PrivacyPage() {
           </ul>
         </LegalSection>
 
-        <LegalSection title="5. Advertising">
+        <LegalSection title="6. Advertising">
           <p>
             The free tier of the Site may show ads served by Google AdSense. Google and its advertising partners may
             use cookies or device identifiers to serve ads, including personalized ones based on your activity
@@ -73,7 +92,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="6. Hosting and technical logs">
+        <LegalSection title="7. Hosting and technical logs">
           <p>
             The Site is hosted on Vercel, with its data stored in a Neon Postgres database. Like virtually every
             website, our hosting provider automatically logs standard technical information for security and
@@ -83,20 +102,20 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="7. Third-party services and sites">
+        <LegalSection title="8. Third-party services and sites">
           <p>
             The Site links out to third-party sites — the House Clerk&rsquo;s disclosure portal, the Senate eFD
             system, and individual source filings — to let you verify data at the source. It also relies on Clerk,
-            Stripe, and Google AdSense to operate, as described above. None of these are under our control, and each
-            has its own privacy practices.
+            Stripe, Resend (which delivers alert emails), and Google AdSense to operate, as described above. None of
+            these are under our control, and each has its own privacy practices.
           </p>
         </LegalSection>
 
-        <LegalSection title="8. Children's privacy">
+        <LegalSection title="9. Children's privacy">
           <p>The Site is not directed at children under 13, and we don&rsquo;t knowingly collect information from them.</p>
         </LegalSection>
 
-        <LegalSection title="9. Your rights">
+        <LegalSection title="10. Your rights">
           <p>
             You can access or update your account details (email, sign-in method) directly through your account
             settings, and cancel a subscription at any time. To request deletion of your account and associated
@@ -105,14 +124,14 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="10. Changes to this policy">
+        <LegalSection title="11. Changes to this policy">
           <p>
             We may update this policy from time to time; the &ldquo;last updated&rdquo; date at the top reflects the
             most recent revision.
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Contact">
+        <LegalSection title="12. Contact">
           <p>
             Questions about this policy can be sent to{" "}
             <a href="mailto:privacy@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

@@ -40,3 +40,18 @@ jobs:
       - run: npm run ingest-senate --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Emails CongTrade Pro subscribers whose saved alerts match anything
+      # that just arrived. Last step on purpose — both chambers are already
+      # in, so a filing found this cycle goes out in this cycle.
+      #
+      # Safe to have here before alerts are switched on: with no
+      # ALERT_FROM_EMAIL set, the job prints why and exits 0 without sending
+      # (Resend's sandbox sender can only deliver to the account owner, so
+      # real user mail needs a verified domain first — see README).
+      - run: npm run alerts:send --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
+          SITE_URL: ${{ secrets.SITE_URL }}

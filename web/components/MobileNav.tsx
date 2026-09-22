@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignedIn } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 
 const LINKS = [
@@ -141,6 +142,25 @@ export function MobileNav() {
               );
             })}
           </ul>
+          {/* Signed-in only, and outside LINKS above, so a signed-out
+              visitor is never offered a page that just tells them to sign
+              in. The same destination is in the avatar menu on wider
+              screens — see Header. */}
+          <SignedIn>
+            <div className="border-t border-line px-4 pb-2">
+              <Link
+                href="/account"
+                tabIndex={open ? undefined : -1}
+                aria-current={pathname === "/account" ? "page" : undefined}
+                className={`mt-2 flex items-center justify-between rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
+                  pathname === "/account" ? "bg-panel-muted text-ink" : "text-ink-muted hover:bg-panel-muted hover:text-ink"
+                }`}
+              >
+                Account &amp; alerts
+                {pathname === "/account" && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
+              </Link>
+            </div>
+          </SignedIn>
           {/* The theme toggle lives in here on phones rather than in the
               header row: brand + Sign in + toggle + menu button together
               overflow a 320px screen, and Sign in is the one that has to

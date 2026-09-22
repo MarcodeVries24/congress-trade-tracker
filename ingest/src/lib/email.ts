@@ -19,6 +19,13 @@ export interface EmailMessage {
   html: string;
   text?: string;
   from?: string;
+  /**
+   * Extra SMTP headers. Used for List-Unsubscribe / List-Unsubscribe-Post on
+   * end-user alert mail — Gmail and Outlook show their own one-click
+   * unsubscribe button when those are present, and increasingly penalize
+   * bulk senders that omit them.
+   */
+  headers?: Record<string, string>;
 }
 
 export async function sendEmail(message: EmailMessage): Promise<void> {
@@ -38,6 +45,7 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
       subject: message.subject,
       html: message.html,
       text: message.text,
+      headers: message.headers,
     }),
   });
 

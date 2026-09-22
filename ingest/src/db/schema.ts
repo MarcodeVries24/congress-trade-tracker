@@ -148,4 +148,56 @@ export const SCHEMA_STATEMENTS = [
     ticker TEXT,
     resolved_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // ---------------------------------------------------------------------
+  // CongTrade Pro email alerts (see web/lib/alertFilters.ts for the filter
+  // shape, and ingest/src/alerts/sendAlerts.ts for the cron that sends them).
+  // ---------------------------------------------------------------------
+  // One saved alert. `user_id` is the Clerk user id — Clerk owns identity,
+  // this table only ever stores the id plus a snapshot of the delivery
+  // address, refreshed from Clerk whenever the owner opens /account (the
+  // sender runs in GitHub Actions and has no Clerk credentials of its own,
+  // so it cannot look an address up at send time).
+  //
+  // `filters` is the JSON produced by normalizeAlertFilters — already
+  // whitelisted before it is stored, never trusted as-is when read back.
+  `CREATE TABLE IF NOT EXISTS alerts (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    name TEXT NOT NULL,
+    filters JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- 'instant' (every ingest run) | 'daily' | 'weekly'
+    frequency TEXT NOT NULL DEFAULT 'instant',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Random, unguessable; lets the List-Unsubscribe header and the email's
+    -- own footer link turn an alert off without a login, which is what
+    -- mailbox providers expect from bulk senders.
+    unsubscribe_token TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_sent_at TIMESTAMPTZ,
+    -- Lifetime counters, shown in the account screen so an alert that never
+    -- fires is visibly distinguishable from one that was never checked.
+    sent_count INTEGER NOT NULL DEFAULT 0,
+    matched_count INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_user ON alerts(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_alerts_due ON alerts(active, frequency, last_sent_at)`,
+  // The "already told you about this" ledger — one row per trade per alert.
+  //
+  // Keyed on a hash of the trade's *content* rather than transactions.id,
+  // because ids are not stable: re-ingesting a filing deletes and reinserts
+  // every one of its rows (see run.ts), and a hand-verified rewrite does the
+  // same. Keying on the id would re-notify a member's entire filing every
+  // time its parse improved. The hash includes an occurrence number so two
+  // genuinely identical lines in one filing (same asset, same day, same
+  // bracket — which does happen) still count as two.
+  `CREATE TABLE IF NOT EXISTS alert_matches (
+    alert_id BIGINT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+    match_key TEXT NOT NULL,
+    doc_id TEXT NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (alert_id, match_key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_alert_matches_sent_at ON alert_matches(sent_at)`,
 ];

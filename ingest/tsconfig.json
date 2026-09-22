@@ -1,10 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    // Bundler resolution, not NodeNext, so that the files this package shares
+    // with the web app (web/lib/alertFilters.ts and friends, imported by
+    // src/alerts/) can use the extensionless relative imports Next's webpack
+    // requires — NodeNext would demand a ".js" specifier that Next then
+    // fails to resolve. Nothing here is ever emitted (everything runs through
+    // tsx), so this only affects how imports are checked.
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

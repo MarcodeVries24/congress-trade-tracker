@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "The terms that govern use of CongTrade.",
 };
 
-const LAST_UPDATED = "September 11, 2026";
+const LAST_UPDATED = "September 22, 2026";
 
 export default function TermsPage() {
   return (
@@ -39,10 +39,17 @@ export default function TermsPage() {
 
         <LegalSection title="3. Accounts and paid plans">
           <p>
-            Some features — filters, saved search alerts, and an ad-free view — require a free account and a paid
+            Some features — filters, email alerts, and an ad-free view — require a free account and a paid
             CongTrade Pro subscription. Accounts are handled by our authentication provider, Clerk; you can sign up
             with an email address or a Google account. Subscriptions are billed by Stripe through Clerk&rsquo;s
             billing integration — we never see or store your card details ourselves.
+          </p>
+          <p>
+            Email alerts send to the address on your account. Each alert email carries a one-click unsubscribe link
+            that switches that alert off; you can also pause or delete any alert from your account screen, with or
+            without an active subscription. Alerts run on the same schedule as our data collection, so &ldquo;as it
+            happens&rdquo; means on the next collection run — we don&rsquo;t promise any particular delivery time,
+            and an alert is a convenience rather than a guarantee that you&rsquo;ll be told about every filing.
           </p>
           <p>
             Subscriptions renew automatically until cancelled. You can cancel at any time from your account

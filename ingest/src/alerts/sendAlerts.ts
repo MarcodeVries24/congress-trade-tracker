@@ -12,6 +12,7 @@ import {
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { alertEmailHtml, alertEmailSubject, alertEmailText } from "./renderAlertEmail.js";
 import { resolveEntitlements } from "./entitlements.js";
+import { SITE_URL } from "../lib/siteUrl.js";
 
 /**
  * Sends CongTrade Pro email alerts. Runs after every ingest
@@ -37,9 +38,7 @@ import { resolveEntitlements } from "./entitlements.js";
  *   npm run alerts:send -- --alert=42    # just one alert, ignoring its schedule
  */
 
-// `||`, not `??`: an unset GitHub Actions secret arrives as an empty
-// string, not as undefined.
-const SITE_URL = (process.env.SITE_URL || "https://www.congtrade.com").replace(/\/$/, "");
+
 
 /**
  * The address alerts are sent from. Unset means "alerts are not switched on

@@ -1,8 +1,9 @@
 import "../loadEnv.js";
-import { sql } from "../db/index.js";
+import { ensureSchema, sql } from "../db/index.js";
 import { sendEmail } from "../lib/email.js";
 import { getReviewQueue, reviewSectionHtml, reviewTextLines } from "./reviewQueue.js";
 import { countEntitlementErrors } from "../alerts/entitlements.js";
+import { SITE_URL } from "../lib/siteUrl.js";
 
 /**
  * Daily digest of yesterday's *actually newly-filed* PTRs, sent once a day
@@ -38,11 +39,11 @@ import { countEntitlementErrors } from "../alerts/entitlements.js";
  * filed yesterday.
  */
 
-const REPORT_TO: string = (() => {
+function reportRecipient(): string {
   const value = process.env.REPORT_EMAIL;
   if (!value) throw new Error("REPORT_EMAIL is not set — the address this daily report goes to. Set it in ingest/.env (or as a GitHub Actions secret).");
   return value;
-})();
+}
 
 interface FilingRow {
   doc_id: string;
@@ -59,9 +60,33 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function yesterdayIso(): string {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+/**
+ * How far back this report reaches: everything ingested since the last one
+ * was successfully sent.
+ *
+ * Falls back to 24 hours on the very first run. Read before sending; only
+ * advanced afterwards (see markReportSent), so a failed send re-reports
+ * instead of skipping a day's filings forever.
+ */
+async function reportSince(): Promise<Date> {
+  const rows = (await sql.query(`SELECT last_report_at FROM report_runs WHERE id = TRUE`)) as { last_report_at: Date }[];
+  return rows[0]?.last_report_at ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 }
+
+async function markReportSent(): Promise<void> {
+  await sql.query(
+    `INSERT INTO report_runs (id, last_report_at) VALUES (TRUE, NOW())
+     ON CONFLICT (id) DO UPDATE SET last_report_at = NOW()`
+  );
+}
+
+/**
+ * Filings older than this are treated as re-processing, not news. Without it a
+ * parser improvement that re-reads the archive (1,400 filings in a day, in
+ * Sept 2026) would land in the report as "new". Counted separately rather than
+ * dropped, so a big backfill is still visible.
+ */
+const NEWS_WINDOW_DAYS = 60;
 
 function renderRows(rows: FilingRow[]): string {
   return rows
@@ -77,19 +102,41 @@ function renderRows(rows: FilingRow[]): string {
 }
 
 async function main() {
+  // `--dry-run` renders the report and prints what it would cover without
+  // sending, and without moving the watermark. Same affordance as
+  // `alerts:send --dry-run`, and the only safe way to check a scoping change
+  // against live data.
+  const dryRun = process.argv.slice(2).includes("--dry-run");
+
+  await ensureSchema();
+  const since = await reportSince();
+
+  // Scoped by when we *learned* of a filing, not by its filing_date. See
+  // report_runs in db/schema.ts for why the filing_date version missed
+  // nearly everything.
   const rows = (await sql.query(
     `SELECT doc_id, chamber, member_name, state_district, parse_status, transaction_count, pdf_url, filing_date
      FROM filings
-     WHERE NULLIF(filing_date, '')::date = CURRENT_DATE - 1
-     ORDER BY transaction_count DESC, filing_date DESC`
+     WHERE ingested_at > $1
+       AND NULLIF(filing_date, '')::date >= CURRENT_DATE - ${NEWS_WINDOW_DAYS}
+     ORDER BY transaction_count DESC, filing_date DESC`,
+    [since]
   )) as FilingRow[];
+
+  // Older documents the pipeline re-read in the same window — a re-ingest or a
+  // parse improvement, not a new disclosure.
+  const [{ count: reprocessedOlder }] = (await sql.query(
+    `SELECT COUNT(*)::int AS count FROM filings
+     WHERE ingested_at > $1 AND NULLIF(filing_date, '')::date < CURRENT_DATE - ${NEWS_WINDOW_DAYS}`,
+    [since]
+  )) as { count: number }[];
 
   const successful = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "manual");
   const undefinedRows = rows.filter((r) => r.parse_status === "failed");
 
   // Scanned filings held back from the site until verified by hand. Both
   // yesterday's and the whole outstanding backlog — see the note above.
-  const needsReviewToday = await getReviewQueue(yesterdayIso());
+  const needsReviewToday = await getReviewQueue(since);
   const backlog = await getReviewQueue();
 
   // Alert sending fails *open* when Clerk can't be reached — a paying
@@ -102,19 +149,22 @@ async function main() {
   const houseCount = rows.filter((r) => r.chamber === "house").length;
   const senateCount = rows.filter((r) => r.chamber === "senate").length;
 
-  const reportDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  // The window this report covers, in words. Not "yesterday" — the watermark
+  // stretches to whenever the last report actually went out, which drifts.
+  const fmt = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  const reportDate = `${fmt(since)} – ${fmt(new Date())} UTC`;
   const MAX_ROWS = 150;
 
   const reviewFlag = backlog.length > 0 ? ` — ${backlog.length} awaiting review` : "";
   const subject =
     rows.length === 0 && backlog.length === 0
-      ? `CongTrade daily report — no new filings (${reportDate})`
+      ? `CongTrade daily report — nothing new (${reportDate})`
       : `CongTrade daily report — ${successful.length} published${reviewFlag} (${reportDate})`;
 
   const html = `
     <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111;">
       <h2 style="margin-bottom:4px;">CongTrade — daily ingest report</h2>
-      <p style="color:#666;margin-top:0;">New PTR filings filed on ${reportDate}.</p>
+      <p style="color:#666;margin-top:0;">PTR filings newly published since the last report — ${reportDate}.</p>
 
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <tr>
@@ -125,11 +175,15 @@ async function main() {
           <td style="padding:10px;background:#f5f5f5;border-radius:0 6px 6px 0;"><strong style="font-size:20px;">${totalNewTransactions.toLocaleString()}</strong><br/><span style="color:#666;font-size:12px;">New transactions</span></td>
         </tr>
       </table>
-      <p style="color:#666;font-size:13px;">House: ${houseCount} · Senate: ${senateCount}</p>
+      <p style="color:#666;font-size:13px;">House: ${houseCount} · Senate: ${senateCount}${
+        reprocessedOlder > 0
+          ? ` · plus ${reprocessedOlder} older filing${reprocessedOlder === 1 ? "" : "s"} re-processed (not listed — older than ${NEWS_WINDOW_DAYS} days)`
+          : ""
+      }</p>
 
       ${
         rows.length === 0
-          ? `<p>No new filings were filed on ${reportDate}.</p>`
+          ? `<p>No new filings appeared in this window.</p>`
           : `
       <h3 style="margin-bottom:4px;color:#0a7d3c;">Published (${successful.length})</h3>
       <p style="color:#666;font-size:13px;margin-top:0;">Native text parse succeeded, or already hand-verified. Live on the site.</p>
@@ -173,13 +227,13 @@ async function main() {
           : ""
       }
 
-      <p style="margin-top:24px;"><a href="https://congress-trade-tracker-rose.vercel.app" style="color:#0070f3;">View CongTrade</a></p>
+      <p style="margin-top:24px;"><a href="${SITE_URL}" style="color:#0070f3;">View CongTrade</a></p>
     </div>
   `;
 
   const text = `CongTrade daily ingest report — ${reportDate}
 
-New filings: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})
+New filings: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})${reprocessedOlder ? `\nOlder filings re-processed: ${reprocessedOlder}` : ""}
 Published: ${successful.length}
 Errors: ${undefinedRows.length}
 New transactions: ${totalNewTransactions}
@@ -191,8 +245,21 @@ ${reviewTextLines(backlog, MAX_ROWS)}
 Publish a reviewed filing with:  npm run review:approve -- <docId>
 ${entitlementErrors > 0 ? `\nWARNING: subscription checks failed for ${entitlementErrors} account(s) in the last 2 days — alerts kept sending. See user_entitlements.last_error.\n` : ""}`;
 
-  await sendEmail({ to: REPORT_TO, subject, html, text });
-  console.log(`Sent daily report to ${REPORT_TO}: ${rows.length} new filings (${successful.length} successful, ${undefinedRows.length} undefined).`);
+  if (dryRun) {
+    console.log(`DRY RUN — nothing sent, watermark left at ${since.toISOString()}\n`);
+    console.log(`subject: ${subject}`);
+    console.log(text);
+    return;
+  }
+
+  await sendEmail({ to: reportRecipient(), subject, html, text });
+  // Only now — a send that threw above leaves the watermark where it was, so
+  // the next run re-reports rather than losing a day.
+  await markReportSent();
+  console.log(
+    `Sent daily report to ${reportRecipient()}: ${rows.length} new filing(s) since ${since.toISOString()} ` +
+      `(${successful.length} published, ${undefinedRows.length} errors, ${reprocessedOlder} older re-processed).`
+  );
 }
 
 main().catch((err) => {

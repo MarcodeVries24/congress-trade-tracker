@@ -232,4 +232,26 @@ export const SCHEMA_STATEMENTS = [
     last_error_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // Watermark for the daily report: everything ingested after this instant is
+  // what the next report covers.
+  //
+  // The report used to select on `filing_date = CURRENT_DATE - 1`, which
+  // silently missed almost everything. A filing is *discovered* long after it
+  // is filed — the House Clerk publishes on its own schedule — so a document
+  // filed on the 22nd might not be ingested until late on the 23rd, by which
+  // point the report for the 22nd had already run and the report for the 23rd
+  // is looking at a different filing_date. Such filings were never reported at
+  // all: in one 45-day sample only 6 filings were ingested within 24h of their
+  // filing date.
+  //
+  // A fixed "last 24 hours" window would not fix it either, because GitHub's
+  // scheduled runs drift by hours (3.5h observed), which would reopen the same
+  // gap. A watermark is exact regardless of when the job actually runs, and it
+  // only moves after the email is sent, so a failed run re-reports rather than
+  // skipping a day.
+  `CREATE TABLE IF NOT EXISTS report_runs (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE,
+    last_report_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT report_runs_singleton CHECK (id)
+  )`,
 ];

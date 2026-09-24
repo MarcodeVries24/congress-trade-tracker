@@ -41,21 +41,27 @@ export interface ReviewItem {
 }
 
 /**
- * @param since  Only filings filed on/after this ISO date. Omit for the whole
- *               backlog — the daily email shows both: what arrived yesterday,
- *               and everything still outstanding, so a filing you don't get to
- *               on day one doesn't quietly vanish from the report.
+ * @param ingestedSince  Only filings *discovered* after this instant — i.e.
+ *   what is newly in front of you since the last report. Omit for the whole
+ *   backlog; the daily email shows both, so a filing you don't get to on day
+ *   one doesn't quietly vanish from the report.
+ *
+ *   Deliberately keyed on when we ingested the filing, not on its filing_date.
+ *   A scanned filing is usually discovered a day or more after it was filed
+ *   (the House Clerk publishes on its own schedule), so a filing_date window
+ *   would keep missing exactly the documents this queue exists to surface —
+ *   the same bug the report itself had. See report_runs in db/schema.ts.
  */
-export async function getReviewQueue(since?: string): Promise<ReviewItem[]> {
+export async function getReviewQueue(ingestedSince?: string | Date): Promise<ReviewItem[]> {
   const rows = (await sql.query(
     `SELECT f.doc_id, f.chamber, f.member_name, f.state_district, f.filing_date,
             f.parse_status, f.transaction_count AS draft_transactions, f.pdf_url,
             (SELECT COUNT(*)::int FROM parse_issues pi WHERE pi.doc_id = f.doc_id) AS issue_count
      FROM filings f
      WHERE f.parse_status = ANY($1)
-       ${since ? "AND NULLIF(f.filing_date, '')::date >= $2::date" : ""}
+       ${ingestedSince ? "AND f.ingested_at > $2::timestamptz" : ""}
      ORDER BY f.filing_date DESC, f.member_name`,
-    since ? [REVIEW_STATUSES, since] : [REVIEW_STATUSES]
+    ingestedSince ? [REVIEW_STATUSES, ingestedSince] : [REVIEW_STATUSES]
   )) as ReviewItem[];
   return rows;
 }
@@ -155,17 +161,17 @@ export function reviewTextLines(backlog: ReviewItem[], maxRows = 150): string {
     .join("\n");
 }
 
-/** CLI: `npm run review:queue [-- --since=2026-09-01]` */
+/** CLI: `npm run review:queue [-- --since=2026-09-01]` (--since filters on when we ingested it) */
 async function main() {
   const since = process.argv.slice(2).find((a) => a.startsWith("--since="))?.split("=")[1];
   const items = await getReviewQueue(since);
 
   if (items.length === 0) {
-    console.log(since ? `Nothing awaiting review since ${since}.` : "Nothing awaiting review — the queue is empty.");
+    console.log(since ? `Nothing ingested since ${since} is awaiting review.` : "Nothing awaiting review — the queue is empty.");
     return;
   }
 
-  console.log(`${items.length} filing(s) awaiting pixel-by-pixel review${since ? ` (filed since ${since})` : ""}:\n`);
+  console.log(`${items.length} filing(s) awaiting pixel-by-pixel review${since ? ` (ingested since ${since})` : ""}:\n`);
   for (const i of items) {
     const draft = i.parse_status === "ocr" ? `${i.draft_transactions} draft row(s)` : "no rows read";
     console.log(

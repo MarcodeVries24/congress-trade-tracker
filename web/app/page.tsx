@@ -15,6 +15,7 @@ import {
 import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AmericanFlag } from "@/components/AmericanFlag";
+import { SentimentRiver } from "@/components/SentimentRiver";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AdSlot } from "@/components/AdSlot";
@@ -97,6 +98,8 @@ export default function Home() {
           </div>
         )}
         {stats && <p className="mb-4 border-x border-transparent px-4 text-[11px] leading-snug text-ink-faint sm:mb-6">{VOLUME_ESTIMATE_NOTE}</p>}
+
+        <SentimentRiver />
 
         <div className="mb-6 sm:mb-8">
           <AdSlot />

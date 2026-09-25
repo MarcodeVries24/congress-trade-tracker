@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { buildAlertConditions } from "@/lib/alertFilters";
+import { ALERT_FROM_SQL, buildAlertConditions } from "@/lib/alertFilters";
 import { getMemberSlugsByName } from "@/lib/members";
 import { hasFeatureServer } from "@/lib/access";
 
@@ -114,15 +114,14 @@ export async function GET(req: NextRequest) {
   const limitPlaceholder = `$${dataParams.length - 1}`;
   const offsetPlaceholder = `$${dataParams.length}`;
 
-  // Most House OCR rows have an asset name but no ticker (see
-  // ocrHousePtr.ts) — asset_name_tickers resolves those to a ticker once
-  // (syncMarketCaps.ts) so they can still match a market cap; a row with
-  // neither a direct nor resolved ticker, or one Finnhub had no cap for,
-  // surfaces as market_cap = NULL ("Undefined" in the UI, not zero).
-  const marketCapJoin = `
-       LEFT JOIN asset_name_tickers ant ON (t.ticker IS NULL OR t.ticker = '') AND ant.asset_name = t.asset_name
-       LEFT JOIN company_market_caps cmc ON cmc.ticker = COALESCE(NULLIF(t.ticker, ''), ant.ticker)`;
-
+  // Both queries take their FROM clause from the same place the conditions
+  // above came from. They used to differ — the count query joined only the
+  // market-cap tables, which was fine while nothing filtered on a member
+  // column, and broke the moment party and state did: the row query returned
+  // results and the count beside it 500'd on a missing FROM-clause entry.
+  // ALERT_FROM_SQL is by definition the set of joins buildAlertConditions
+  // expects, including the asset_name_tickers hop that lets an OCR row with
+  // no ticker of its own still match a market cap.
   const [dataRows, countRows] = await Promise.all([
     sql.query(
       `SELECT t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
@@ -131,24 +130,13 @@ export async function GET(req: NextRequest) {
               COALESCE(mh.state, mr.state) AS member_state,
               cmc.market_cap, cmc.company_name,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
-       FROM transactions t
-       JOIN filings f ON f.doc_id = t.doc_id
-       LEFT JOIN members_reference mr ON mr.state_district = t.state_district
-       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
-       ${marketCapJoin}
+       ${ALERT_FROM_SQL}
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams
     ),
-    sql.query(
-      `SELECT COUNT(*)::int as count
-       FROM transactions t
-       JOIN filings f ON f.doc_id = t.doc_id
-       ${marketCapJoin}
-       ${where}`,
-      params
-    ),
+    sql.query(`SELECT COUNT(*)::int as count ${ALERT_FROM_SQL} ${where}`, params),
   ]);
 
   const total = (countRows as { count: number }[])[0]?.count ?? 0;

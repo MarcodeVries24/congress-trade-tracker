@@ -55,7 +55,7 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
   }, [open]);
 
   return (
-    <span ref={ref} className="relative inline-flex align-middle">
+    <span ref={ref} className="relative inline-block align-baseline">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -63,9 +63,20 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
         aria-controls={id}
         aria-label={label}
         title={text}
-        className="relative -top-px ml-[3px] inline-flex h-[1.05em] w-[1.05em] shrink-0 items-center justify-center rounded-full border border-line-strong font-semibold leading-none text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-muted"
+        // Sized and seated to the figure it annotates rather than to the line
+        // box: 0.72em is the cap height of this typeface, so the ring matches
+        // the height of "$3.6B" beside it, and its bottom sits on the same
+        // baseline. The glyph is taken out of flow so the button has no inline
+        // baseline of its own to be aligned by — without that, the flex item's
+        // baseline governs and the ring floats. The single pixel back up is
+        // measured, not guessed: without it the ring lands 1px under the
+        // baseline in this typeface.
+        //
+        // before:-inset-2 restores a finger-sized target around a ring that is
+        // only ~9px across at this text size.
+        className="relative -top-px ml-[3px] inline-block h-[0.72em] w-[0.72em] shrink-0 rounded-full border border-line-strong align-baseline text-ink-faint transition-colors before:absolute before:-inset-2 before:content-[''] hover:border-ink-faint hover:text-ink-muted"
       >
-        <span className="text-[0.66em] leading-none">i</span>
+        <span className="absolute inset-0 flex items-center justify-center text-[0.52em] font-semibold leading-none">i</span>
       </button>
       {open && (
         <span

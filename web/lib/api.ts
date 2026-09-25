@@ -150,10 +150,15 @@ export interface TradeFilters {
   chamber?: string[];
   q?: string;
   members?: string[];
+  parties?: string[];
+  /** Two-letter state/territory codes, matched against the member's state. */
+  states?: string[];
   tickers?: string[];
   types?: string[];
   owners?: string[];
   assetTypes?: string[];
+  /** Matches when the disclosed bracket's floor is at least this much. */
+  minAmount?: number;
   amountRanges?: string[];
   marketCapTiers?: string[];
   filedStatus?: "late" | "onTime";

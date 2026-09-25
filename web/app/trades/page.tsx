@@ -28,7 +28,7 @@ import {
 import Link from "next/link";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
-import { AlertFilters } from "@/lib/alertFilters";
+import { AlertFilters, ALERT_PARTIES, MIN_AMOUNT_OPTIONS, US_STATES } from "@/lib/alertFilters";
 import { alertUpgradeHref } from "@/lib/alertsClient";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { MultiSelect } from "@/components/MultiSelect";
@@ -153,10 +153,13 @@ export default function Home() {
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [members, setMembers] = useState<string[]>([]);
+  const [parties, setParties] = useState<string[]>([]);
+  const [states, setStates] = useState<string[]>([]);
   const [tickers, setTickers] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [owners, setOwners] = useState<string[]>([]);
   const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
+  const [minAmount, setMinAmount] = useState<number | "">("");
   const [amountRanges, setAmountRanges] = useState<string[]>([]);
   const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
   const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
@@ -194,10 +197,13 @@ export default function Home() {
       chamber: chamber === "both" ? ["house", "senate"] : [chamber],
       q: debouncedQ || undefined,
       members: members.length ? members : undefined,
+      parties: parties.length ? parties : undefined,
+      states: states.length ? states : undefined,
       tickers: tickers.length ? tickers : undefined,
       types: types.length ? types : undefined,
       owners: owners.length ? owners : undefined,
       assetTypes: assetTypes.length ? assetTypes : undefined,
+      minAmount: minAmount || undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
       marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
       filedStatus: filedStatus || undefined,
@@ -212,10 +218,13 @@ export default function Home() {
       chamber,
       debouncedQ,
       members,
+      parties,
+      states,
       tickers,
       types,
       owners,
       assetTypes,
+      minAmount,
       amountRanges,
       marketCapTiers,
       filedStatus,
@@ -249,15 +258,33 @@ export default function Home() {
       q: debouncedQ || undefined,
       chambers: chamber === "both" ? undefined : [chamber],
       members: members.length ? members : undefined,
+      parties: parties.length ? parties : undefined,
+      states: states.length ? states : undefined,
       tickers: tickers.length ? tickers : undefined,
       types: types.length ? types : undefined,
       owners: owners.length ? owners : undefined,
       assetTypes: assetTypesAreDefault ? undefined : assetTypes.length ? assetTypes : undefined,
+      minAmount: minAmount || undefined,
       amountRanges: amountRanges.length ? amountRanges : undefined,
       marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
       filedStatus: filedStatus || undefined,
     }),
-    [debouncedQ, chamber, members, tickers, types, owners, assetTypes, assetTypesAreDefault, amountRanges, marketCapTiers, filedStatus]
+    [
+      debouncedQ,
+      chamber,
+      members,
+      parties,
+      states,
+      tickers,
+      types,
+      owners,
+      assetTypes,
+      assetTypesAreDefault,
+      minAmount,
+      amountRanges,
+      marketCapTiers,
+      filedStatus,
+    ]
   );
 
   useEffect(() => {
@@ -266,10 +293,13 @@ export default function Home() {
     chamber,
     debouncedQ,
     members,
+    parties,
+    states,
     tickers,
     types,
     owners,
     assetTypes,
+    minAmount,
     amountRanges,
     marketCapTiers,
     filedStatus,
@@ -330,8 +360,10 @@ export default function Home() {
   }
 
   const activeFilterCount =
-    [dateFrom, dateTo, filedStatus].filter(Boolean).length +
+    [dateFrom, dateTo, filedStatus, minAmount].filter(Boolean).length +
     members.length +
+    parties.length +
+    states.length +
     tickers.length +
     types.length +
     owners.length +
@@ -343,15 +375,32 @@ export default function Home() {
   function clearFilters() {
     setChamber("both");
     setMembers([]);
+    setParties([]);
+    setStates([]);
     setTickers([]);
     setTypes([]);
     setOwners([]);
     setAssetTypes(DEFAULT_ASSET_TYPES);
     setMarketCapTiers([]);
+    setMinAmount("");
     setAmountRanges([]);
     setFiledStatus("");
     setDateFrom("");
     setDateTo("");
+  }
+
+  // "At least $X" and "exactly these brackets" are two ways of saying the
+  // same thing, and setting both can only ever narrow to nothing — the alert
+  // editor stops that with an explicit mode toggle, which is more chrome than
+  // a filter bar can spare, so each simply clears the other.
+  function pickMinAmount(value: number | "") {
+    setMinAmount(value);
+    if (value) setAmountRanges([]);
+  }
+
+  function pickAmountRanges(values: string[]) {
+    setAmountRanges(values);
+    if (values.length) setMinAmount("");
   }
 
   function applyDatePreset(days: number) {
@@ -489,6 +538,18 @@ export default function Home() {
                   loading={optionsLoading}
                 />
               </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
+                <MultiSelect placeholder="Any party" selected={parties} onChange={setParties} options={ALERT_PARTIES} />
+              </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-40">
+                <SearchableMultiSelect
+                  placeholder="Any state"
+                  searchPlaceholder="Type a state…"
+                  selected={states}
+                  onChange={setStates}
+                  options={US_STATES}
+                />
+              </GatedFilter>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <MultiSelect
@@ -529,11 +590,26 @@ export default function Home() {
                   options={Object.entries(OWNER_LABELS).map(([value, label]) => ({ value, label }))}
                 />
               </GatedFilter>
+              <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-auto">
+                <Select
+                  aria-label="Minimum trade size"
+                  value={minAmount === "" ? "" : String(minAmount)}
+                  onChange={(e) => pickMinAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  active={minAmount !== ""}
+                >
+                  <option value="">Any size</option>
+                  {MIN_AMOUNT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </GatedFilter>
               <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-48">
                 <MultiSelect
-                  placeholder="Any trade size"
+                  placeholder="Exact brackets"
                   selected={amountRanges}
-                  onChange={setAmountRanges}
+                  onChange={pickAmountRanges}
                   options={AMOUNT_RANGES.map((r) => ({ value: r, label: r }))}
                 />
               </GatedFilter>

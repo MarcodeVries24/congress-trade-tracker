@@ -30,6 +30,14 @@ export const FINNHUB = {
   searchUrl: (query: string) => `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}`,
 };
 
+// Finnhub reports a market cap in the *listing's own* currency, so a foreign
+// listing needs converting before it can sit in the same column as a US one
+// (see syncMarketCaps.ts). Finnhub's own /forex/rates is paid-tier, and the
+// ECB feed everyone reaches for first doesn't publish TWD — which the corpus
+// needs, for TSMC. This one is free, needs no key, and carries 160+
+// currencies including TWD, KRW and IDR.
+export const FX_RATES_URL = "https://open.er-api.com/v6/latest/USD";
+
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
   // Same dataset's companion file for members no longer serving (retired,

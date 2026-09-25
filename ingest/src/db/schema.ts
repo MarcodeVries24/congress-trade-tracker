@@ -135,6 +135,15 @@ export const SCHEMA_STATEMENTS = [
     company_name TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // market_cap is always USD. Finnhub reports it in the listing's own
+  // currency, which went unnoticed until /issuers sorted by it and put SK
+  // Hynix above Nvidia: 55 of 2,068 priced tickers — Japanese, Korean,
+  // Taiwanese, Indonesian and Indian listings — held a number in KRW, JPY,
+  // TWD, IDR or INR. This records which currency the figure was converted
+  // *from*, so the same mistake is visible in the data rather than only in
+  // an implausible ranking. NULL for a row written before the conversion
+  // existed, or one whose provider gave no currency.
+  `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS source_currency TEXT`,
   // Most House OCR rows (paper filings — see ocrHousePtr.ts) have an asset
   // name but no ticker, so they'd never match company_market_caps directly.
   // This resolves a name to a ticker *once* (via a name-search API call) and

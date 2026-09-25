@@ -1,6 +1,6 @@
 import "../loadEnv.js";
 import { sql, ensureSchema } from "../db/index.js";
-import { FINNHUB } from "../config.js";
+import { FINNHUB, FX_RATES_URL } from "../config.js";
 
 /**
  * Enriches trades with the *current* market cap of the company traded —
@@ -22,6 +22,14 @@ import { FINNHUB } from "../config.js";
  *  2. refreshMarketCaps — (re)fetches the market cap for every ticker
  *     actually in play (directly extracted, or resolved by name above).
  *     This is the part that actually changes month to month.
+ *
+ * Everything written to company_market_caps.market_cap is USD. Finnhub
+ * reports the figure in the listing's *own* currency, which is easy to miss
+ * because the overwhelming majority of the corpus is US-listed: it surfaced
+ * only when the issuer list was sorted by market cap and put SK Hynix, whose
+ * cap was in won, above Nvidia. Non-USD listings are converted here, and a
+ * listing whose currency can't be converted is left untouched rather than
+ * written in the wrong unit.
  */
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -81,8 +89,58 @@ interface FinnhubSearchResult {
 }
 
 interface FinnhubProfile {
-  marketCapitalization?: number; // in millions USD
+  /** In millions of `currency` — NOT of USD. See toUsdMarketCap. */
+  marketCapitalization?: number;
+  /** The listing's own currency: "USD", "JPY", "KRW", "TWD", … */
+  currency?: string;
   name?: string;
+}
+
+/** Units of the currency per 1 USD, e.g. { JPY: 157.2, KRW: 1368.6 }. */
+type FxRates = Record<string, number>;
+
+/**
+ * Today's rates, or null if they couldn't be fetched.
+ *
+ * Fetched once per run rather than per ticker: they move by fractions of a
+ * percent inside the hour this takes, and a market cap is a rounded headline
+ * figure anyway.
+ */
+async function fetchFxRates(): Promise<FxRates | null> {
+  try {
+    const res = await fetch(FX_RATES_URL);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = (await res.json()) as { result?: string; rates?: FxRates };
+    if (data.result !== "success" || !data.rates || typeof data.rates.EUR !== "number") {
+      throw new Error("unexpected response shape");
+    }
+    return { ...data.rates, USD: 1 };
+  } catch (err) {
+    console.error(`FX rates unavailable (${(err as Error).message}).`);
+    return null;
+  }
+}
+
+/**
+ * A profile's market cap as whole USD.
+ *
+ * Returns undefined — distinct from null — when the figure exists but can't
+ * be trusted in USD: an unknown currency, or a run with no FX rates. The
+ * caller leaves such a ticker's stored value alone rather than overwriting
+ * it with a number in the wrong currency, which is the bug this exists to
+ * prevent. null means the provider genuinely has no cap (a fund, say).
+ */
+function toUsdMarketCap(profile: FinnhubProfile, rates: FxRates | null): number | null | undefined {
+  const millions = profile.marketCapitalization;
+  if (typeof millions !== "number" || millions <= 0) return null;
+
+  const currency = (profile.currency ?? "").toUpperCase();
+  if (currency === "USD") return Math.round(millions * 1_000_000);
+  if (!currency) return undefined;
+
+  const perUsd = rates?.[currency];
+  if (typeof perUsd !== "number" || perUsd <= 0) return undefined;
+  return Math.round((millions * 1_000_000) / perUsd);
 }
 
 async function resolveNewAssetNames(): Promise<void> {
@@ -150,21 +208,42 @@ async function refreshMarketCaps(missingOnly = false): Promise<void> {
     return;
   }
   console.log(`${missingOnly ? "Looking up" : "Refreshing"} market cap for ${rows.length} ticker(s)...`);
+
+  const rates = await fetchFxRates();
+  if (rates) console.log(`FX rates loaded for ${Object.keys(rates).length} currencies.`);
+  else console.warn("  Non-USD listings will be left as they are until rates are available again.");
+
   let updated = 0;
   let noCap = 0;
+  let skipped = 0;
   let failed = 0;
+  const converted = new Map<string, number>();
 
   for (let i = 0; i < rows.length; i++) {
     const ticker = rows[i].ticker;
     try {
       const data = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(ticker));
-      const marketCap = typeof data.marketCapitalization === "number" && data.marketCapitalization > 0 ? Math.round(data.marketCapitalization * 1_000_000) : null;
-      if (marketCap !== null) updated++;
-      else noCap++;
+      const marketCap = toUsdMarketCap(data, rates);
+      if (marketCap === undefined) {
+        // Can't be expressed in USD right now. Writing what the provider
+        // gave would put a figure in yen or won into a column every other
+        // row reads as dollars, so this row is left exactly as it was.
+        skipped++;
+        continue;
+      }
+      if (marketCap !== null) {
+        updated++;
+        const currency = (data.currency ?? "USD").toUpperCase();
+        if (currency !== "USD") converted.set(currency, (converted.get(currency) ?? 0) + 1);
+      } else {
+        noCap++;
+      }
       await sql.query(
-        `INSERT INTO company_market_caps (ticker, market_cap, company_name, updated_at) VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, company_name = EXCLUDED.company_name, updated_at = NOW()`,
-        [ticker, marketCap, data.name ?? null]
+        `INSERT INTO company_market_caps (ticker, market_cap, company_name, source_currency, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, company_name = EXCLUDED.company_name,
+           source_currency = EXCLUDED.source_currency, updated_at = NOW()`,
+        [ticker, marketCap, data.name ?? null, (data.currency ?? "").toUpperCase() || null]
       );
     } catch (err) {
       failed++;
@@ -172,7 +251,14 @@ async function refreshMarketCaps(missingOnly = false): Promise<void> {
     }
     if ((i + 1) % 200 === 0) console.log(`  ...${i + 1}/${rows.length}`);
   }
-  console.log(`Market caps: ${updated} updated, ${noCap} had no cap on file (e.g. a fund, not a company), ${failed} failed.`);
+  console.log(
+    `Market caps: ${updated} updated, ${noCap} had no cap on file (e.g. a fund, not a company), ` +
+      `${skipped} left alone (no usable currency), ${failed} failed.`
+  );
+  if (converted.size) {
+    const summary = [...converted.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}\u00d7${n}`).join(", ");
+    console.log(`  Converted to USD from: ${summary}`);
+  }
 }
 
 async function main() {

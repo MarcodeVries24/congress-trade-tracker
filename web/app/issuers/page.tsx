@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   fetchIssuers,
@@ -30,16 +30,29 @@ const SORT_OPTIONS: { value: string; label: string; sort: SortField; order: "asc
 ];
 
 export default function Issuers() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  // Linked to from the dashboard's "Most Traded Stocks" card, which is ranked
-  // by trade count — open on that ordering rather than resetting.
-  const initialSort = searchParams.get("sort");
-  const initialSortValue = SORT_OPTIONS.find((o) => o.sort === initialSort)?.value ?? "trade_count:desc";
+  // Hydrated from the URL and written back to it, so a refresh or the back
+  // button keeps your place — same arrangement as /trades and /politicians.
+  // ?sort= is also how the dashboard's "Most Traded Stocks" card links here,
+  // so that spelling has to keep working without an ?order= beside it.
+  const initial = useRef(searchParams).current;
 
-  const [q, setQ] = useState("");
-  const [sortValue, setSortValue] = useState(initialSortValue);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [q, setQ] = useState(() => initial.get("q") ?? "");
+  const [sortValue, setSortValue] = useState(() => {
+    const field = initial.get("sort");
+    const order = initial.get("order");
+    return (
+      SORT_OPTIONS.find((o) => o.sort === field && o.order === order)?.value ??
+      SORT_OPTIONS.find((o) => o.sort === field)?.value ??
+      "trade_count:desc"
+    );
+  });
+  const [page, setPage] = useState(() => Math.max(Number(initial.get("page")) || 1, 1));
+  const [pageSize, setPageSize] = useState(() => {
+    const v = Number(initial.get("limit"));
+    return PAGE_SIZE_OPTIONS.includes(v) ? v : 25;
+  });
 
   const [result, setResult] = useState<{ data: IssuerRow[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +62,25 @@ export default function Issuers() {
   const activeSort = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
 
   useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (sortValue !== "trade_count:desc") {
+      params.set("sort", activeSort.sort);
+      params.set("order", activeSort.order);
+    }
+    if (page !== 1) params.set("page", String(page));
+    if (pageSize !== 25) params.set("limit", String(pageSize));
+    const query = params.toString();
+    router.replace(query ? `/issuers?${query}` : "/issuers", { scroll: false });
+  }, [router, debouncedQ, sortValue, activeSort.sort, activeSort.order, page, pageSize]);
+
+  // Not on the first render, which would discard a page number just restored.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      return;
+    }
     setPage(1);
   }, [debouncedQ, sortValue]);
 

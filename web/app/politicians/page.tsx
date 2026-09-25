@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { compactUSD, formatDate } from "@/lib/format";
@@ -40,19 +40,38 @@ function partyColor(party: string | null): string {
 }
 
 export default function Politicians() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  // The dashboard's "Most Active Politicians" / "Top by Trading Volume"
-  // cards link here with ?sort=trade_count or ?sort=volume_sum so the
-  // list opens already sorted the way the card that sent them here
-  // was ranked, instead of always resetting to the default.
-  const initialSort = searchParams.get("sort");
-  const initialSortValue = SORT_OPTIONS.find((o) => o.sort === initialSort)?.value ?? "trade_count:desc";
+  // The whole view is hydrated from the URL and written back to it, so a
+  // refresh or the back button keeps your place. Read once, in the lazy
+  // initialisers below; after that this component owns the state and only
+  // pushes, which is what keeps the two from fighting.
+  //
+  // Sort arrives as ?sort= plus an optional ?order= — the dashboard's "Most
+  // Active Politicians" and "Top by Trading Volume" cards have always linked
+  // here with ?sort=trade_count / ?sort=volume_sum alone, so that spelling
+  // has to keep working on its own.
+  const initial = useRef(searchParams).current;
 
-  const [q, setQ] = useState("");
-  const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
-  const [sortValue, setSortValue] = useState(initialSortValue);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [q, setQ] = useState(() => initial.get("q") ?? "");
+  const [chamber, setChamber] = useState<"house" | "senate" | "both">(() => {
+    const v = initial.get("chamber");
+    return v === "house" || v === "senate" ? v : "both";
+  });
+  const [sortValue, setSortValue] = useState(() => {
+    const field = initial.get("sort");
+    const order = initial.get("order");
+    return (
+      SORT_OPTIONS.find((o) => o.sort === field && o.order === order)?.value ??
+      SORT_OPTIONS.find((o) => o.sort === field)?.value ??
+      "trade_count:desc"
+    );
+  });
+  const [page, setPage] = useState(() => Math.max(Number(initial.get("page")) || 1, 1));
+  const [pageSize, setPageSize] = useState(() => {
+    const v = Number(initial.get("limit"));
+    return PAGE_SIZE_OPTIONS.includes(v) ? v : 25;
+  });
 
   const [result, setResult] = useState<{ data: PoliticianRow[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +80,30 @@ export default function Politicians() {
   const debouncedQ = useDebounced(q);
   const activeSort = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
 
+  // replace(), not push(), so changing a sort doesn't bury the previous page
+  // in history; the browser still restores the last URL on reload. Defaults
+  // are omitted so a plain /politicians link stays plain.
   useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (chamber !== "both") params.set("chamber", chamber);
+    if (sortValue !== "trade_count:desc") {
+      params.set("sort", activeSort.sort);
+      params.set("order", activeSort.order);
+    }
+    if (page !== 1) params.set("page", String(page));
+    if (pageSize !== 25) params.set("limit", String(pageSize));
+    const query = params.toString();
+    router.replace(query ? `/politicians?${query}` : "/politicians", { scroll: false });
+  }, [router, debouncedQ, chamber, sortValue, activeSort.sort, activeSort.order, page, pageSize]);
+
+  // Not on the first render, which would discard a page number just restored.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      return;
+    }
     setPage(1);
   }, [debouncedQ, chamber, sortValue]);
 

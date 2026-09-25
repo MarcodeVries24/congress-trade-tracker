@@ -254,16 +254,19 @@ export const OWNER_LABELS: Record<string, string> = {
 export const NOT_FILED = "Not filed";
 
 /**
- * Shown wherever an "Est. volume" figure appears.
+ * Shown behind the ⓘ wherever an "Est. volume" figure appears.
  *
  * The figure is a derived estimate, not a disclosed number, and a reader who
  * doesn't know that will read it as one — so the method travels with it
  * rather than living only on /about. One constant, because every surface
  * must describe the same arithmetic (see VOLUME_MIDPOINT_SQL in lib/sql.ts,
  * which is the arithmetic).
+ *
+ * Two short sentences, and it does not name the label it hangs off: the
+ * reader is already pointing at it.
  */
 export const VOLUME_ESTIMATE_NOTE =
-  "Trades are disclosed as value brackets, never exact figures \u2014 \u201CEst. volume\u201D sums the midpoint of each disclosed bracket.";
+  "Members disclose a value range, never an exact amount. This adds up the midpoint of each range.";
 
 /**
  * How a row's Owner column should read.

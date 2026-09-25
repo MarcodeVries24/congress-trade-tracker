@@ -63,9 +63,9 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
         aria-controls={id}
         aria-label={label}
         title={text}
-        className="ml-1 inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-muted"
+        className="relative -top-px ml-1 inline-flex h-[1.15em] w-[1.15em] shrink-0 items-center justify-center rounded-full border border-line-strong font-semibold leading-none text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-muted"
       >
-        i
+        <span className="text-[0.66em] leading-none">i</span>
       </button>
       {open && (
         <span

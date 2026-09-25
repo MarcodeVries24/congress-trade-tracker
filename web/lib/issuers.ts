@@ -1,6 +1,7 @@
 import { sql } from "./db";
 import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { ISSUER_SLUG_SQL, issuerSlug } from "./issuerSlug";
+import { assetGroupName } from "./assetGroup";
 import { getTradeFlow, type TradeFlowQuarter } from "./tradeFlow";
 
 /**
@@ -103,6 +104,78 @@ export interface IssuerTrader {
  */
 export function getIssuerTradeFlow(ticker: string): Promise<TradeFlowQuarter[]> {
   return getTradeFlow("t.ticker = $1", [ticker]);
+}
+
+/**
+ * Everything Congress trades that isn't a company with a ticker: municipal
+ * bonds, treasuries, corporate paper, funds, private LLCs. 10,699 rows the
+ * issuer directory couldn't show, because none of them has a symbol to be
+ * keyed on.
+ *
+ * Grouped by the body of the filed name (see assetGroupName), which is an
+ * approximation rather than an identity — the filing writes each maturity and
+ * coupon as its own string, so there is nothing exact to group on.
+ */
+export interface AssetGroup {
+  name: string;
+  /** The asset type most of the group's trades were filed under. */
+  type: string | null;
+  trade_count: number;
+  volume_sum: number;
+  politician_count: number;
+  last_traded: string | null;
+}
+
+export async function getOtherAssetDirectory(): Promise<AssetGroup[]> {
+  const rows = (await sql.query(
+    `SELECT t.asset_name,
+            (ARRAY_AGG(t.asset_type_code ORDER BY t.id))[1] AS type,
+            COUNT(*)::int AS trade_count,
+            ${VOLUME_MIDPOINT_SQL}::float8 AS volume_sum,
+            ${PEOPLE_SQL} AS politician_count,
+            MAX(NULLIF(t.transaction_date, '')) AS last_traded
+     FROM transactions t
+     JOIN filings f ON f.doc_id = t.doc_id
+     WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} AND (t.ticker IS NULL OR btrim(t.ticker) = '')
+     GROUP BY t.asset_name`
+  )) as {
+    asset_name: string;
+    type: string | null;
+    trade_count: number;
+    volume_sum: number;
+    politician_count: number;
+    last_traded: string | null;
+  }[];
+
+  // Folded here rather than in SQL: the rules are a paragraph of regular
+  // expressions, and they have to read the same way in the browser, which
+  // builds the links.
+  const groups = new Map<string, AssetGroup>();
+  for (const row of rows) {
+    const name = assetGroupName(row.asset_name);
+    if (!name) continue;
+    const existing = groups.get(name);
+    if (existing) {
+      existing.trade_count += row.trade_count;
+      existing.volume_sum += Number(row.volume_sum ?? 0);
+      // Distinct members can't be summed across names without double
+      // counting, so this is the widest single spelling, not the true total.
+      existing.politician_count = Math.max(existing.politician_count, row.politician_count);
+      if (row.last_traded && (!existing.last_traded || row.last_traded > existing.last_traded)) {
+        existing.last_traded = row.last_traded;
+      }
+      continue;
+    }
+    groups.set(name, {
+      name,
+      type: row.type,
+      trade_count: row.trade_count,
+      volume_sum: Number(row.volume_sum ?? 0),
+      politician_count: row.politician_count,
+      last_traded: row.last_traded,
+    });
+  }
+  return [...groups.values()].sort((a, b) => b.trade_count - a.trade_count);
 }
 
 /** How many trades an issuer page lists before pointing at the full filter UI. */

@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 // state), and a client component can't export metadata — hence this layout,
 // same arrangement /about uses.
 export const metadata: Metadata = {
-  title: "Issuers — companies Congress trades | CongTrade",
+  title: "Issuers — what Congress trades | CongTrade",
   description:
-    "Every company disclosed in a Congressional stock trade, with how many members have traded it, an estimated volume and its market cap. Built from official Periodic Transaction Reports.",
+    "Every company disclosed in a Congressional stock trade, plus the bonds, treasuries, funds and private holdings that carry no ticker. Built from official Periodic Transaction Reports.",
   alternates: { canonical: "/issuers" },
 };
 

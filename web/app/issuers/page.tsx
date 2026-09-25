@@ -17,6 +17,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Select } from "@/components/Select";
 import { AdSlot } from "@/components/AdSlot";
+import { OtherAssetsTable } from "@/components/OtherAssetsTable";
 
 type SortField = "trade_count" | "volume_sum" | "politician_count" | "market_cap" | "last_traded";
 
@@ -117,11 +118,11 @@ export default function Issuers() {
       <Header />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Issuers — companies Congress trades</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Issuers — what Congress trades</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Every company with a disclosed trade, with how many members have traded it and an estimated volume. Trades are
-            disclosed as value brackets, never exact figures, so the volume shown is the sum of each trade&apos;s disclosed
-            bracket midpoint.
+            Companies first, then everything else — bonds, treasuries, funds and private holdings. Trades are disclosed as
+            value brackets, never exact figures, so the volume shown is the sum of each trade&apos;s disclosed bracket
+            midpoint.
           </p>
         </div>
 
@@ -132,7 +133,7 @@ export default function Issuers() {
         <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-line bg-panel p-4">
           <input
             type="text"
-            placeholder="Search a company or ticker…"
+            placeholder="Search a company, ticker or asset…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="min-w-[180px] flex-1 rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-line-strong"
@@ -151,6 +152,8 @@ export default function Issuers() {
             {error}
           </div>
         )}
+
+        <h2 className="mb-3 text-base font-semibold text-ink sm:text-lg">Companies</h2>
 
         {/* Desktop table */}
         <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
@@ -272,6 +275,8 @@ export default function Issuers() {
             </div>
           </div>
         )}
+
+        <OtherAssetsTable query={debouncedQ} />
 
         <div className="mt-6">
           <AdSlot />

@@ -22,6 +22,7 @@ import {
   Trade,
   TradeFilters,
 } from "@/lib/api";
+import { AlertFilters } from "@/lib/alertFilters";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { MultiSelect } from "@/components/MultiSelect";
 import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
@@ -31,6 +32,7 @@ import { Footer } from "@/components/Footer";
 import { GatedFilter } from "@/components/GatedFilter";
 import { AdSlot } from "@/components/AdSlot";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { AlertCta } from "@/components/AlertCta";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, memberLocation, typeBadge } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
@@ -207,6 +209,38 @@ export default function Home() {
     ]
   );
 
+  // The default view is Stocks-only, not "no filter" — so the asset-type
+  // pills only count toward the active-filter badge (and "Clear filters")
+  // once they've actually been changed from that default.
+  const assetTypesAreDefault =
+    assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
+
+  /**
+   * The same search, in the shape a saved alert takes.
+   *
+   * Two deliberate differences from `filters` above: the filing-date range is
+   * dropped, because an alert is about what arrives next and a window over
+   * past filing dates would silently match nothing forever; and sort/paging
+   * are irrelevant to a match. Asset types are only carried when they differ
+   * from the default Stocks-only view, so the alert isn't silently narrowed
+   * by a default the visitor never chose.
+   */
+  const alertFilters: AlertFilters = useMemo(
+    () => ({
+      q: debouncedQ || undefined,
+      chambers: chamber === "both" ? undefined : [chamber],
+      members: members.length ? members : undefined,
+      tickers: tickers.length ? tickers : undefined,
+      types: types.length ? types : undefined,
+      owners: owners.length ? owners : undefined,
+      assetTypes: assetTypesAreDefault ? undefined : assetTypes.length ? assetTypes : undefined,
+      amountRanges: amountRanges.length ? amountRanges : undefined,
+      marketCapTiers: marketCapTiers.length ? marketCapTiers : undefined,
+      filedStatus: filedStatus || undefined,
+    }),
+    [debouncedQ, chamber, members, tickers, types, owners, assetTypes, assetTypesAreDefault, amountRanges, marketCapTiers, filedStatus]
+  );
+
   useEffect(() => {
     setPage(1);
   }, [
@@ -275,12 +309,6 @@ export default function Home() {
       </th>
     );
   }
-
-  // The default view is Stocks-only, not "no filter" — so the asset-type
-  // pills only count toward the active-filter badge (and "Clear filters")
-  // once they've actually been changed from that default.
-  const assetTypesAreDefault =
-    assetTypes.length === DEFAULT_ASSET_TYPES.length && DEFAULT_ASSET_TYPES.every((t) => assetTypes.includes(t));
 
   const activeFilterCount =
     [dateFrom, dateTo, filedStatus].filter(Boolean).length +
@@ -563,6 +591,20 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Directly under the filters, where the intent already exists: the
+            visitor has just described what they care about, so turning it
+            into an alert is one click and nothing to re-enter. */}
+        <AlertCta
+          filters={alertFilters}
+          // `notifications` as well as `filters`: those are the two slugs the
+          // paid plan actually grants, and the API gate accepts either (see
+          // PRO_FEATURES in lib/access.ts). Checking only `filters` here would
+          // show a paying subscriber the upsell instead of the link.
+          locked={!isSignedIn || (authLoaded && !has({ feature: "notifications" }) && !has({ feature: "filters" }) && !isAdmin)}
+          signedIn={!!isSignedIn}
+          onLockedClick={promptUpgrade}
+        />
 
         {error && (
           <div className="mb-4 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">

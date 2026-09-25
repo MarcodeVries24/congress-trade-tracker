@@ -67,3 +67,37 @@ export function deleteAlert(id: string): Promise<{ ok: true }> {
 export function previewAlert(filters: AlertFilters, signal?: AbortSignal): Promise<AlertPreviewResult> {
   return request("/api/alerts/preview", { method: "POST", body: JSON.stringify({ filters }), signal });
 }
+
+/**
+ * Carries a set of filters from the trades page to the account screen, which
+ * opens the alert editor pre-filled with them.
+ *
+ * Passed through the URL rather than held in memory because the two live on
+ * different pages — and because it survives a sign-in or checkout redirect in
+ * between, which is exactly the path a new subscriber takes.
+ *
+ * The receiving end re-runs normalizeAlertFilters, so a hand-edited or stale
+ * link can only ever produce a valid filter set, never trusted input.
+ */
+export const ALERT_DRAFT_PARAM = "draft";
+
+export function alertDraftHref(filters: AlertFilters): string {
+  const keys = Object.keys(filters);
+  if (keys.length === 0) return "/account";
+  return `/account?${ALERT_DRAFT_PARAM}=${encodeURIComponent(JSON.stringify(filters))}`;
+}
+
+/**
+ * Reads the draft back on /account. Returns undefined when the param is absent
+ * or unparseable — a malformed link opens an empty editor rather than failing.
+ */
+export function readAlertDraft(search: string): AlertFilters | undefined {
+  const raw = new URLSearchParams(search).get(ALERT_DRAFT_PARAM);
+  if (raw === null) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as AlertFilters) : {};
+  } catch {
+    return {};
+  }
+}

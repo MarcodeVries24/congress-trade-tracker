@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ALERT_FREQUENCIES, describeAlert } from "@/lib/alertFilters";
-import { AlertsResponse, SavedAlert, createAlert, deleteAlert, fetchAlerts, updateAlert } from "@/lib/alertsClient";
+import { AlertFilters, summarizeAlert } from "@/lib/alertFilters";
+import { AlertsResponse, SavedAlert, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
 import { AlertDraft, AlertEditor } from "./AlertEditor";
 
@@ -31,9 +32,24 @@ export function AlertsManager() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Filters handed over from the trades page (see AlertCta). Read from
+  // window rather than useSearchParams so this component never forces a
+  // Suspense boundary on the page that renders it.
+  const [draft, setDraft] = useState<AlertFilters | undefined>(undefined);
+
   useEffect(() => {
+    const handover = readAlertDraft(window.location.search);
     fetchAlerts()
-      .then(setState)
+      .then((loaded) => {
+        setState(loaded);
+        // Only open the editor for someone who can actually save — a free
+        // visitor arriving on this link sees the upsell instead of a form
+        // that would 403 on submit.
+        if (handover && loaded.isPro) {
+          setDraft(handover);
+          setEditing("new");
+        }
+      })
       .catch((err: Error) => setLoadError(err.message));
   }, []);
 
@@ -49,6 +65,7 @@ export function AlertsManager() {
         setState((s) => (s ? { ...s, alerts: s.alerts.map((a) => (a.id === alert.id ? alert : a)) } : s));
       }
       setEditing(null);
+      setDraft(undefined);
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -231,10 +248,21 @@ export function AlertsManager() {
 
       {editing && (
         <AlertEditor
-          initial={editing === "new" ? undefined : { name: editing.name, frequency: editing.frequency, filters: editing.filters }}
+          existing={editing !== "new"}
+          initial={
+            editing === "new"
+              ? // A handover from the trades page arrives with a suggested
+                // name already written from its own criteria, so the whole
+                // thing is one click from saved.
+                draft && { name: summarizeAlert(draft).slice(0, 80), frequency: "instant" as const, filters: draft }
+              : { name: editing.name, frequency: editing.frequency, filters: editing.filters }
+          }
           saving={saving}
           error={saveError}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            setEditing(null);
+            setDraft(undefined);
+          }}
           onSave={handleSave}
         />
       )}

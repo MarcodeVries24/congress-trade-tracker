@@ -56,12 +56,20 @@ const inputClass =
 
 export function AlertEditor({
   initial,
+  existing = false,
   saving,
   error,
   onCancel,
   onSave,
 }: {
   initial?: { name: string; frequency: AlertFrequency; filters: AlertFilters };
+  /**
+   * Whether this is an edit of a saved alert, as opposed to a new one that
+   * merely arrives pre-filled — a draft handed over from the trades page has
+   * `initial` values but is still a *create*, and labelling it "Edit alert"
+   * would be a lie about what the button does.
+   */
+  existing?: boolean;
   saving: boolean;
   error: string | null;
   onCancel: () => void;
@@ -170,7 +178,7 @@ export function AlertEditor({
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-panel px-4 py-3 sm:rounded-t-xl sm:px-6">
           <h2 id="alert-editor-title" className="text-base font-bold tracking-tight text-ink">
-            {initial ? "Edit alert" : "New alert"}
+            {existing ? "Edit alert" : "New alert"}
           </h2>
           <button type="button" onClick={onCancel} aria-label="Close" className="rounded-md px-2 py-1 text-ink-faint hover:bg-panel-muted hover:text-ink">
             ✕
@@ -368,7 +376,7 @@ export function AlertEditor({
             onClick={() => onSave({ name: name.trim(), frequency, filters })}
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? "Saving…" : initial ? "Save changes" : "Create alert"}
+            {saving ? "Saving…" : existing ? "Save changes" : "Create alert"}
           </button>
         </div>
       </div>

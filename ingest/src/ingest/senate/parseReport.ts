@@ -48,6 +48,25 @@ function parseAmountRange(range: string): { low: number | null; high: number | n
  * Returns null if the page doesn't have the expected transactions table
  * (e.g. a paper/scanned filing rendered as an embedded image instead).
  */
+/**
+ * The eFD Ticker column holds one symbol per row — except on an exchange,
+ * where it holds two: the security given up and the one received, e.g.
+ * "T WBD" for AT&T exchanged into Warner Bros. Discovery, or "-- WBD" when
+ * the old symbol isn't known. Those went into the database verbatim, so 23
+ * rows carried a ticker that matches no security and could never be filtered,
+ * charted or priced.
+ *
+ * The received symbol is the one to keep: it is what the member holds
+ * afterwards, it is always present (the other side is sometimes just "--"),
+ * and it is the security the asset name describes as "(Received)".
+ *
+ * "--" alone still means no ticker, as before.
+ */
+export function normalizeTickerCell(cell: string | undefined): string | null {
+  const parts = (cell ?? "").trim().split(/\s+/).filter((p) => p && p !== "--");
+  return parts.length ? parts[parts.length - 1] : null;
+}
+
 export async function parseSenateReportPage(page: Page): Promise<SenateTransaction[] | null> {
   const hasTable = await page.locator("table thead th", { hasText: "Transaction Date" }).count();
   if (hasTable === 0) return null;
@@ -68,7 +87,7 @@ export async function parseSenateReportPage(page: Page): Promise<SenateTransacti
     const typeKey = typeCell.trim().toLowerCase();
     const transactionType = TYPE_MAP[typeKey] ?? typeCell;
 
-    const ticker = tickerCell && tickerCell !== "--" ? tickerCell : null;
+    const ticker = normalizeTickerCell(tickerCell);
     const { low, high } = parseAmountRange(amountCell);
 
     transactions.push({

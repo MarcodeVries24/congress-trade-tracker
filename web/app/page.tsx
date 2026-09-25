@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  amountLabel,
   displayAssetName,
   DashboardData,
   displayName,
@@ -153,7 +154,7 @@ export default function Home() {
                         </div>
                         <div className="shrink-0 whitespace-nowrap text-right">
                           <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
-                          <div className="mt-1 text-xs text-ink-muted">{compactAmountRange(trade.amount_low, trade.amount_high, trade.amount_range)}</div>
+                          <div className="mt-1 text-xs text-ink-muted">{compactAmountRange(trade.amount_low, trade.amount_high, amountLabel(trade.amount_range))}</div>
                         </div>
                       </Link>
                     </li>
@@ -265,7 +266,7 @@ export default function Home() {
                         <div className="truncate text-xs text-ink-faint">{trade.ticker ?? displayAssetName(trade)}</div>
                       </div>
                       <div className="shrink-0 whitespace-nowrap text-right text-xs font-medium text-ink-muted">
-                        {compactAmountRange(trade.amount_low, trade.amount_high, trade.amount_range)}
+                        {compactAmountRange(trade.amount_low, trade.amount_high, amountLabel(trade.amount_range))}
                       </div>
                     </Link>
                   </li>

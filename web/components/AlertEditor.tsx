@@ -12,6 +12,7 @@ import {
   US_STATES,
 } from "@/lib/alertFilters";
 import {
+  amountLabel,
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
   MARKET_CAP_TIERS,
@@ -350,7 +351,7 @@ export function AlertEditor({
                       <span className={`rounded border px-1.5 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
                       <span className="font-medium text-ink">{displayName(row.member_name)}</span>
                       <span>{row.ticker || displayAssetName(row)}</span>
-                      <span>{compactAmountRange(row.amount_low, row.amount_high, row.amount_range ?? "—")}</span>
+                      <span>{compactAmountRange(row.amount_low, row.amount_high, amountLabel(row.amount_range))}</span>
                       <span className="text-ink-faint">filed {formatDate(row.filing_date)}</span>
                     </li>
                   );

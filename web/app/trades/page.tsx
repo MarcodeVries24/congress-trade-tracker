@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import {
+  amountLabel,
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
   displayAssetName,
@@ -16,6 +17,7 @@ import {
   formatMarketCap,
   marketCapTierLabel,
   MARKET_CAP_TIERS,
+  ownerLabel,
   OWNER_LABELS,
   PAGE_SIZE_OPTIONS,
   Stats,
@@ -708,11 +710,11 @@ export default function Home() {
                           {badge.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-ink-muted">{OWNER_LABELS[trade.owner ?? "self"] ?? trade.owner}</td>
+                      <td className="px-4 py-3 text-ink-muted">{ownerLabel(trade.owner)}</td>
                       <td className="px-4 py-3 text-ink-muted">
                         <div className="flex items-center gap-2">
                           <SizeIndicator amountLow={trade.amount_low} />
-                          <span className="whitespace-nowrap">{trade.amount_range}</span>
+                          <span className="whitespace-nowrap">{amountLabel(trade.amount_range)}</span>
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(trade.transaction_date)}</td>
@@ -799,7 +801,7 @@ export default function Home() {
                       <div className="text-ink-faint">Amount</div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-ink-muted">
                         <SizeIndicator amountLow={trade.amount_low} />
-                        {trade.amount_range}
+                        {amountLabel(trade.amount_range)}
                       </div>
                     </div>
                     <div>

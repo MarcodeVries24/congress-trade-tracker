@@ -1,5 +1,6 @@
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { describeAlert } from "../../../web/lib/alertFilters";
+import { amountLabel } from "../../../web/lib/api";
 
 /**
  * The alert email itself.
@@ -93,7 +94,7 @@ export function alertEmailHtml(input: AlertEmailInput): string {
           <div style="font-size:14px;color:#111;margin-top:6px;">
             <span style="color:${type.color};font-weight:600;">${type.label}</span>
             &nbsp;${escapeHtml(assetLabel(row))}
-            &nbsp;<span style="color:#555;">${escapeHtml(row.amount_range ?? "\u2014")}</span>
+            &nbsp;<span style="color:#555;">${escapeHtml(amountLabel(row.amount_range))}</span>
           </div>
           <div style="font-size:12px;color:#888;margin-top:4px;">
             traded ${formatDate(row.transaction_date)} · filed ${formatDate(row.filing_date)} ·
@@ -141,7 +142,7 @@ export function alertEmailText(input: AlertEmailInput): string {
   const lines = shown.map((row) => {
     const type = typeLabel(row.transaction_type).label;
     return `  ${displayName(row.member_name)} (${row.chamber === "house" ? "House" : "Senate"})
-    ${type}  ${assetLabel(row)}  ${row.amount_range ?? "—"}
+    ${type}  ${assetLabel(row)}  ${amountLabel(row.amount_range)}
     traded ${formatDate(row.transaction_date)}, filed ${formatDate(row.filing_date)}
     ${row.pdf_url}`;
   });

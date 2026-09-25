@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { AdSlot } from "@/components/AdSlot";
-import { ASSET_TYPE_LABELS, OWNER_LABELS, displayAssetName } from "@/lib/api";
+import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel } from "@/lib/api";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getMemberBySlug, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 
@@ -149,8 +149,8 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                     <td className="px-4 py-3">
                       <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-ink-muted">{t.owner ? (OWNER_LABELS[t.owner] ?? t.owner) : "Self"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{t.amount_range ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs text-ink-muted">{ownerLabel(t.owner)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{amountLabel(t.amount_range)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{formatDate(t.transaction_date)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
                       {formatDate(t.filing_date)}
@@ -182,7 +182,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                       {t.ticker && <span className="text-ink-muted">{t.ticker}</span>}
                       {t.ticker && t.asset_type_code && " · "}
                       {t.asset_type_code && (ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code)}
-                      {t.owner && ` · ${OWNER_LABELS[t.owner] ?? t.owner}`}
+                      {t.owner && ` · ${ownerLabel(t.owner)}`}
                     </div>
                   </div>
                   <span className={`shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium ${badge.className}`}>
@@ -190,7 +190,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
-                  <span className="text-ink">{t.amount_range ?? "—"}</span>
+                  <span className="text-ink">{amountLabel(t.amount_range)}</span>
                   <span>traded {formatDate(t.transaction_date)}</span>
                   <span className="text-ink-faint">
                     filed {formatDate(t.filing_date)}

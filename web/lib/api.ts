@@ -10,7 +10,7 @@ export interface Trade {
   transaction_type: string;
   transaction_date: string | null;
   notification_date: string | null;
-  amount_range: string;
+  amount_range: string | null;
   amount_low: number | null;
   amount_high: number | null;
   filing_date: string | null;
@@ -224,6 +224,46 @@ export const OWNER_LABELS: Record<string, string> = {
   SP: "Spouse",
   DC: "Dependent Child",
 };
+
+/**
+ * Shown wherever a disclosure simply doesn't carry the value — as opposed to
+ * a value we have and chose not to render. Deliberately not "—" or blank: an
+ * empty cell reads like a rendering bug and invites the reader to assume a
+ * default, whereas this says the gap is in the filing itself.
+ *
+ * Distinct from "(unreadable)", which is a real stored amount_range meaning
+ * the opposite: the member *did* disclose, and the scan defeated us.
+ */
+export const NOT_FILED = "Not filed";
+
+/**
+ * How a row's Owner column should read.
+ *
+ * NULL is *not* a gap: the House PTR's owner box is left blank when the asset
+ * is the filer's own, which is why the Pro owner filter maps "self" to
+ * `t.owner IS NULL` (see alertFilters.ts). Only SP/DC/JT are documented
+ * (https://fd.house.gov), so anything else is a value we can't interpret —
+ * 777 rows across 14 of Diana Harshbarger's 2022-23 filings carry a bare
+ * "O", which no current parser can even emit — and printing the raw code
+ * puts a meaningless letter in front of the reader. Those read as unfiled.
+ */
+export function ownerLabel(owner: string | null): string {
+  if (owner === null || owner.trim() === "") return OWNER_LABELS.self;
+  return OWNER_LABELS[owner] ?? NOT_FILED;
+}
+
+/**
+ * How a row's Amount column should read.
+ *
+ * A missing amount_range means no bracket checkbox was transcribed at all
+ * (287 published rows, nearly all in Ro Khanna's and Michael McCaul's
+ * hand-reviewed filings). A row whose *label* exists but whose amount_high
+ * is NULL is a different thing entirely — the top "over $1,000,000" brackets
+ * are open-ended by design — so this keys on the label, never the bounds.
+ */
+export function amountLabel(amountRange: string | null): string {
+  return amountRange === null || amountRange.trim() === "" ? NOT_FILED : amountRange;
+}
 
 // Reference: https://fd.house.gov/reference/asset-type-codes.aspx
 export const ASSET_TYPE_LABELS: Record<string, string> = {

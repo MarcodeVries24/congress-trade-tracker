@@ -177,7 +177,7 @@ function Dial({ value }: { value: number }) {
   const cy = 60;
   const angle = -Math.PI / 2 + Math.max(-1, Math.min(1, value)) * (Math.PI / 2) * 0.92;
   return (
-    <svg viewBox="0 0 120 72" className="h-14 w-[120px] shrink-0" aria-hidden>
+    <svg viewBox="0 6 120 60" className="h-[52px] w-[104px] shrink-0" aria-hidden>
       <path d={`M${cx - r},${cy} A${r},${r} 0 0 1 ${cx},${cy - r}`} fill="none" stroke="#f43f5e" strokeOpacity="0.3" strokeWidth="10" strokeLinecap="round" />
       <path d={`M${cx},${cy - r} A${r},${r} 0 0 1 ${cx + r},${cy}`} fill="none" stroke="#34d399" strokeOpacity="0.3" strokeWidth="10" strokeLinecap="round" />
       <line x1={cx} y1={cy} x2={(cx + r * 0.78 * Math.cos(angle)).toFixed(1)} y2={(cy + r * 0.78 * Math.sin(angle)).toFixed(1)}
@@ -231,20 +231,20 @@ export function SentimentRiver() {
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-4 sm:flex-col sm:items-end sm:gap-1.5">
-          <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-4 sm:flex-col sm:items-end sm:gap-2.5">
+          <div className="flex items-center gap-2.5">
             <Dial value={reading.value} />
-            <div>
+            <div className="sm:text-right">
               <div className="text-3xl font-bold leading-none tracking-tight sm:text-4xl" style={{ color: sentimentColor(reading.value) }}>
                 {reading.value >= 0 ? "+" : ""}
                 {reading.value.toFixed(2)}
               </div>
-              <div className="mt-1 text-[11px] font-semibold text-ink-muted">
+              <div className="mt-1.5 text-[11px] font-semibold leading-none text-ink-muted">
                 net {reading.value >= 0 ? "buying" : "selling"}
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-ink-faint sm:whitespace-nowrap">
+          <p className="text-[11px] leading-none text-ink-faint sm:whitespace-nowrap sm:text-right">
             {fmt(reading.bought)} bought · {fmt(reading.sold)} sold
           </p>
         </div>

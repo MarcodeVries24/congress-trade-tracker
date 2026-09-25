@@ -99,8 +99,6 @@ export default function Home() {
         )}
         {stats && <p className="mb-4 border-x border-transparent px-4 text-[11px] leading-snug text-ink-faint sm:mb-6">{VOLUME_ESTIMATE_NOTE}</p>}
 
-        <SentimentRiver />
-
         <div className="mb-6 sm:mb-8">
           <AdSlot />
         </div>
@@ -334,6 +332,10 @@ export default function Home() {
               </div>
             )}
           </Card>
+        </div>
+
+        <div className="mt-4 lg:mt-6">
+          <SentimentRiver />
         </div>
       </main>
       <Footer />

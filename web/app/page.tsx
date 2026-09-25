@@ -12,6 +12,7 @@ import {
   Stats,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
+import { memberDisplayName } from "@/lib/memberDisplay";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -154,7 +155,7 @@ export default function Home() {
                       >
                         <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
+                          <div className="truncate text-sm text-ink">{memberDisplayName(trade)}</div>
                           <div className="truncate text-xs text-ink-faint">
                             {trade.ticker ? `${trade.ticker} · ` : ""}
                             {displayAssetName(trade)}
@@ -186,7 +187,7 @@ export default function Home() {
                         <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                           <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                            <div className="truncate text-sm text-ink">{memberDisplayName(p)}</div>
                             <div className="truncate text-xs text-ink-faint">
                               {p.party ? `${p.party} · ` : ""}
                               {location ?? p.chamber}
@@ -216,7 +217,7 @@ export default function Home() {
                         <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                           <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm text-ink">{displayName(p.member_name)}</div>
+                            <div className="truncate text-sm text-ink">{memberDisplayName(p)}</div>
                             <div className="truncate text-xs text-ink-faint">
                               {p.party ? `${p.party} · ` : ""}
                               {location ?? p.chamber}
@@ -270,7 +271,7 @@ export default function Home() {
                     <Link href={tradesSearchHref(trade.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
+                        <div className="truncate text-sm text-ink">{memberDisplayName(trade)}</div>
                         <div className="truncate text-xs text-ink-faint">{trade.ticker ?? displayAssetName(trade)}</div>
                       </div>
                       <div className="shrink-0 whitespace-nowrap text-right text-xs font-medium text-ink-muted">

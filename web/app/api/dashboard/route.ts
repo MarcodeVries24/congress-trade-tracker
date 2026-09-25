@@ -25,7 +25,7 @@ const MEMBER_COLUMNS_GROUPED = `
 const STATE_DISTRICT_GROUPED = `(ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district`;
 const GROUPED_BY_PERSON = `t.member_name, f.bioguide_id, mh.photo_url, mh.party, mh.state, f.chamber`;
 
-const TRADE_COLUMNS = `t.id, t.member_name, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
+const TRADE_COLUMNS = `t.id, t.member_name, f.bioguide_id, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
               t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, cmc.company_name, ${MEMBER_COLUMNS}`;
 
 // One canonical company name per ticker, so the same company isn't shown four
@@ -75,7 +75,7 @@ export async function GET() {
       sql.query(latestUniqueQuery(`AND t.asset_type_code IN (${stockPlaceholders})`), stockValues),
       sql.query(latestUniqueQuery("")),
       sql.query(
-        `SELECT t.member_name, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber, COUNT(*)::int as trade_count
+        `SELECT t.member_name, f.bioguide_id, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
@@ -85,7 +85,7 @@ export async function GET() {
          LIMIT 8`
       ),
       sql.query(
-        `SELECT t.member_name, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber,
+        `SELECT t.member_name, f.bioguide_id, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber,
                 ${VOLUME_MIDPOINT_SQL}::float8 as volume_sum, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id

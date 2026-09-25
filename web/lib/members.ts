@@ -2,6 +2,7 @@ import { sql } from "./db";
 import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { displayName } from "./api";
 import { memberSlug } from "./memberSlug";
+import { cleanName, NAME_NOISE, titleCaseIfShouted } from "./memberDisplay";
 import { MEMBER_DISPLAY_NAMES } from "./memberNames";
 
 // Re-exported so server code has one import for everything member-related.
@@ -34,55 +35,6 @@ export interface MemberDirectoryEntry {
   /** The name the filings alone imply, before any curated override. */
   derivedDisplay: string;
   trades: number;
-}
-
-// Tokens that are form-filling noise rather than part of a name: honorifics
-// and post-nominals that appear in some spellings and not others.
-const NAME_NOISE = /\b(mr|mrs|ms|dr|hon|md|facs|dds|esq)\b/i;
-
-/**
- * Title-cases a name that only ever appears in capitals.
- *
- * Two members — Blumenthal and Feinstein — are filed exclusively as
- * "RICHARD BLUMENTHAL" and "DIANNE FEINSTEIN", so there is no better-cased
- * variant to prefer and shouting them in an <h1> is the only alternative.
- * Applied only when the name carries no case information at all, so a
- * correctly-cased "McCaul" or "DelBene" is never touched.
- */
-function titleCaseIfShouted(name: string): string {
-  if (/[a-z]/.test(name)) return name;
-  return name
-    .toLowerCase()
-    .replace(/(^|[\s('\-])([a-z])/g, (_, lead: string, ch: string) => lead + ch.toUpperCase())
-    .replace(/\bMc([a-z])/g, (_, ch: string) => `Mc${ch.toUpperCase()}`);
-}
-
-/**
- * Strips form-filling noise from a chosen name.
- *
- * Sometimes every spelling is polluted, so picking between them can't help:
- * Neal Dunn is filed only as "Neal Patrick Dunn, MD, FACS" and "Neal Patrick
- * MD, Facs Dunn" — the second with his surname stranded mid-name. Removing the
- * post-nominals makes both read "Neal Patrick Dunn".
- *
- * Only applied when at least two words survive, so a name that is somehow all
- * honorific is left alone rather than emptied.
- */
-function cleanName(name: string): string {
-  const stripped = name
-    .split(/\s+/)
-    .filter((w) => !NAME_NOISE.test(w.replace(/[^A-Za-z]/g, "")))
-    .join(" ")
-    .replace(/\s*,\s*$/, "")
-    .replace(/\s+,/g, ",")
-    .replace(/,+/g, ",")
-    .replace(/\s{2,}/g, " ")
-    .replace(/[,\s]+$/, "")
-    .trim();
-  const words = stripped.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return name;
-  // "Scott Scott Franklin" -> "Scott Franklin"
-  return words.filter((w, i) => i === 0 || w.toLowerCase() !== words[i - 1].toLowerCase()).join(" ");
 }
 
 /**

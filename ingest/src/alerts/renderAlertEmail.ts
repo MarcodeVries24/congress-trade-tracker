@@ -1,6 +1,7 @@
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { describeAlert } from "../../../web/lib/alertFilters";
 import { amountLabel } from "../../../web/lib/api";
+import { memberDisplayName } from "../../../web/lib/memberDisplay";
 
 /**
  * The alert email itself.
@@ -32,10 +33,6 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function displayName(name: string): string {
-  return name.replace(/^Hon\.\s+/, "").trim();
-}
-
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00Z`);
@@ -64,7 +61,7 @@ export function alertEmailSubject(input: Pick<AlertEmailInput, "alertName" | "to
   if (totalMatched === 1 && trades[0]) {
     const row = trades[0];
     const verb = row.transaction_type.toUpperCase().startsWith("P") ? "bought" : row.transaction_type.toUpperCase().startsWith("S") ? "sold" : "exchanged";
-    return `${displayName(row.member_name)} ${verb} ${assetLabel(row)} — ${alertName}`;
+    return `${memberDisplayName(row)} ${verb} ${assetLabel(row)} — ${alertName}`;
   }
   return `${totalMatched} new trades — ${alertName}`;
 }
@@ -89,7 +86,7 @@ export function alertEmailHtml(input: AlertEmailInput): string {
       const where = [row.chamber === "house" ? "House" : "Senate", row.member_state, row.party].filter(Boolean).join(" · ");
       return `<tr>
         <td style="padding:12px 0;border-bottom:1px solid #eee;">
-          <div style="font-size:15px;font-weight:600;color:#111;">${escapeHtml(displayName(row.member_name))}</div>
+          <div style="font-size:15px;font-weight:600;color:#111;">${escapeHtml(memberDisplayName(row))}</div>
           <div style="font-size:12px;color:#888;margin-top:1px;">${escapeHtml(where)}</div>
           <div style="font-size:14px;color:#111;margin-top:6px;">
             <span style="color:${type.color};font-weight:600;">${type.label}</span>
@@ -141,7 +138,7 @@ export function alertEmailText(input: AlertEmailInput): string {
   const shown = trades.slice(0, MAX_ROWS_SHOWN);
   const lines = shown.map((row) => {
     const type = typeLabel(row.transaction_type).label;
-    return `  ${displayName(row.member_name)} (${row.chamber === "house" ? "House" : "Senate"})
+    return `  ${memberDisplayName(row)} (${row.chamber === "house" ? "House" : "Senate"})
     ${type}  ${assetLabel(row)}  ${amountLabel(row.amount_range)}
     traded ${formatDate(row.transaction_date)}, filed ${formatDate(row.filing_date)}
     ${row.pdf_url}`;

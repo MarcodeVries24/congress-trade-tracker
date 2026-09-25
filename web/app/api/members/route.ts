@@ -10,7 +10,7 @@ export async function GET() {
   // story). The displayed state_district is whichever the member's most
   // recent filing reported.
   const rows = await sql.query(
-    `SELECT t.member_name,
+    `SELECT t.member_name, f.bioguide_id,
             (ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district,
             COUNT(*) as trade_count, MAX(t.transaction_date) as last_trade_date
      FROM transactions t

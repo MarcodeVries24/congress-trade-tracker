@@ -2,6 +2,7 @@ export interface Trade {
   id: number;
   doc_id: string;
   member_name: string;
+  bioguide_id: string | null;
   state_district: string | null;
   asset_name: string;
   ticker: string | null;
@@ -51,6 +52,7 @@ export interface Stats {
 export interface DashboardTrade {
   id: number;
   member_name: string;
+  bioguide_id: string | null;
   state_district: string | null;
   asset_name: string;
   ticker: string | null;
@@ -69,6 +71,7 @@ export interface DashboardTrade {
 
 export interface DashboardPolitician {
   member_name: string;
+  bioguide_id: string | null;
   state_district: string | null;
   party: string | null;
   photo_url: string | null;
@@ -79,6 +82,7 @@ export interface DashboardPolitician {
 
 export interface DashboardVolumeLeader {
   member_name: string;
+  bioguide_id: string | null;
   state_district: string | null;
   party: string | null;
   photo_url: string | null;
@@ -496,16 +500,26 @@ export async function fetchStats(chambers?: string[]): Promise<Stats> {
 // Option lists for the searchable Member / Ticker filters — fetched once
 // (not per-keystroke; filtering as the user types happens client-side
 // against this list, same as every other checkbox filter here).
-export async function fetchMemberOptions(): Promise<{ member_name: string; trade_count: number }[]> {
+export async function fetchMemberOptions(): Promise<{ member_name: string; bioguide_id: string | null; trade_count: number }[]> {
   const res = await fetch("/api/members");
   if (!res.ok) throw new Error(`Failed to fetch members: ${res.status}`);
-  const rows: { member_name: string; trade_count: number }[] = (await res.json()).data;
+  const rows: { member_name: string; bioguide_id: string | null; trade_count: number }[] = (await res.json()).data;
   // /api/members groups by (member_name, state_district) — a member who's
   // been redistricted can appear more than once under the same name, which
-  // would otherwise show as duplicate options.
-  const byName = new Map<string, number>();
-  for (const r of rows) byName.set(r.member_name, (byName.get(r.member_name) ?? 0) + r.trade_count);
-  return [...byName.entries()].map(([member_name, trade_count]) => ({ member_name, trade_count })).sort((a, b) => b.trade_count - a.trade_count);
+  // would otherwise show as duplicate options. bioguide_id comes along so the
+  // option can be *labelled* with the curated name while its value stays the
+  // filed spelling the filter actually queries on.
+  const byName = new Map<string, { bioguide_id: string | null; trade_count: number }>();
+  for (const r of rows) {
+    const seen = byName.get(r.member_name);
+    byName.set(r.member_name, {
+      bioguide_id: seen?.bioguide_id ?? r.bioguide_id,
+      trade_count: (seen?.trade_count ?? 0) + r.trade_count,
+    });
+  }
+  return [...byName.entries()]
+    .map(([member_name, v]) => ({ member_name, ...v }))
+    .sort((a, b) => b.trade_count - a.trade_count);
 }
 
 export async function fetchTickerOptions(): Promise<{ ticker: string; trade_count: number }[]> {

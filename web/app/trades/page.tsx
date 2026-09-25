@@ -25,6 +25,7 @@ import {
   TradeFilters,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
+import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters } from "@/lib/alertFilters";
 import { alertUpgradeHref } from "@/lib/alertsClient";
 import { AmericanFlag } from "@/components/AmericanFlag";
@@ -177,7 +178,7 @@ export default function Home() {
   useEffect(() => {
     Promise.all([fetchMemberOptions(), fetchTickerOptions()])
       .then(([memberRows, tickerRows]) => {
-        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: displayName(m.member_name) })));
+        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: memberDisplayName(m) })));
         setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
       })
       .catch(() => {})
@@ -678,9 +679,9 @@ export default function Home() {
                             <button
                               onClick={() => setMembers([trade.member_name])}
                               className="text-left font-medium hover:underline"
-                              title={`Filter to ${displayName(trade.member_name)}`}
+                              title={`Filter to ${memberDisplayName(trade)}`}
                             >
-                              {displayName(trade.member_name)}
+                              {memberDisplayName(trade)}
                             </button>
                             {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
                           </div>
@@ -773,7 +774,7 @@ export default function Home() {
                     <button onClick={() => setMembers([trade.member_name])} className="flex items-center gap-2.5 text-left">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div>
-                        <div className="font-medium">{displayName(trade.member_name)}</div>
+                        <div className="font-medium">{memberDisplayName(trade)}</div>
                         {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
                       </div>
                     </button>

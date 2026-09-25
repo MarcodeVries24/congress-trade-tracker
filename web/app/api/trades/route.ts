@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
 
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
+      `SELECT t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
               COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.state, mr.state) AS member_state,

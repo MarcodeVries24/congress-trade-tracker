@@ -22,6 +22,7 @@ import {
   fetchMemberOptions,
   fetchTickerOptions,
 } from "@/lib/api";
+import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertPreviewResult, previewAlert } from "@/lib/alertsClient";
 import { compactAmountRange, formatDate, typeBadge } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
@@ -102,7 +103,7 @@ export function AlertEditor({
   useEffect(() => {
     Promise.all([fetchMemberOptions(), fetchTickerOptions()])
       .then(([memberRows, tickerRows]) => {
-        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: displayName(m.member_name) })));
+        setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: memberDisplayName(m) })));
         setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
       })
       .catch(() => {})
@@ -349,7 +350,7 @@ export function AlertEditor({
                   return (
                     <li key={row.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-muted">
                       <span className={`rounded border px-1.5 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
-                      <span className="font-medium text-ink">{displayName(row.member_name)}</span>
+                      <span className="font-medium text-ink">{memberDisplayName(row)}</span>
                       <span>{row.ticker || displayAssetName(row)}</span>
                       <span>{compactAmountRange(row.amount_low, row.amount_high, amountLabel(row.amount_range))}</span>
                       <span className="text-ink-faint">filed {formatDate(row.filing_date)}</span>

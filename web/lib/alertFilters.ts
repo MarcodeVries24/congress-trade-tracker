@@ -336,7 +336,7 @@ export function summarizeAlert(filters: AlertFilters): string {
  * The columns an alert's matches are read with — enough to render an email
  * row (or a preview row) without a second query.
  */
-export const ALERT_SELECT_SQL = `t.id, t.doc_id, t.member_name, t.state_district, t.asset_name, t.ticker,
+export const ALERT_SELECT_SQL = `t.id, t.doc_id, t.member_name, f.bioguide_id, t.state_district, t.asset_name, t.ticker,
   t.asset_type_code, t.owner, t.transaction_type, t.transaction_date, t.amount_range, t.amount_low,
   t.amount_high, f.filing_date, f.pdf_url, f.chamber, f.ingested_at,
   COALESCE(mh.party, mr.party) AS party,
@@ -348,6 +348,7 @@ export interface AlertTradeRow {
   id: number;
   doc_id: string;
   member_name: string;
+  bioguide_id: string | null;
   state_district: string | null;
   asset_name: string;
   ticker: string | null;

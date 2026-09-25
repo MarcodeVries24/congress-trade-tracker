@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
@@ -53,6 +53,9 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const member = await getMemberBySlug(slug);
   if (!member) notFound();
+  // An old spelling of this person's name — send them to the canonical URL
+  // rather than serving the same page at two addresses.
+  if (member.redirectTo) redirect(`/politicians/${member.redirectTo}`);
 
   const { profile, trades } = member;
   const tradesHref = `/trades?${profile.names.map((n) => `members=${encodeURIComponent(n)}`).join("&")}`;

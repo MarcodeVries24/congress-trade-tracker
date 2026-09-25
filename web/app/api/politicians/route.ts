@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { groupMembers } from "@/lib/members";
 
 // Same impossible-date guard used across /api/trades, /api/stats, /api/dashboard.
 const VALID_DATE_ORDER = `(
@@ -11,31 +12,36 @@ const VALID_DATE_ORDER = `(
 // /api/dashboard use.
 const VOLUME_EXPR = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
 
-const SORT_EXPRESSIONS: Record<string, string> = {
-  trade_count: "trade_count",
-  volume_sum: "volume_sum",
-  last_filed: "last_filed",
-};
+const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 
 // A politician leaderboard — free/ungated, like /api/members and
-// /api/dashboard. Grouped by (member_name, bioguide_id, chamber) rather than
-// state_district: a redistricted member's older and newer filings carry two
-// different state_district values for the same real person (confirmed on
-// real data — e.g. Nancy Pelosi's CA11 vs CA12 filings both resolve to
-// bioguide P000197), so grouping on state_district split 17 real members
-// into two rows apiece and inflated this leaderboard's count past /api/stats'
-// true distinct-member count. bioguide_id is stable across a member's own
-// filings regardless of district, so it collapses these back into one row;
-// the displayed state_district is simply whichever the member's most recent
-// filing reported, picked via the ordered ARRAY_AGG below. A chamber change
-// (House <-> Senate) still produces two rows deliberately, since that's a
-// real distinguishable phase of a career rather than a district-code split.
+// /api/dashboard.
+//
+// One row per *person*, keyed on bioguide_id. Grouping on the disclosed name
+// doesn't give that: the corpus holds the same member under several spellings
+// because the disclosure sites aren't consistent — Marjorie Taylor Greene as
+// both "Marjorie Taylor Greene" and "Marjorie Taylor Mrs Greene", Scott
+// Franklin four ways, Thomas Kean three, John Boozman once in capitals. Each
+// variant was its own leaderboard row with a share of the trades.
+//
+// bioguide_id is assigned per person and resolved per filing, so it survives
+// spelling drift, honorifics, suffixes and redistricting alike (a redistricted
+// member's filings carry two different state_district values — Pelosi's CA11
+// and CA12 both resolve to P000197). The displayed district is whichever the
+// most recent filing reported.
+//
+// The merge happens in TypeScript rather than SQL, and the query returns every
+// group rather than a page of them, for one reason: /politicians/[slug] groups
+// the same people with the same function. A second implementation in SQL would
+// eventually disagree with it, and the symptom would be a leaderboard row
+// linking to a page showing different totals. There are fewer than 300 members,
+// so paginating in memory costs nothing.
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const q = sp.get("q") ?? undefined;
   const chambers = sp.getAll("chamber");
   const sortKey = sp.get("sort") ?? "trade_count";
-  const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.trade_count;
+  const sortField = SORT_KEYS.has(sortKey) ? sortKey : "trade_count";
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";
 
   const limitNum = Math.min(Number(sp.get("limit")) || 25, 200);
@@ -49,7 +55,10 @@ export async function GET(req: NextRequest) {
     return `$${params.length}`;
   };
 
-  if (q) conditions.push(`t.member_name ILIKE ${addParam(`%${q}%`)}`);
+  // Chamber stays in SQL — it's a real partition, and no member in the corpus
+  // has filed in both. The text search is applied after merging instead, so a
+  // query matching only one spelling of a name still returns that person's
+  // full totals rather than a fragment of them.
   if (chambers.length) {
     const placeholders = chambers.map((c) => addParam(c));
     conditions.push(`f.chamber IN (${placeholders.join(", ")})`);
@@ -57,44 +66,73 @@ export async function GET(req: NextRequest) {
   conditions.push(PUBLISHED_FILING_SQL);
   const where = `WHERE ${conditions.join(" AND ")}`;
 
-  const dataParams = [...params, limitNum, offset];
-  const limitPlaceholder = `$${dataParams.length - 1}`;
-  const offsetPlaceholder = `$${dataParams.length}`;
+  const rawRows = (await sql.query(
+    `SELECT t.member_name, f.bioguide_id,
+            (ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district,
+            COALESCE(mh.party, (ARRAY_AGG(mr.party ORDER BY f.filing_date DESC NULLS LAST))[1]) AS party,
+            COALESCE(mh.photo_url, (ARRAY_AGG(mr.photo_url ORDER BY f.filing_date DESC NULLS LAST))[1]) AS photo_url,
+            COALESCE(mh.state, (ARRAY_AGG(mr.state ORDER BY f.filing_date DESC NULLS LAST))[1]) AS member_state,
+            f.chamber, COUNT(*)::int AS trade_count, ${VOLUME_EXPR}::float8 AS volume_sum,
+            MAX(f.filing_date) AS last_filed
+     FROM transactions t
+     JOIN filings f ON f.doc_id = t.doc_id
+     LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+     LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
+     ${where}
+     GROUP BY t.member_name, f.bioguide_id, mh.party, mh.photo_url, mh.state, f.chamber
+     ORDER BY MAX(f.filing_date) DESC NULLS LAST`,
+    params
+  )) as {
+    member_name: string; bioguide_id: string | null; state_district: string | null;
+    party: string | null; photo_url: string | null; member_state: string | null;
+    chamber: "house" | "senate"; trade_count: number; volume_sum: number; last_filed: string | null;
+  }[];
 
-  const [dataRows, countRows] = await Promise.all([
-    sql.query(
-      `SELECT t.member_name,
-              (ARRAY_AGG(t.state_district ORDER BY f.filing_date DESC NULLS LAST))[1] AS state_district,
-              COALESCE(mh.party, (ARRAY_AGG(mr.party ORDER BY f.filing_date DESC NULLS LAST))[1]) AS party,
-              COALESCE(mh.photo_url, (ARRAY_AGG(mr.photo_url ORDER BY f.filing_date DESC NULLS LAST))[1]) AS photo_url,
-              COALESCE(mh.state, (ARRAY_AGG(mr.state ORDER BY f.filing_date DESC NULLS LAST))[1]) AS member_state,
-              f.chamber, COUNT(*)::int as trade_count, ${VOLUME_EXPR}::float8 as volume_sum, MAX(f.filing_date) as last_filed
-       FROM transactions t
-       JOIN filings f ON f.doc_id = t.doc_id
-       LEFT JOIN members_reference mr ON mr.state_district = t.state_district
-       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
-       ${where}
-       GROUP BY t.member_name, f.bioguide_id, mh.party, mh.photo_url, mh.state, f.chamber
-       ORDER BY ${sortExpr} ${order} NULLS LAST
-       LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
-      dataParams
-    ),
-    sql.query(
-      `SELECT COUNT(*)::int as count FROM (
-         SELECT 1
-         FROM transactions t
-         JOIN filings f ON f.doc_id = t.doc_id
-         ${where}
-         GROUP BY t.member_name, f.bioguide_id, f.chamber
-       ) sub`,
-      params
-    ),
-  ]);
+  // Same grouping the member pages use, so a row and the page it links to can
+  // never disagree.
+  const identities = groupMembers(rawRows.map((r) => ({ ...r, trades: r.trade_count })));
+  let merged = identities.map((id) => {
+    // Sum over the rows themselves, not over distinct names: one name can
+    // appear twice (resolved and unresolved bioguide), and summing per name
+    // would quietly drop the second.
+    const parts = id.rows;
+    // Display fields come from the most recently filed variant — rawRows is
+    // already ordered by last_filed, so the first row here is the freshest.
+    const latest = parts[0];
+    return {
+      member_name: id.display,
+      slug: id.slug,
+      state_district: latest?.state_district ?? null,
+      party: latest?.party ?? null,
+      photo_url: latest?.photo_url ?? null,
+      member_state: latest?.member_state ?? null,
+      chamber: latest?.chamber ?? "house",
+      trade_count: parts.reduce((sum, p) => sum + p.trade_count, 0),
+      volume_sum: parts.reduce((sum, p) => sum + (p.volume_sum ?? 0), 0),
+      last_filed: parts.reduce<string | null>((max, p) => (!max || (p.last_filed ?? "") > max ? p.last_filed : max), null),
+      _names: id.names,
+    };
+  });
 
-  const total = (countRows as { count: number }[])[0]?.count ?? 0;
+  if (q) {
+    const needle = q.toLowerCase();
+    merged = merged.filter((m) => m._names.some((n) => n.toLowerCase().includes(needle)));
+  }
+
+  const direction = order === "ASC" ? 1 : -1;
+  merged.sort((a, b) => {
+    const pick = (m: typeof a) =>
+      sortField === "volume_sum" ? m.volume_sum : sortField === "last_filed" ? (m.last_filed ?? "") : m.trade_count;
+    const av = pick(a);
+    const bv = pick(b);
+    return av < bv ? -direction : av > bv ? direction : 0;
+  });
+
+  const total = merged.length;
+  const data = merged.slice(offset, offset + limitNum).map(({ _names, ...row }) => row);
 
   return NextResponse.json({
-    data: dataRows,
+    data,
     page: pageNum,
     limit: limitNum,
     total,

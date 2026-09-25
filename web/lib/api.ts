@@ -103,6 +103,13 @@ export interface DashboardData {
 
 export interface PoliticianRow {
   member_name: string;
+  /**
+   * The member's page slug, supplied by the API rather than derived here.
+   * /api/politicians already merged this person's name variants to produce it,
+   * so re-deriving it from the displayed name on the client could disagree —
+   * particularly where two namesakes forced a disambiguating suffix.
+   */
+  slug: string;
   state_district: string | null;
   party: string | null;
   photo_url: string | null;

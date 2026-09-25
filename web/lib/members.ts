@@ -2,6 +2,7 @@ import { sql } from "./db";
 import { PUBLISHED_FILING_SQL } from "./sql";
 import { displayName } from "./api";
 import { memberSlug } from "./memberSlug";
+import { MEMBER_DISPLAY_NAMES } from "./memberNames";
 
 // Re-exported so server code has one import for everything member-related.
 export { memberSlug };
@@ -30,6 +31,8 @@ export interface MemberDirectoryEntry {
    */
   names: string[];
   display: string;
+  /** The name the filings alone imply, before any curated override. */
+  derivedDisplay: string;
   trades: number;
 }
 
@@ -157,6 +160,7 @@ export function groupMembers<T extends { member_name: string; bioguide_id: strin
         slug: "",
         names: [row.member_name],
         display: "",
+        derivedDisplay: "",
         trades: row.trades,
         rows: [row],
       });
@@ -167,7 +171,11 @@ export function groupMembers<T extends { member_name: string; bioguide_id: strin
   for (const e of entries) {
     const weight = new Map<string, number>();
     for (const r of e.rows) weight.set(r.member_name, (weight.get(r.member_name) ?? 0) + r.trades);
-    e.display = titleCaseIfShouted(cleanName(displayName(bestSpelling(e.names, weight))));
+    // What the filings alone would produce. Kept even when a curated name
+    // overrides it, so a URL built from it still resolves — see
+    // resolveMemberSlug.
+    e.derivedDisplay = titleCaseIfShouted(cleanName(displayName(bestSpelling(e.names, weight))));
+    e.display = (e.bioguideId && MEMBER_DISPLAY_NAMES[e.bioguideId]) || e.derivedDisplay;
     e.slug = memberSlug(e.display);
   }
 
@@ -210,7 +218,12 @@ export function resolveMemberSlug(
   const exact = directory.find((m) => m.slug === slug);
   if (exact) return { entry: exact, redirectTo: null };
 
-  const byVariant = directory.find((m) => m.names.some((n) => memberSlug(n) === slug));
+  // Any earlier form of this person's URL: a raw filed spelling, or the name
+  // the filings implied before a curated one replaced it ("rohit-khanna" and
+  // "neal-patrick-dunn" both still resolve).
+  const byVariant = directory.find(
+    (m) => memberSlug(m.derivedDisplay) === slug || m.names.some((n) => memberSlug(n) === slug)
+  );
   return byVariant ? { entry: byVariant, redirectTo: byVariant.slug } : null;
 }
 

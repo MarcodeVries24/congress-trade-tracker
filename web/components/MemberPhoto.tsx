@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const AVATAR_COLORS = [
   "bg-rose-500/20 text-rose-600 dark:text-rose-300",
@@ -70,19 +70,39 @@ export function MemberPhoto({
   className?: string;
 }) {
   const [stage, setStage] = useState<"primary" | "fallback" | "failed">("primary");
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const fallback = photoUrl ? fallbackPhotoUrl(photoUrl) : null;
+
+  const advance = useCallback(() => {
+    setStage((s) => (s === "primary" && fallback ? "fallback" : "failed"));
+  }, [fallback]);
+
+  // On a server-rendered page — the member and issuer pages — the browser
+  // starts fetching this <img> from the HTML, long before React hydrates. If
+  // it 404s in that window the error event has already come and gone, so the
+  // onError below never runs and the photo stays a broken-image icon forever
+  // (seen on Josh Gottheimer, whose bioguide.congress.gov portrait is
+  // missing). A finished image with no intrinsic width is exactly that case,
+  // so check for it once the handler is finally attached. Re-runs per stage,
+  // since the fallback can have failed by then too.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth === 0) advance();
+  }, [stage, advance]);
+
   const initialsClass = `${className} ${className.includes("h-8") ? "text-xs" : "text-lg"}`;
   if (!photoUrl || stage === "failed") return <InitialsAvatar name={name} className={initialsClass} />;
 
-  const fallback = fallbackPhotoUrl(photoUrl);
   const src = stage === "primary" ? photoUrl : fallback;
   if (!src) return <InitialsAvatar name={name} className={initialsClass} />;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      ref={imgRef}
       src={src}
       alt=""
-      onError={() => setStage((s) => (s === "primary" && fallback ? "fallback" : "failed"))}
+      onError={advance}
       className={`shrink-0 rounded-full bg-panel-muted object-cover ${className}`}
     />
   );

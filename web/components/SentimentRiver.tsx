@@ -38,6 +38,8 @@ const LAYOUT = {
 /** The rolling window for the spine. Shorter jitters, longer flattens the turns. */
 const SPINE_WEEKS = 8;
 const DEADLINE_DAYS = 45;
+/** Weeks beginning after this may still be filing, so they are not drawn. */
+const SETTLED_THROUGH = new Date(Date.now() - DEADLINE_DAYS * 86400000).toISOString().slice(0, 10);
 
 const compactCount = new Intl.NumberFormat("en-US");
 
@@ -76,7 +78,12 @@ function smooth(points: [number, number][]): string {
 
 function River({ weeks: allWeeks, mode, variant }: { weeks: RiverWeek[]; mode: Mode; variant: keyof typeof LAYOUT }) {
   const { W, H, weeks: maxWeeks } = LAYOUT[variant];
-  const weeks = allWeeks.slice(-Math.min(allWeeks.length, maxWeeks));
+  // The river stops where the disclosures do. Congress has 45 days to file, so
+  // more recent weeks are guaranteed to be part-empty and would draw as a
+  // collapse in trading that hasn't happened. They are left off rather than
+  // drawn and caveated.
+  const settled = allWeeks.filter((w) => w.week <= SETTLED_THROUGH);
+  const weeks = settled.slice(-Math.min(settled.length, maxWeeks));
   const PAD = { l: variant === "wide" ? 56 : 42, r: 18, t: 22, b: 34 };
   const PLOT_W = W - PAD.l - PAD.r;
   const PLOT_H = H - PAD.t - PAD.b;
@@ -96,12 +103,6 @@ function River({ weeks: allWeeks, mode, variant }: { weeks: RiverWeek[]; mode: M
     return b + l > 0 ? (b - l) / (b + l) : 0;
   });
 
-  // Weeks after this may legally still be unfiled, so the river there is
-  // incomplete by definition — drawn hatched rather than as a real decline.
-  const cutoff = new Date(Date.now() - DEADLINE_DAYS * 86400000).toISOString().slice(0, 10);
-  const pendingFrom = weeks.findIndex((w) => w.week > cutoff);
-  const pendingX = pendingFrom >= 0 ? x(pendingFrom) : null;
-
   const slot = PLOT_W / Math.max(1, weeks.length);
 
   return (
@@ -116,10 +117,6 @@ function River({ weeks: allWeeks, mode, variant }: { weeks: RiverWeek[]; mode: M
           <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.12" />
           <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.72" />
         </linearGradient>
-        <pattern id={`riverPending-${mode}-${variant}`} width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-          <rect width="6" height="6" className="fill-panel" fillOpacity="0.7" />
-          <line x1="0" y1="0" x2="0" y2="6" className="stroke-line-strong" strokeWidth="2" />
-        </pattern>
       </defs>
 
       {weeks.map((w, i) => (
@@ -129,14 +126,6 @@ function River({ weeks: allWeeks, mode, variant }: { weeks: RiverWeek[]; mode: M
 
       <path d={`${smooth(weeks.map((w, i) => [x(i), MID - scale(up(w))]))}L${x(weeks.length - 1).toFixed(1)},${MID}L${x(0).toFixed(1)},${MID}Z`} fill={`url(#riverBuy-${mode}-${variant})`} />
       <path d={`${smooth(weeks.map((w, i) => [x(i), MID + scale(down(w))]))}L${x(weeks.length - 1).toFixed(1)},${MID}L${x(0).toFixed(1)},${MID}Z`} fill={`url(#riverSell-${mode}-${variant})`} />
-
-      {pendingX !== null && (
-        <>
-          <rect x={pendingX.toFixed(1)} y={PAD.t} width={(W - PAD.r - pendingX).toFixed(1)} height={PLOT_H} fill={`url(#riverPending-${mode}-${variant})`} />
-          <line x1={pendingX.toFixed(1)} x2={pendingX.toFixed(1)} y1={PAD.t} y2={H - PAD.b} className="stroke-ink-faint" strokeWidth="1.2" strokeDasharray="4 3" />
-          <text x={(pendingX + 8).toFixed(1)} y={PAD.t + 13} className="fill-ink-muted" fontSize="10.5">still arriving</text>
-        </>
-      )}
 
       {weeks.map((_, i) =>
         i === 0 ? null : (
@@ -266,7 +255,6 @@ export function SentimentRiver() {
             <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-emerald-500" />Purchases</span>
             <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-rose-500" />Sales</span>
             <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-ink-faint" />Balance, 8-week</span>
-            <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm border border-line-strong" />Not yet disclosed</span>
           </div>
         </div>
 
@@ -281,8 +269,8 @@ export function SentimentRiver() {
           {mode === "value"
             ? "Read by money: one large sale outweighs dozens of small purchases, so this moves when someone large moves. Figures are the midpoint of each disclosed bracket — Congress never reports an exact amount."
             : "Read by decisions: forty small purchases now outweigh one large sale. Where this and the value reading disagree, a few big trades are pulling against the crowd."}{" "}
-          The hatched tail is trading that has happened but need not be disclosed yet — the law allows 45 days — so the
-          headline figure is taken from the last fully settled window, through {data.settled.settledThrough}.
+          The chart ends at {data.settled.settledThrough}: Congress has 45 days to disclose, so more recent weeks are
+          still filling in and would read as a fall in trading that hasn&rsquo;t happened.
         </p>
       </div>
     </section>

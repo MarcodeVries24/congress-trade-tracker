@@ -8,7 +8,8 @@ import { AdSlot } from "@/components/AdSlot";
 import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
-import { getMemberBySlug, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
+import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
+import { TradeFlowChart } from "@/components/TradeFlowChart";
 
 /**
  * One page per member who has traded.
@@ -59,6 +60,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
   if (member.redirectTo) redirect(`/politicians/${member.redirectTo}`);
 
   const { profile, trades } = member;
+  const flow = await getMemberTradeFlow(profile.names);
   const tradesHref = `/trades?${profile.names.map((n) => `members=${encodeURIComponent(n)}`).join("&")}`;
 
   return (
@@ -106,6 +108,8 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
               </div>
             </div>
           )}
+
+          <TradeFlowChart quarters={flow} memberName={profile.display} />
         </div>
 
         <div className="my-6">

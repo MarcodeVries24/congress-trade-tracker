@@ -252,6 +252,59 @@ export interface MemberTrade {
   company_name: string | null;
 }
 
+/** One quarter of a member's disclosed trading, for the flow chart. */
+export interface MemberFlowQuarter {
+  /** "2026-Q3" — sortable and directly printable. */
+  quarter: string;
+  buy: number;
+  sell: number;
+  /** The portion of each that reached the public more than 45 days late. */
+  buyLate: number;
+  sellLate: number;
+  trades: number;
+  lateTrades: number;
+}
+
+/**
+ * How far back the chart reaches. Five years is long enough to show a
+ * pattern and short enough that the bars stay readable — the busiest member
+ * in the corpus has 38 quarters of history, which at this width would be
+ * hairlines.
+ */
+const FLOW_QUARTERS = 20;
+
+/**
+ * Quarterly buy/sell flow, split by whether the disclosure met its deadline.
+ *
+ * The lateness split is the part worth having. Across the corpus only 8.8% of
+ * trades are filed late, so for most members it is a thin stripe or absent —
+ * but it is not evenly spread: Alan Armstrong filed 701 of 707 late, Julia
+ * Letlow 211 of 257, while Pelosi's and Khanna's bars are solid. A chart that
+ * draws that difference says something about a member that no price line can.
+ */
+export async function getMemberTradeFlow(names: string[]): Promise<MemberFlowQuarter[]> {
+  const midpoint = `((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
+  const late = `(NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) > 45`;
+  const rows = (await sql.query(
+    `SELECT to_char(date_trunc('quarter', NULLIF(t.transaction_date, '')::date), 'YYYY-"Q"Q') AS quarter,
+            COALESCE(SUM(${midpoint}) FILTER (WHERE t.transaction_type ILIKE 'P%'), 0)::float8 AS buy,
+            COALESCE(SUM(${midpoint}) FILTER (WHERE t.transaction_type ILIKE 'S%'), 0)::float8 AS sell,
+            COALESCE(SUM(${midpoint}) FILTER (WHERE t.transaction_type ILIKE 'P%' AND ${late}), 0)::float8 AS "buyLate",
+            COALESCE(SUM(${midpoint}) FILTER (WHERE t.transaction_type ILIKE 'S%' AND ${late}), 0)::float8 AS "sellLate",
+            COUNT(*)::int AS trades,
+            COUNT(*) FILTER (WHERE ${late})::int AS "lateTrades"
+     FROM transactions t
+     JOIN filings f ON f.doc_id = t.doc_id
+     WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
+       AND t.transaction_date IS NOT NULL AND t.transaction_date <> ''
+     GROUP BY 1
+     ORDER BY 1 DESC
+     LIMIT ${FLOW_QUARTERS}`,
+    [names]
+  )) as MemberFlowQuarter[];
+  return rows.reverse();
+}
+
 /** How many trades a member page lists before pointing at the full filter UI. */
 export const MEMBER_PAGE_TRADE_LIMIT = 100;
 

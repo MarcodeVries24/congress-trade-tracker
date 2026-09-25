@@ -111,24 +111,22 @@ export default function Home() {
           </div>
         )}
 
-        {/* Latest Trades sits beside a sidebar of two shorter cards, rather
-            than sharing one CSS grid row with them — a shared row forces
-            equal-height stretching (via row-span + the default grid
-            align-items: stretch), which left a large blank gap inside
-            whichever card had less content. items-start here means each
-            column simply ends where its own content ends.
-
-            The flip side is that the two columns only finish level if their
-            row counts are chosen to match: LATEST_TRADES_LIMIT in
+        {/* Latest Trades beside a sidebar of two cards. Row counts are chosen
+            to bring the two columns close — LATEST_TRADES_LIMIT in
             api/dashboard/route.ts is set against the sidebar's two 8-row
-            cards for exactly that reason. Change either one and the other
-            needs re-checking, or a hole opens under the shorter column. */}
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:gap-6">
+            cards — but 66px trade rows against 56px sidebar rows never land
+            exactly, and the last 15px showed as a step at the foot of the
+            grid. So the columns stretch to the taller of the two and the
+            shorter one takes up the remainder inside its own border, where
+            15px of extra padding is invisible. Matching the counts still
+            matters: it keeps that remainder small enough not to read as a
+            hole. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           {/* Latest Trades */}
           <Card
             title="Latest Trades"
             href="/trades"
-            className="lg:col-span-2"
+            className="h-full lg:col-span-2"
             actions={
               <div className="flex items-center gap-1 text-[11px]">
                 {(["stocks", "all"] as const).map((v) => (
@@ -178,7 +176,7 @@ export default function Home() {
           </Card>
 
           {/* Sidebar: Most Active Politicians + Top by Trading Volume, stacked */}
-          <div className="flex flex-col gap-4 lg:gap-6">
+          <div className="flex h-full flex-col gap-4 lg:gap-6">
             <Card title="Most Active Politicians" href="/politicians?sort=trade_count">
               {!dashboard && <CardSkeleton rows={6} />}
               {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
@@ -209,7 +207,7 @@ export default function Home() {
               )}
             </Card>
 
-            <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum">
+            <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum" className="flex-1">
               {!dashboard && <CardSkeleton rows={6} />}
               {dashboard && dashboard.topByVolume.length === 0 && <EmptyRow />}
               {dashboard && (

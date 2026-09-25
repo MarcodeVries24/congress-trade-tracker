@@ -17,6 +17,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Select } from "@/components/Select";
 import { AdSlot } from "@/components/AdSlot";
+import { InfoTip } from "@/components/InfoTip";
 import { OtherAssetsTable } from "@/components/OtherAssetsTable";
 
 type SortField = "trade_count" | "volume_sum" | "politician_count" | "market_cap" | "last_traded";
@@ -120,9 +121,7 @@ export default function Issuers() {
         <div className="mb-6 sm:mb-8">
           <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Issuers — what Congress trades</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Companies first, then everything else — bonds, treasuries, funds and private holdings. Trades are disclosed as
-            value brackets, never exact figures, so the volume shown is the sum of each trade&apos;s disclosed bracket
-            midpoint.
+            Companies first, then everything else — bonds, treasuries, funds and private holdings.
           </p>
         </div>
 
@@ -164,8 +163,9 @@ export default function Issuers() {
                 <th className="px-4 py-3">Issuer</th>
                 <th className="px-4 py-3">Trades</th>
                 <th className="px-4 py-3">Politicians</th>
-                <th className="px-4 py-3" title={VOLUME_ESTIMATE_NOTE}>
+                <th className="px-4 py-3">
                   Est. Volume
+                  <InfoTip text={VOLUME_ESTIMATE_NOTE} />
                 </th>
                 <th className="px-4 py-3">Market Cap</th>
                 <th className="px-4 py-3">Last Traded</th>
@@ -240,7 +240,6 @@ export default function Issuers() {
             ))}
         </div>
 
-        <p className="mt-3 border-x border-transparent px-4 text-[11px] leading-snug text-ink-faint">{VOLUME_ESTIMATE_NOTE}</p>
 
         {result && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">

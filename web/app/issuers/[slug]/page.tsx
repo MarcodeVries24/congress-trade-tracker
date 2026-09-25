@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { AdSlot } from "@/components/AdSlot";
 import {
@@ -98,11 +99,10 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
 
           <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Disclosed trades" value={issuer.trade_count.toLocaleString()} />
-            <Stat label="Est. volume" value={compactUSD.format(issuer.volume_sum)} hint={VOLUME_ESTIMATE_NOTE} />
+            <Stat label="Est. volume" value={compactUSD.format(issuer.volume_sum)} info={VOLUME_ESTIMATE_NOTE} />
             <Stat label="Purchases / sales" value={`${issuer.purchases.toLocaleString()} / ${issuer.sales.toLocaleString()}`} />
             <Stat label="Members trading" value={issuer.politician_count.toLocaleString()} />
           </dl>
-          <p className="mt-2 text-[11px] leading-snug text-ink-faint">{VOLUME_ESTIMATE_NOTE}</p>
 
           {traders.length > 0 && (
             <div className="mt-5 border-t border-line pt-4">
@@ -268,10 +268,13 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, info }: { label: string; value: string; info?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-panel-muted px-3 py-2.5" title={hint}>
-      <dt className="text-xs text-ink-faint">{label}</dt>
+    <div className="rounded-lg border border-line bg-panel-muted px-3 py-2.5">
+      <dt className="text-xs text-ink-faint">
+        {label}
+        {info && <InfoTip text={info} />}
+      </dt>
       <dd className="mt-0.5 text-base font-semibold text-ink">{value}</dd>
     </div>
   );

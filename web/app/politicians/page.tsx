@@ -10,6 +10,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Select } from "@/components/Select";
 import { AdSlot } from "@/components/AdSlot";
+import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
 
 const SORT_OPTIONS: { value: string; label: string; sort: "trade_count" | "volume_sum" | "last_filed"; order: "asc" | "desc" }[] = [
@@ -143,8 +144,7 @@ export default function Politicians() {
         <div className="mb-6 sm:mb-8">
           <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Politicians — disclosed trading activity</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Every member of Congress with a disclosed trade, with how often they trade and an estimated volume. Trades are disclosed as
-            value brackets, never exact figures, so the volume shown is the sum of each trade&apos;s disclosed bracket midpoint.
+            Every member of Congress with a disclosed trade, with how often they trade and an estimated volume.
           </p>
         </div>
 
@@ -193,7 +193,10 @@ export default function Politicians() {
                 <th className="px-4 py-3">Member</th>
                 <th className="px-4 py-3">Chamber</th>
                 <th className="px-4 py-3">Trades</th>
-                <th className="px-4 py-3" title={VOLUME_ESTIMATE_NOTE}>Est. Volume</th>
+                <th className="px-4 py-3">
+                  Est. Volume
+                  <InfoTip text={VOLUME_ESTIMATE_NOTE} />
+                </th>
                 <th className="px-4 py-3">Avg / Trade</th>
                 <th className="px-4 py-3">Last Filed</th>
               </tr>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ASSET_TYPE_LABELS, PAGE_SIZE_OPTIONS, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { Select } from "./Select";
+import { InfoTip } from "./InfoTip";
 import { compactUSD, formatDate } from "@/lib/format";
 import type { AssetGroup } from "@/lib/issuers";
 
@@ -109,8 +110,9 @@ export function OtherAssetsTable({ query }: { query: string }) {
               <th className="px-4 py-3">Asset</th>
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Trades</th>
-              <th className="px-4 py-3" title={VOLUME_ESTIMATE_NOTE}>
+              <th className="px-4 py-3">
                 Est. Volume
+                <InfoTip text={VOLUME_ESTIMATE_NOTE} />
               </th>
               <th className="px-4 py-3">Last Traded</th>
             </tr>

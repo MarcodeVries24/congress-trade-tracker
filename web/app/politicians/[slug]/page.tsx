@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { AdSlot } from "@/components/AdSlot";
-import { ASSET_TYPE_LABELS, OWNER_LABELS, cleanAssetName } from "@/lib/api";
+import { ASSET_TYPE_LABELS, OWNER_LABELS, displayAssetName } from "@/lib/api";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getMemberBySlug, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 
@@ -139,7 +139,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                 return (
                   <tr key={t.id} className="border-b border-line/50">
                     <td className="px-4 py-3">
-                      <div className="text-ink">{cleanAssetName(t.asset_name)}</div>
+                      <div className="text-ink">{displayAssetName(t)}</div>
                       <div className="mt-0.5 text-xs text-ink-faint">
                         {t.ticker && <span className="text-ink-muted">{t.ticker}</span>}
                         {t.ticker && t.asset_type_code && " · "}
@@ -177,7 +177,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
               <div key={t.id} className={`rounded-lg border border-line border-l-2 bg-panel p-3 ${badge.accent}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-ink">{cleanAssetName(t.asset_name)}</div>
+                    <div className="truncate text-sm text-ink">{displayAssetName(t)}</div>
                     <div className="mt-0.5 text-xs text-ink-faint">
                       {t.ticker && <span className="text-ink-muted">{t.ticker}</span>}
                       {t.ticker && t.asset_type_code && " · "}

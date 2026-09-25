@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  cleanAssetName,
+  displayAssetName,
   DashboardData,
   displayName,
   fetchDashboard,
@@ -148,7 +148,7 @@ export default function Home() {
                           <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
                           <div className="truncate text-xs text-ink-faint">
                             {trade.ticker ? `${trade.ticker} · ` : ""}
-                            {cleanAssetName(trade.asset_name)}
+                            {displayAssetName(trade)}
                           </div>
                         </div>
                         <div className="shrink-0 whitespace-nowrap text-right">
@@ -262,7 +262,7 @@ export default function Home() {
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm text-ink">{displayName(trade.member_name)}</div>
-                        <div className="truncate text-xs text-ink-faint">{trade.ticker ?? cleanAssetName(trade.asset_name)}</div>
+                        <div className="truncate text-xs text-ink-faint">{trade.ticker ?? displayAssetName(trade)}</div>
                       </div>
                       <div className="shrink-0 whitespace-nowrap text-right text-xs font-medium text-ink-muted">
                         {compactAmountRange(trade.amount_low, trade.amount_high, trade.amount_range)}

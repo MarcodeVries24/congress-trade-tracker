@@ -6,7 +6,7 @@ import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import {
   AMOUNT_RANGES,
   ASSET_TYPE_LABELS,
-  cleanAssetName,
+  displayAssetName,
   DEFAULT_ASSET_TYPES,
   displayName,
   fetchMemberOptions,
@@ -684,7 +684,7 @@ export default function Home() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5" title={trade.asset_name}>
-                          {cleanAssetName(trade.asset_name)}
+                          {displayAssetName(trade)}
                           {trade.parse_status === "ocr" && <OcrBadge />}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
@@ -779,7 +779,7 @@ export default function Home() {
                   </div>
 
                   <div className="mt-3 flex items-center gap-1.5 text-sm" title={trade.asset_name}>
-                    {cleanAssetName(trade.asset_name)}
+                    {displayAssetName(trade)}
                     {trade.parse_status === "ocr" && <OcrBadge />}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">

@@ -22,6 +22,8 @@ export interface Trade {
   member_state: string | null;
   parse_status: string;
   market_cap: number | null;
+  /** Canonical company name for this ticker, when we have one. See displayAssetName. */
+  company_name: string | null;
 }
 
 export interface TradesResponse {
@@ -62,6 +64,7 @@ export interface DashboardTrade {
   photo_url: string | null;
   party: string | null;
   member_state: string | null;
+  company_name: string | null;
 }
 
 export interface DashboardPolitician {
@@ -306,6 +309,63 @@ const BOND_DETAIL_MARKERS = [
  * down to just the issuer/company name for the main display text. Applied
  * only for display — searching and the raw record are unaffected.
  */
+/**
+ * Asset types where the issuer's name *is* the whole description, so the
+ * canonical company name can safely replace whatever the filing wrote.
+ *
+ * Everything else keeps its filed text, because the detail is the point: an
+ * option's "PUT/XSP @ 544 EXP 04/17/2025" carries the strike and expiry, a
+ * municipal bond's name carries its coupon and maturity. Replacing those with
+ * "S&P 500 ETF" would delete the only information that distinguishes one row
+ * from the next.
+ */
+const CANONICAL_NAME_ASSET_TYPES = new Set(["ST", "Stock", "Non-Public Stock", "PS"]);
+
+/** Option types, which are only sometimes safe to rename — see CONTRACT_DETAIL. */
+const OPTION_ASSET_TYPES = new Set(["OP", "Stock Option"]);
+
+/**
+ * Marks a name as describing a specific contract rather than just its issuer:
+ * a strike, an expiry, a CALL/ or PUT/ prefix, a date.
+ *
+ * Options split two ways in the filings. Most carry that detail — "CALL/MSFT
+ * FLEX EURO PM 485 EXP 08/07/2026" — and replacing it with "Microsoft Corp"
+ * would make several distinct contracts look like one row repeated. About a
+ * quarter are written as nothing but the company ("GE Aerospace Common Stock
+ * (GE) [OP]"), and those should read the same as every other Microsoft or GE
+ * row on the page.
+ */
+const CONTRACT_DETAIL = /(EXP\s|\bCALL\/|\bPUT\/|@\s*\d|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\$\d)/i;
+
+/**
+ * What to show in the asset column.
+ *
+ * The same company reaches us under many spellings — Microsoft as "Microsoft
+ * Corporation - Common Stock (MSFT) [ST]", "MICROSOFT CORPORATION CMN",
+ * "MICROSOFT CORP" and "Microsoft Corp", all on one page. company_market_caps
+ * already holds one canonical name per ticker, so a stock row uses that and
+ * 4,405 distinct displayed names collapse to 1,109.
+ *
+ * Falls back to cleaning the filed name when there's no canonical one (an
+ * unlisted ticker, or a type we deliberately leave alone).
+ *
+ * One consequence worth knowing: the canonical name is the company's name
+ * *now*, not at the time of the trade, so a since-renamed issuer shows its
+ * current name — the same trade-off market cap already makes.
+ */
+export function displayAssetName(row: {
+  asset_name: string;
+  asset_type_code: string | null;
+  company_name?: string | null;
+}): string {
+  if (row.company_name) {
+    const type = row.asset_type_code ?? "";
+    if (CANONICAL_NAME_ASSET_TYPES.has(type)) return row.company_name;
+    if (OPTION_ASSET_TYPES.has(type) && !CONTRACT_DETAIL.test(row.asset_name)) return row.company_name;
+  }
+  return cleanAssetName(row.asset_name);
+}
+
 export function cleanAssetName(name: string): string {
   let cleaned = name.trim();
 

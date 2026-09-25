@@ -341,7 +341,8 @@ export const ALERT_SELECT_SQL = `t.id, t.doc_id, t.member_name, t.state_district
   t.amount_high, f.filing_date, f.pdf_url, f.chamber, f.ingested_at,
   COALESCE(mh.party, mr.party) AS party,
   COALESCE(mh.state, mr.state) AS member_state,
-  cmc.market_cap`;
+  cmc.market_cap,
+  cmc.company_name`;
 
 export interface AlertTradeRow {
   id: number;
@@ -364,6 +365,7 @@ export interface AlertTradeRow {
   party: string | null;
   member_state: string | null;
   market_cap: number | null;
+  company_name: string | null;
 }
 
 /**

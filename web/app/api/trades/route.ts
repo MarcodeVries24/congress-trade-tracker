@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
               COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.state, mr.state) AS member_state,
-              cmc.market_cap,
+              cmc.market_cap, cmc.company_name,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id

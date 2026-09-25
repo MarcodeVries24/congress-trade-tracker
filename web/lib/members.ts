@@ -259,6 +259,7 @@ export interface MemberTrade {
   filing_date: string | null;
   pdf_url: string;
   days_to_file: number | null;
+  company_name: string | null;
 }
 
 /** How many trades a member page lists before pointing at the full filter UI. */
@@ -302,9 +303,10 @@ export async function getMemberBySlug(
     sql.query(
       `SELECT t.id, t.asset_name, t.ticker, t.asset_type_code, t.owner, t.transaction_type,
               t.transaction_date, t.amount_range, t.amount_low, t.amount_high,
-              f.filing_date, f.pdf_url,
+              f.filing_date, f.pdf_url, cmc.company_name,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
        WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL}
        ORDER BY f.filing_date DESC NULLS LAST, t.transaction_date DESC NULLS LAST, t.id DESC
        LIMIT ${MEMBER_PAGE_TRADE_LIMIT}`,

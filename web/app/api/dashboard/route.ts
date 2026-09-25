@@ -40,7 +40,11 @@ const STATE_DISTRICT_GROUPED = `(ARRAY_AGG(t.state_district ORDER BY f.filing_da
 const GROUPED_BY_PERSON = `t.member_name, f.bioguide_id, mh.photo_url, mh.party, mh.state, f.chamber`;
 
 const TRADE_COLUMNS = `t.id, t.member_name, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
-              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, ${MEMBER_COLUMNS}`;
+              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, cmc.company_name, ${MEMBER_COLUMNS}`;
+
+// One canonical company name per ticker, so the same company isn't shown four
+// different ways across these cards — see displayAssetName in lib/api.
+const COMPANY_JOIN = `LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')`;
 
 // One row per member (their single most recent trade), rather than raw
 // "last N rows" — a member who filed a dozen trades on the same day would
@@ -55,6 +59,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       FROM transactions t
       JOIN filings f ON f.doc_id = t.doc_id
       ${MEMBER_JOIN}
+      ${COMPANY_JOIN}
       WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} ${assetTypeFilter}
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
@@ -110,6 +115,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
+         ${COMPANY_JOIN}
          WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} AND t.amount_low IS NOT NULL
            AND (NULLIF(f.filing_date, '')::date) >= (CURRENT_DATE - INTERVAL '30 days')
          ORDER BY t.amount_low DESC

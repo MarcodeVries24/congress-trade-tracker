@@ -96,7 +96,7 @@ export default function Home() {
             />
           </div>
         )}
-        {stats && <p className="mb-4 text-[11px] leading-snug text-ink-faint sm:mb-6">{VOLUME_ESTIMATE_NOTE}</p>}
+        {stats && <p className="mb-4 border-x border-transparent px-4 text-[11px] leading-snug text-ink-faint sm:mb-6">{VOLUME_ESTIMATE_NOTE}</p>}
 
         <div className="mb-6 sm:mb-8">
           <AdSlot />

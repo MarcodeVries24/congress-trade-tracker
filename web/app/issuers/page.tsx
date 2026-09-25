@@ -205,7 +205,7 @@ export default function Issuers() {
             ))}
         </div>
 
-        <p className="mt-3 text-[11px] leading-snug text-ink-faint">{VOLUME_ESTIMATE_NOTE}</p>
+        <p className="mt-3 border-x border-transparent px-4 text-[11px] leading-snug text-ink-faint">{VOLUME_ESTIMATE_NOTE}</p>
 
         {result && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">

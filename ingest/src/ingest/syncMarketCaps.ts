@@ -143,6 +143,135 @@ function toUsdMarketCap(profile: FinnhubProfile, rates: FxRates | null): number 
   return Math.round((millions * 1_000_000) / perUsd);
 }
 
+/**
+ * A ticker the filer typed into the asset name itself.
+ *
+ * Senate reports especially often leave the ticker column blank and write
+ * "Infineon Technologies AG (IFNNY)" instead — 424 published rows carry a
+ * symbol only their name knows about, so they match no ticker filter, reach
+ * no issuer page and get no market cap.
+ *
+ * Only a symbol at the very *end* counts, after something that reads as a
+ * company name (an optional trailing "[ST]" type code is allowed, since the
+ * House template puts one there). That rules out the parentheses these names
+ * are otherwise full of — "DOW CHEMICAL COMPANY (THE) 4.8% 11/30/2028",
+ * "Brazilian SELIC (LFT) Bonds", "GS FINANCE CORP. LINKED TO ESTX BANKS
+ * (EUR)" — none of which are trailing.
+ *
+ * Structure alone is not enough to be safe, though: "UnitedHealth Group
+ * Incorporated Common Stock (DE)" is shaped exactly like a real one, and DE
+ * is Deere's ticker. Every candidate is confirmed against the provider's own
+ * name for that symbol before it is believed.
+ */
+const EMBEDDED_TICKER = /\(([A-Z]{1,5}(?:\.[A-Z])?)\)\s*(?:\[[A-Za-z]{1,3}\])?\s*$/;
+
+export function embeddedTickerCandidate(assetName: string): { symbol: string; company: string } | null {
+  const match = assetName.match(EMBEDDED_TICKER);
+  if (!match || match.index === undefined) return null;
+  const company = assetName.slice(0, match.index).trim();
+  // Something has to be named. Deliberately not "at least two words" — that
+  // would drop a legitimate "Tesla (TSLA)", and the provider check below is
+  // what actually keeps a wrong symbol out.
+  if (!/[A-Za-z]/.test(company)) return null;
+  return { symbol: match[1], company };
+}
+
+// Words that describe the *instrument* rather than name the company, and the
+// legal-form suffixes that differ between how a filer writes a name and how a
+// data provider does. Stripped from both sides before comparing.
+const INSTRUMENT_WORDS =
+  /\b(SPONSORED|UNSPONSORED|ADR|ADS|COMMON STOCK|ORDINARY SHARES?|DEPOSITARY SHARES?|CLASS [A-Z]|COMMON|SHARES?|STOCK|NEW)\b/g;
+const LEGAL_FORMS = /\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLC|LP|PLC|NV|SA|SAU|SE|AG|SPA|ASA|AB|AS|OY|OYJ|ABP|GROUP|HOLDINGS?|THE)\b/g;
+
+/**
+ * Two names for the same company, allowing for how differently they get
+ * written down. Dots come out first so "Mitsui O.S.K." and "Mitsui OSK"
+ * agree; a provider name that is a prefix of the filed one counts, because
+ * the filing usually appends descriptors the provider leaves off.
+ */
+function sameCompany(filed: string, provider: string): boolean {
+  const normalize = (value: string) =>
+    value
+      .toUpperCase()
+      .replace(/\(.*?\)/g, " ")
+      .replace(/[.'\u2019]/g, "")
+      .replace(/[,&/-]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(INSTRUMENT_WORDS, " ")
+      .replace(LEGAL_FORMS, " ")
+      .replace(/[^A-Z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const a = normalize(filed);
+  const b = normalize(provider);
+  if (!a || !b) return false;
+  return a === b || a.startsWith(b) || b.startsWith(a);
+}
+
+/**
+ * Fills in tickers the filer wrote into the asset name.
+ *
+ * Runs before the name search below, and overrides it: these names are
+ * already in asset_name_tickers as confirmed misses, because a search for
+ * "Infineon Technologies AG (IFNNY)" finds nothing. The symbol in the
+ * parentheses is far better evidence than that search ever was.
+ *
+ * The provider intermittently answers with an empty object rather than an
+ * error, so an empty name is retried once before it is taken at face value —
+ * without that, roughly a third of real tickers looked unverifiable.
+ */
+async function resolveEmbeddedTickers(): Promise<void> {
+  const rows = (await sql.query(`
+    SELECT DISTINCT t.asset_name FROM transactions t
+    WHERE (t.ticker IS NULL OR t.ticker = '')
+      AND t.asset_name ~ '\\([A-Z]{1,5}(\\.[A-Z])?\\)[[:space:]]*(\\[[A-Za-z]{1,3}\\])?[[:space:]]*$'
+  `)) as { asset_name: string }[];
+
+  const candidates = rows
+    .map((r) => ({ assetName: r.asset_name, ...(embeddedTickerCandidate(r.asset_name) ?? {}) }))
+    .filter((c): c is { assetName: string; symbol: string; company: string } => "symbol" in c);
+
+  if (candidates.length === 0) {
+    console.log("No asset names carry an unextracted ticker.");
+    return;
+  }
+  console.log(`Checking ${candidates.length} asset name(s) that appear to carry their own ticker...`);
+
+  let confirmed = 0;
+  let rejected = 0;
+  let failed = 0;
+  let rowsFixed = 0;
+
+  for (const { assetName, symbol, company } of candidates) {
+    try {
+      let profile = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(symbol));
+      if (!profile.name) profile = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(symbol));
+
+      if (!profile.name || !sameCompany(company, profile.name)) {
+        rejected++;
+        if (profile.name) console.log(`  rejected ${symbol}: "${company}" is not "${profile.name}"`);
+        continue;
+      }
+
+      const result = (await sql.query(
+        `UPDATE transactions SET ticker = $1 WHERE asset_name = $2 AND (ticker IS NULL OR ticker = '')`,
+        [symbol, assetName]
+      )) as unknown as { rowCount?: number };
+      await sql.query(
+        `INSERT INTO asset_name_tickers (asset_name, ticker, resolved_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (asset_name) DO UPDATE SET ticker = EXCLUDED.ticker, resolved_at = NOW()`,
+        [assetName, symbol]
+      );
+      confirmed++;
+      rowsFixed += result?.rowCount ?? 0;
+    } catch (err) {
+      failed++;
+      console.error(`  profile failed for "${symbol}": ${(err as Error).message}`);
+    }
+  }
+  console.log(`Embedded tickers: ${confirmed} confirmed (${rowsFixed} rows), ${rejected} rejected, ${failed} failed.`);
+}
+
 async function resolveNewAssetNames(): Promise<void> {
   const rows = (await sql.query(`
     SELECT DISTINCT t.asset_name FROM transactions t
@@ -268,7 +397,10 @@ async function main() {
   const missingOnly = process.argv.slice(2).includes("--missing-only");
 
   await ensureSchema();
-  if (!missingOnly) await resolveNewAssetNames();
+  if (!missingOnly) {
+    await resolveEmbeddedTickers();
+    await resolveNewAssetNames();
+  }
   await refreshMarketCaps(missingOnly);
 }
 

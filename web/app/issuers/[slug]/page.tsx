@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getIssuerBySlug, ISSUER_PAGE_TRADE_LIMIT } from "@/lib/issuers";
+import { memberDisplayName } from "@/lib/memberDisplay";
 
 /**
  * One page per traded company — the asset-side counterpart to the member
@@ -169,16 +170,15 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
             <tbody>
               {trades.map((t) => {
                 const badge = typeBadge(t.transaction_type);
-                const display = traders.find((x) => x.member_name === t.member_name)?.display ?? t.member_name;
                 return (
                   <tr key={t.id} className="border-b border-line/50">
                     <td className="px-4 py-3">
                       {t.member_slug ? (
                         <Link href={`/politicians/${t.member_slug}`} className="text-ink hover:underline">
-                          {display}
+                          {memberDisplayName(t)}
                         </Link>
                       ) : (
-                        <span className="text-ink">{display}</span>
+                        <span className="text-ink">{memberDisplayName(t)}</span>
                       )}
                       <div className={`mt-0.5 text-xs ${partyColor(t.party)}`}>{t.party ?? "Unknown party"}</div>
                     </td>
@@ -189,7 +189,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
+                      <span className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-muted">{ownerLabel(t.owner)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{amountLabel(t.amount_range)}</td>
@@ -217,17 +217,16 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
         <div className="space-y-2 sm:hidden">
           {trades.map((t) => {
             const badge = typeBadge(t.transaction_type);
-            const display = traders.find((x) => x.member_name === t.member_name)?.display ?? t.member_name;
             return (
               <div key={t.id} className={`rounded-lg border border-line border-l-2 bg-panel p-3 ${badge.accent}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     {t.member_slug ? (
                       <Link href={`/politicians/${t.member_slug}`} className="truncate text-sm text-ink hover:underline">
-                        {display}
+                        {memberDisplayName(t)}
                       </Link>
                     ) : (
-                      <div className="truncate text-sm text-ink">{display}</div>
+                      <div className="truncate text-sm text-ink">{memberDisplayName(t)}</div>
                     )}
                     <div className="mt-0.5 text-xs text-ink-faint">
                       {t.asset_type_code && `${ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code}`}

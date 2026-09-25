@@ -157,7 +157,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
+                      <span className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-muted">{ownerLabel(t.owner)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{amountLabel(t.amount_range)}</td>

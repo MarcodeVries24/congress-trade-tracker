@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import { AccountMenu } from "./AccountMenu";
 import { ThemeToggle } from "./ThemeToggle";
 import { MobileNav } from "./MobileNav";
 
@@ -31,16 +32,6 @@ function Logo({ size = 28 }: { size?: number }) {
       <rect x="14.8" y="17.8" width="1.5" height="3.6" fill="currentColor" />
       <rect x="17.7" y="17.8" width="1.5" height="3.6" fill="currentColor" />
       <rect x="2" y="21.4" width="20" height="1.7" rx="0.4" fill="currentColor" />
-    </svg>
-  );
-}
-
-// Sized to match Clerk's own menu-item icons (16px, stroked, currentColor).
-function BellIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   );
 }
@@ -107,13 +98,8 @@ export function Header() {
             {/* The account screen (plan + email alerts) is reachable from the
                 avatar menu rather than the nav row — it's only meaningful
                 once you're signed in, and the row is already tight on
-                phones. Clerk renders this item above its own Manage/Sign out
-                entries. */}
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }}>
-              <UserButton.MenuItems>
-                <UserButton.Link label="Email alerts" labelIcon={<BellIcon />} href="/account" />
-              </UserButton.MenuItems>
-            </UserButton>
+                phones. See AccountMenu for why it's an action, not a link. */}
+            <AccountMenu />
           </SignedIn>
           {/* On phones this sits inside the menu instead — see MobileNav. */}
           <div className="hidden sm:block">

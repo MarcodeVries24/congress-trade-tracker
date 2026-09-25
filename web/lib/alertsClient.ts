@@ -101,3 +101,18 @@ export function readAlertDraft(search: string): AlertFilters | undefined {
     return {};
   }
 }
+
+/**
+ * The same handover, routed via the pricing page for someone who can't save an
+ * alert yet.
+ *
+ * Without this, the funnel loses people at its most expensive moment: they
+ * build a filter, hit the upgrade wall, pay — and land back with the draft
+ * gone, having to rebuild from memory the thing they just told us they wanted.
+ * /upgrade carries it through checkout and hands it to /account afterwards.
+ */
+export function alertUpgradeHref(filters: AlertFilters): string {
+  const keys = Object.keys(filters);
+  if (keys.length === 0) return "/upgrade";
+  return `/upgrade?${ALERT_DRAFT_PARAM}=${encodeURIComponent(JSON.stringify(filters))}`;
+}

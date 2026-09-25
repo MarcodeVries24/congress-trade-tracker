@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PricingTable } from "@clerk/nextjs";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
 
 export const metadata: Metadata = {
   title: "Upgrade — CongTrade",
@@ -18,7 +19,10 @@ export default function UpgradePage() {
           Filter trades by member, ticker, type, owner, size, market cap, and date, save searches as email alerts, and
           browse without ads.
         </p>
+        {/* Only renders when someone arrived mid-way through building an
+            alert — see UpgradeDraftHandoff. */}
         <div className="mt-8">
+          <UpgradeDraftHandoff />
           <PricingTable />
         </div>
       </main>

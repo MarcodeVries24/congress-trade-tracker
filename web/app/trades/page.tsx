@@ -23,6 +23,7 @@ import {
   TradeFilters,
 } from "@/lib/api";
 import { AlertFilters } from "@/lib/alertFilters";
+import { alertUpgradeHref } from "@/lib/alertsClient";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { MultiSelect } from "@/components/MultiSelect";
 import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
@@ -114,21 +115,33 @@ export default function Home() {
   // client's plan state.
   const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  // Which wall they hit. A locked *filter* should just take them to pricing;
+  // only the alert offer carries the half-built alert through checkout, so
+  // that upgrading from a filter click doesn't drop them into an alert editor
+  // they never asked for.
+  const [upgradeIntent, setUpgradeIntent] = useState<"filters" | "alert">("filters");
   function promptUpgrade() {
+    setUpgradeIntent("filters");
+    setUpgradeModalOpen(true);
+  }
+  function promptUpgradeForAlert() {
+    setUpgradeIntent("alert");
     setUpgradeModalOpen(true);
   }
   function continueUpgrade() {
     setUpgradeModalOpen(false);
-    if (isSignedIn) router.push("/upgrade");
+    const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
+    if (isSignedIn) router.push(target);
     // `redirectUrl` is deprecated in this Clerk version and gets silently
     // ignored — forceRedirectUrl is what actually lands them on /upgrade
     // after sign-up; signInForceRedirectUrl covers it too if they instead
     // click "Already have an account? Sign in" inside the same modal.
-    else openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
+    else openSignUp({ forceRedirectUrl: target, signInForceRedirectUrl: target });
   }
   function continueSignIn() {
     setUpgradeModalOpen(false);
-    openSignIn({ forceRedirectUrl: "/upgrade", signUpForceRedirectUrl: "/upgrade" });
+    const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
+    openSignIn({ forceRedirectUrl: target, signUpForceRedirectUrl: target });
   }
 
   const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
@@ -603,7 +616,7 @@ export default function Home() {
           // show a paying subscriber the upsell instead of the link.
           locked={!isSignedIn || (authLoaded && !has({ feature: "notifications" }) && !has({ feature: "filters" }) && !isAdmin)}
           signedIn={!!isSignedIn}
-          onLockedClick={promptUpgrade}
+          onLockedClick={promptUpgradeForAlert}
         />
 
         {error && (

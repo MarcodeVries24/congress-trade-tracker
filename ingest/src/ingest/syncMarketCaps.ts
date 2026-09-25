@@ -123,16 +123,33 @@ async function resolveNewAssetNames(): Promise<void> {
   console.log(`Resolved ${resolved}/${rows.length} new asset names to a ticker (the rest go to Undefined — no confident match).`);
 }
 
-async function refreshMarketCaps(): Promise<void> {
+/**
+ * @param missingOnly  Only tickers with no row in company_market_caps at all.
+ *
+ * The monthly full refresh keeps caps current, but it leaves a gap: a ticker
+ * first traded on the 2nd shows "Undefined" for the next 51 days, because
+ * nothing looks it up until the following month. Running this in gap-fill mode
+ * after each ingest closes that to a few hours, and costs one request per
+ * genuinely new symbol — usually none at all.
+ *
+ * A failed lookup writes no row, so gap-fill also retries anything the last
+ * full run couldn't reach.
+ */
+async function refreshMarketCaps(missingOnly = false): Promise<void> {
   const rows = (await sql.query(`
     SELECT ticker FROM (
       SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker != ''
       UNION
       SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL
     ) t
+    ${missingOnly ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker)" : ""}
   `)) as { ticker: string }[];
 
-  console.log(`Refreshing market cap for ${rows.length} ticker(s)...`);
+  if (rows.length === 0) {
+    console.log(missingOnly ? "No tickers are missing a market-cap lookup." : "No tickers to refresh.");
+    return;
+  }
+  console.log(`${missingOnly ? "Looking up" : "Refreshing"} market cap for ${rows.length} ticker(s)...`);
   let updated = 0;
   let noCap = 0;
   let failed = 0;
@@ -159,9 +176,14 @@ async function refreshMarketCaps(): Promise<void> {
 }
 
 async function main() {
+  // `--missing-only` is the cheap mode meant to run after every ingest: it
+  // skips the name-resolution sweep and looks up only tickers nothing has
+  // priced yet. The full run stays monthly (see market-caps.yml).
+  const missingOnly = process.argv.slice(2).includes("--missing-only");
+
   await ensureSchema();
-  await resolveNewAssetNames();
-  await refreshMarketCaps();
+  if (!missingOnly) await resolveNewAssetNames();
+  await refreshMarketCaps(missingOnly);
 }
 
 main().catch((err) => {

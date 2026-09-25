@@ -41,6 +41,21 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      # Price anything newly traded. Gap-fill only — one request per symbol
+      # nothing has priced yet, usually none — so it adds seconds, not the
+      # hour the monthly full refresh takes (see market-caps.yml). Without it
+      # a ticker first traded on the 2nd shows "Undefined" until the 1st of
+      # the next month.
+      #
+      # continue-on-error because a market cap is an enrichment: Finnhub being
+      # down or rate-limiting should never turn an otherwise good ingest red,
+      # and the monthly run picks up whatever this missed.
+      - run: npm run sync-market-caps:missing --workspace ingest
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+
       # Emails CongTrade Pro subscribers whose saved alerts match anything
       # that just arrived. Last step on purpose — both chambers are already
       # in, so a filing found this cycle goes out in this cycle.

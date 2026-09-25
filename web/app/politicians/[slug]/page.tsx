@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { AdSlot } from "@/components/AdSlot";
 import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
+import { issuerSlug } from "@/lib/issuerSlug";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getMemberBySlug, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 
@@ -94,9 +95,13 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
               <h2 className="text-xs font-medium uppercase tracking-wide text-ink-faint">Most traded</h2>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {profile.top_tickers.map((t) => (
-                  <span key={t.ticker} className="rounded-full border border-line bg-panel-muted px-2.5 py-1 text-xs text-ink-muted">
+                  <Link
+                    key={t.ticker}
+                    href={`/issuers/${issuerSlug(t.ticker)}`}
+                    className="rounded-full border border-line bg-panel-muted px-2.5 py-1 text-xs text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+                  >
                     <span className="text-ink">{t.ticker}</span> {t.count}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -142,7 +147,11 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                     <td className="px-4 py-3">
                       <div className="text-ink">{displayAssetName(t)}</div>
                       <div className="mt-0.5 text-xs text-ink-faint">
-                        {t.ticker && <span className="text-ink-muted">{t.ticker}</span>}
+                        {t.ticker && (
+                          <Link href={`/issuers/${issuerSlug(t.ticker)}`} className="text-ink-muted hover:text-ink hover:underline">
+                            {t.ticker}
+                          </Link>
+                        )}
                         {t.ticker && t.asset_type_code && " · "}
                         {t.asset_type_code && (ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code)}
                       </div>
@@ -180,7 +189,11 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                   <div className="min-w-0">
                     <div className="truncate text-sm text-ink">{displayAssetName(t)}</div>
                     <div className="mt-0.5 text-xs text-ink-faint">
-                      {t.ticker && <span className="text-ink-muted">{t.ticker}</span>}
+                      {t.ticker && (
+                        <Link href={`/issuers/${issuerSlug(t.ticker)}`} className="text-ink-muted hover:text-ink hover:underline">
+                          {t.ticker}
+                        </Link>
+                      )}
                       {t.ticker && t.asset_type_code && " · "}
                       {t.asset_type_code && (ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code)}
                       {t.owner && ` · ${ownerLabel(t.owner)}`}
@@ -208,9 +221,9 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
 
         <p className="mt-4 text-xs leading-relaxed text-ink-faint">
           Figures come from {profile.display}&rsquo;s own Periodic Transaction Reports, which disclose a value{" "}
-          <em>bracket</em> rather than an exact amount — the volume above sums the lower bound of each bracket and is
-          therefore a floor, not an estimate of what was actually traded. Every row links to the original filing.
-          Nothing here is investment advice.
+          <em>bracket</em> rather than an exact amount — the volume above sums the midpoint of each bracket, the same
+          estimate used everywhere on the site. Every row links to the original filing. Nothing here is investment
+          advice.
         </p>
       </main>
       <Footer />

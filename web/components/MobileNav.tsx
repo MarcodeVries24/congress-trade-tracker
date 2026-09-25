@@ -9,6 +9,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const LINKS = [
   { href: "/trades", label: "All Trades" },
   { href: "/politicians", label: "Politicians" },
+  { href: "/issuers", label: "Issuers" },
   { href: "/about", label: "About" },
 ];
 

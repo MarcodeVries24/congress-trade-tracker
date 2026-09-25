@@ -12,6 +12,7 @@ import {
   Stats,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
+import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { Header } from "@/components/Header";
@@ -241,14 +242,14 @@ export default function Home() {
 
         <div className="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}
-          <Card title="Most Traded Stocks" href="/trades">
+          <Card title="Most Traded Stocks" href="/issuers">
             {!dashboard && <CardSkeleton rows={6} />}
             {dashboard && dashboard.topStocks.length === 0 && <EmptyRow />}
             {dashboard && (
               <ul className="divide-y divide-line/60">
                 {dashboard.topStocks.map((s) => (
                   <li key={s.ticker}>
-                    <Link href={tradesSearchHref(s.ticker)} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                    <Link href={`/issuers/${issuerSlug(s.ticker)}`} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <span className="text-sm font-medium text-ink">{s.ticker}</span>
                       <span className="text-sm text-ink-muted">
                         {s.trade_count.toLocaleString()} trade{s.trade_count === 1 ? "" : "s"}

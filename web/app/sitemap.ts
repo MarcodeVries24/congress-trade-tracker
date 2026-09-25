@@ -1,13 +1,16 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 import { getMemberDirectory } from "@/lib/members";
+import { getIssuerDirectory } from "@/lib/issuers";
 
 /**
- * Every indexable page: seven fixed routes plus one per member who has traded.
+ * Every indexable page: eight fixed routes, one per member who has traded, and
+ * one per company they traded.
  *
- * The member pages come from a query, not a list, which is what makes this
- * self-maintaining — a politician filing for the first time appears here on
- * the next revalidation without anyone touching the code.
+ * Both lists come from a query, not a list, which is what makes this
+ * self-maintaining — a politician filing for the first time, or a ticker
+ * nobody has traded before, appears here on the next revalidation without
+ * anyone touching the code.
  *
  * /account and /unsubscribe are omitted on purpose: both are `noindex`, and
  * listing a page you've asked not to be indexed is a contradiction search
@@ -25,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/trades`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/politicians`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
+    { url: `${SITE_URL}/issuers`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/upgrade`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
@@ -44,5 +48,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // whole file is broken, so a database blip degrades rather than fails.
   }
 
-  return [...fixed, ...members];
+  let issuers: MetadataRoute.Sitemap = [];
+  try {
+    issuers = (await getIssuerDirectory()).map((i) => ({
+      url: `${SITE_URL}/issuers/${i.slug}`,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    }));
+  } catch {
+    // Same reasoning as the member list above: degrade, don't 500.
+  }
+
+  return [...fixed, ...members, ...issuers];
 }

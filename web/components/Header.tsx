@@ -80,6 +80,12 @@ export function Header() {
           >
             Politicians
           </Link>
+          <Link
+            href="/issuers"
+            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
+          >
+            Issuers
+          </Link>
         </nav>
 
         {/* `ml-auto` pins these right; `shrink-0` + `whitespace-nowrap` stop

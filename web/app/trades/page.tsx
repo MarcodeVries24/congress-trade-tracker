@@ -25,6 +25,8 @@ import {
   TradeFilters,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
+import Link from "next/link";
+import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters } from "@/lib/alertFilters";
 import { alertUpgradeHref } from "@/lib/alertsClient";
@@ -694,13 +696,13 @@ export default function Home() {
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                           {trade.ticker && (
-                            <button
-                              onClick={() => setTickers([trade.ticker as string])}
+                            <Link
+                              href={`/issuers/${issuerSlug(trade.ticker)}`}
                               className="font-mono hover:text-ink hover:underline"
-                              title={`Filter to ${trade.ticker}`}
+                              title={`${trade.company_name ?? trade.ticker} — all disclosed trades`}
                             >
                               {trade.ticker}
-                            </button>
+                            </Link>
                           )}
                           {assetTypeLabel && <span>{assetTypeLabel}</span>}
                           {trade.market_cap !== null && (
@@ -789,9 +791,9 @@ export default function Home() {
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                     {trade.ticker && (
-                      <button onClick={() => setTickers([trade.ticker as string])} className="font-mono hover:text-ink hover:underline">
+                      <Link href={`/issuers/${issuerSlug(trade.ticker)}`} className="font-mono hover:text-ink hover:underline">
                         {trade.ticker}
-                      </button>
+                      </Link>
                     )}
                     {assetTypeLabel && <span>{assetTypeLabel}</span>}
                     {trade.market_cap !== null && (

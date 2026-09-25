@@ -534,6 +534,46 @@ export async function fetchDashboard(): Promise<DashboardData> {
   return (await res.json()).data;
 }
 
+export interface IssuerRow {
+  ticker: string;
+  /** Supplied by the API, not derived here — see PoliticianRow.slug. */
+  slug: string;
+  company_name: string | null;
+  market_cap: number | null;
+  trade_count: number;
+  volume_sum: number;
+  politician_count: number;
+  purchases: number;
+  sales: number;
+  last_traded: string | null;
+  last_filed: string | null;
+}
+
+export interface IssuersResponse {
+  data: IssuerRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export async function fetchIssuers(filters: {
+  q?: string;
+  sort?: "trade_count" | "volume_sum" | "politician_count" | "market_cap" | "last_traded";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}): Promise<IssuersResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === "") continue;
+    params.set(key, String(value));
+  }
+  const res = await fetch(`/api/issuers?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to fetch issuers: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchPoliticians(filters: PoliticianFilters): Promise<PoliticiansResponse> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {

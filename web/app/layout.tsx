@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 // The AdSense account script (no ad slot, just the client ID) needs to be
@@ -10,8 +11,15 @@ import "./globals.css";
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export const metadata: Metadata = {
+  // Without a metadataBase, Next emits relative URLs in metadata and warns at
+  // build time; it's also what makes the canonical below absolute.
+  metadataBase: new URL(SITE_URL),
   title: "CongTrade — Congress Trade Tracker",
   description: "Searchable U.S. Congress (House & Senate) asset trade disclosures (Periodic Transaction Reports)",
+  // No `alternates.canonical` here on purpose: metadata is inherited, so a
+  // canonical set in the root layout would make every page declare the
+  // homepage as its canonical — telling Google that /trades is a duplicate
+  // of /. Canonicals belong on individual pages or nowhere.
 };
 
 // Clerk's <SignedIn>/<SignedOut>/<UserButton> (used in Header, rendered on

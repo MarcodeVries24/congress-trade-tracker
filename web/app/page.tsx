@@ -15,6 +15,7 @@ import {
 import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AmericanFlag } from "@/components/AmericanFlag";
+import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { SentimentRiver } from "@/components/SentimentRiver";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -241,7 +242,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}
           <Card title="Most Traded Stocks" href="/issuers">
             {!dashboard && <CardSkeleton rows={6} />}
@@ -332,6 +333,10 @@ export default function Home() {
               </div>
             )}
           </Card>
+        </div>
+
+        <div className="mt-4 lg:mt-6">
+          <AboutCongTrade />
         </div>
 
         <div className="mt-4 lg:mt-6">

@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { groupMembers } from "@/lib/members";
-
-// Same impossible-date guard used across /api/trades, /api/stats, /api/dashboard.
-const VALID_DATE_ORDER = `(
-  (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
-  OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0
-)`;
-
-// Range midpoint estimate, summed per member — same formula /api/stats and
-// /api/dashboard use.
-const VOLUME_EXPR = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
 
 const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 
@@ -48,7 +38,7 @@ export async function GET(req: NextRequest) {
   const pageNum = Math.max(Number(sp.get("page")) || 1, 1);
   const offset = (pageNum - 1) * limitNum;
 
-  const conditions: string[] = [VALID_DATE_ORDER];
+  const conditions: string[] = [PLAUSIBLE_DATES_SQL];
   const params: unknown[] = [];
   const addParam = (value: unknown) => {
     params.push(value);
@@ -72,7 +62,7 @@ export async function GET(req: NextRequest) {
             COALESCE(mh.party, (ARRAY_AGG(mr.party ORDER BY f.filing_date DESC NULLS LAST))[1]) AS party,
             COALESCE(mh.photo_url, (ARRAY_AGG(mr.photo_url ORDER BY f.filing_date DESC NULLS LAST))[1]) AS photo_url,
             COALESCE(mh.state, (ARRAY_AGG(mr.state ORDER BY f.filing_date DESC NULLS LAST))[1]) AS member_state,
-            f.chamber, COUNT(*)::int AS trade_count, ${VOLUME_EXPR}::float8 AS volume_sum,
+            f.chamber, COUNT(*)::int AS trade_count, ${VOLUME_MIDPOINT_SQL}::float8 AS volume_sum,
             MAX(f.filing_date) AS last_filed
      FROM transactions t
      JOIN filings f ON f.doc_id = t.doc_id

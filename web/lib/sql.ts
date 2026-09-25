@@ -33,3 +33,21 @@ export const PUBLISHED_FILING_SQL = `f.parse_status IN ('ok', 'manual')`;
  */
 export const PLAUSIBLE_DATES_SQL = `((NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
       OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0)`;
+
+/**
+ * The site's one and only "Est. volume" figure.
+ *
+ * The STOCK Act discloses a bracket, never an exact figure, so any single
+ * dollar number is an estimate — and *which* estimate has to be the same
+ * everywhere, because these figures sit next to each other: a leaderboard row
+ * links straight to the member page showing the same label. They disagreed
+ * once already (the member page summed each bracket's lower bound while every
+ * other surface summed midpoints, so Ro Khanna read $160.6M on his own page
+ * and $432.3M on the leaderboard — the same 25,846 trades, 2.7x apart), which
+ * is what this constant exists to prevent. /about promises the midpoint by
+ * name; this is that promise.
+ *
+ * COALESCE(amount_high, amount_low) keeps the open-ended top brackets
+ * ("Over $1,000,000***") at their floor rather than dropping them to half.
+ */
+export const VOLUME_MIDPOINT_SQL = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;

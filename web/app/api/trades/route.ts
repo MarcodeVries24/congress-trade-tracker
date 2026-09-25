@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL } from "@/lib/db";
 import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
 import { hasFeatureServer } from "@/lib/access";
 
@@ -64,10 +64,7 @@ export async function GET(req: NextRequest) {
   // A transaction dated after its own filing date is impossible — that's a
   // typo in the source document (see README), not a real trade. Exclude
   // these from the default view rather than showing an evidently wrong date.
-  conditions.push(
-    `((NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
-      OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0)`
-  );
+  conditions.push(PLAUSIBLE_DATES_SQL);
   {
     const placeholders = chamberFilter.map((c) => addParam(c));
     conditions.push(`f.chamber IN (${placeholders.join(", ")})`);

@@ -13,4 +13,4 @@ export const sql = neon(connectionString);
 // Re-exported so existing callers keep importing it from here. It lives in
 // lib/sql.ts because ingest/ imports it too (see the note there), and this
 // module pulls in the Neon client, which the ingest side must not load.
-export { PUBLISHED_FILING_SQL } from "./sql";
+export { PUBLISHED_FILING_SQL, PLAUSIBLE_DATES_SQL, VOLUME_MIDPOINT_SQL } from "./sql";

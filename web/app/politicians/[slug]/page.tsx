@@ -83,7 +83,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
 
           <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Disclosed trades" value={profile.trade_count.toLocaleString()} />
-            <Stat label="Est. volume" value={compactUSD.format(profile.volume_low)} hint="Sum of each disclosed bracket's lower bound" />
+            <Stat label="Est. volume" value={compactUSD.format(profile.volume_sum)} hint="Sum of each disclosed bracket's midpoint — the same estimate used site-wide" />
             <Stat label="Purchases / sales" value={`${profile.purchases.toLocaleString()} / ${profile.sales.toLocaleString()}`} />
             <Stat label="Latest filing" value={formatDate(profile.last_filed)} />
           </dl>

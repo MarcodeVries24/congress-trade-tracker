@@ -1,5 +1,5 @@
 import { sql } from "./db";
-import { PUBLISHED_FILING_SQL } from "./sql";
+import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { displayName } from "./api";
 import { memberSlug } from "./memberSlug";
 import { MEMBER_DISPLAY_NAMES } from "./memberNames";
@@ -237,7 +237,7 @@ export interface MemberProfile {
   chamber: "house" | "senate" | null;
   photo_url: string | null;
   trade_count: number;
-  volume_low: number;
+  volume_sum: number;
   first_filed: string | null;
   last_filed: string | null;
   purchases: number;
@@ -275,7 +275,7 @@ export async function getMemberBySlug(
   const [summaryRows, tickerRows, tradeRows] = await Promise.all([
     sql.query(
       `SELECT COUNT(*)::int AS trade_count,
-              COALESCE(SUM(t.amount_low), 0)::bigint AS volume_low,
+              COALESCE(${VOLUME_MIDPOINT_SQL}, 0)::float8 AS volume_sum,
               MIN(NULLIF(f.filing_date, '')) AS first_filed,
               MAX(NULLIF(f.filing_date, '')) AS last_filed,
               COUNT(*) FILTER (WHERE t.transaction_type ILIKE 'P%')::int AS purchases,
@@ -289,13 +289,13 @@ export async function getMemberBySlug(
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
        LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
-       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL}`,
+       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}`,
       [entry.names]
     ),
     sql.query(
       `SELECT t.ticker, COUNT(*)::int AS count
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL}
+       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
          AND t.ticker IS NOT NULL AND t.ticker <> ''
        GROUP BY 1 ORDER BY 2 DESC LIMIT 8`,
       [entry.names]
@@ -307,7 +307,7 @@ export async function getMemberBySlug(
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
-       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL}
+       WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
        ORDER BY f.filing_date DESC NULLS LAST, t.transaction_date DESC NULLS LAST, t.id DESC
        LIMIT ${MEMBER_PAGE_TRADE_LIMIT}`,
       [entry.names]
@@ -327,7 +327,7 @@ export async function getMemberBySlug(
       chamber: (s?.chamber as "house" | "senate") ?? null,
       photo_url: (s?.photo_url as string) ?? null,
       trade_count: Number(s?.trade_count ?? 0),
-      volume_low: Number(s?.volume_low ?? 0),
+      volume_sum: Number(s?.volume_sum ?? 0),
       first_filed: (s?.first_filed as string) ?? null,
       last_filed: (s?.last_filed as string) ?? null,
       purchases: Number(s?.purchases ?? 0),

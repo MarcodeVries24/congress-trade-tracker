@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { groupMembers } from "@/lib/members";
-
-// A transaction dated after its own filing date is impossible (a source
-// document typo) — excluded here too, so stats match what the trade list
-// actually shows. See the same condition in app/api/trades/route.ts.
-const VALID_DATE_ORDER = `(
-  (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
-  OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0
-)`;
 
 export async function GET(req: NextRequest) {
   // Defaults to House-only, same reasoning as /api/trades.
@@ -21,7 +13,7 @@ export async function GET(req: NextRequest) {
     sql.query(
       `SELECT COUNT(*)::int as transactions
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
+       WHERE ${PLAUSIBLE_DATES_SQL} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
       chambers
     ),
     sql.query(`SELECT COUNT(*)::int as filings FROM filings f WHERE ${chamberFilter}`, chambers),
@@ -40,15 +32,15 @@ export async function GET(req: NextRequest) {
     // Amount is disclosed as a range, not an exact figure — this is the sum of
     // range midpoints, i.e. a rough estimate, not a precise trading volume.
     sql.query(
-      `SELECT SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)::float8 as volume
+      `SELECT ${VOLUME_MIDPOINT_SQL}::float8 as volume
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
+       WHERE ${PLAUSIBLE_DATES_SQL} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
       chambers
     ),
     sql.query(
       `SELECT t.ticker, COUNT(*)::int as count
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE t.ticker IS NOT NULL AND ${VALID_DATE_ORDER} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}
+       WHERE t.ticker IS NOT NULL AND ${PLAUSIBLE_DATES_SQL} AND ${chamberFilter} AND ${PUBLISHED_FILING_SQL}
        GROUP BY t.ticker ORDER BY count DESC LIMIT 10`,
       chambers
     ),

@@ -1,20 +1,6 @@
 import { NextResponse } from "next/server";
-import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { ASSET_TYPE_VALUES } from "@/lib/api";
-
-// Same impossible-date guard as /api/trades and /api/stats — a transaction
-// dated after its own filing date is a source-document typo, not a real
-// trade, so it's excluded everywhere trades are ranked or counted.
-const VALID_DATE_ORDER = `(
-  (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) IS NULL
-  OR (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) >= 0
-)`;
-
-// Range midpoint estimate, summed per member — same formula /api/stats uses
-// for estimatedVolume. A trade's exact value is never disclosed, only a
-// bracket, so this is the standard "best guess" figure used everywhere
-// volume is shown on the site.
-const VOLUME_EXPR = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
 
 // members_history/member_terms resolve which specific person filed a trade
 // (state_district alone is just the seat, reused by whoever holds it next —
@@ -60,7 +46,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       JOIN filings f ON f.doc_id = t.doc_id
       ${MEMBER_JOIN}
       ${COMPANY_JOIN}
-      WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} ${assetTypeFilter}
+      WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} ${assetTypeFilter}
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
     ORDER BY sub.filing_date DESC NULLS LAST, sub.id DESC
@@ -83,18 +69,18 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
          GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY trade_count DESC
          LIMIT 8`
       ),
       sql.query(
         `SELECT t.member_name, ${STATE_DISTRICT_GROUPED}, ${MEMBER_COLUMNS_GROUPED}, f.chamber,
-                ${VOLUME_EXPR}::float8 as volume_sum, COUNT(*)::int as trade_count
+                ${VOLUME_MIDPOINT_SQL}::float8 as volume_sum, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
          GROUP BY ${GROUPED_BY_PERSON}
          ORDER BY volume_sum DESC
          LIMIT 8`
@@ -103,7 +89,7 @@ export async function GET() {
         `SELECT t.ticker, COUNT(*)::int as trade_count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         WHERE ${PUBLISHED_FILING_SQL} AND t.ticker IS NOT NULL AND t.ticker != '' AND ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND t.ticker IS NOT NULL AND t.ticker != '' AND ${PLAUSIBLE_DATES_SQL}
          GROUP BY t.ticker
          ORDER BY trade_count DESC
          LIMIT 8`
@@ -116,7 +102,7 @@ export async function GET() {
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
          ${COMPANY_JOIN}
-         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} AND t.amount_low IS NOT NULL
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} AND t.amount_low IS NOT NULL
            AND (NULLIF(f.filing_date, '')::date) >= (CURRENT_DATE - INTERVAL '30 days')
          ORDER BY t.amount_low DESC
          LIMIT 5`
@@ -125,7 +111,7 @@ export async function GET() {
         `SELECT f.chamber, COUNT(*)::int as count
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
-         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER}
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
          GROUP BY f.chamber`
       ),
       sql.query(
@@ -133,7 +119,7 @@ export async function GET() {
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
          ${MEMBER_JOIN}
-         WHERE ${PUBLISHED_FILING_SQL} AND ${VALID_DATE_ORDER} AND COALESCE(mh.party, mr.party) IS NOT NULL
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} AND COALESCE(mh.party, mr.party) IS NOT NULL
          GROUP BY COALESCE(mh.party, mr.party)`
       ),
     ]);

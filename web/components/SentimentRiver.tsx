@@ -208,7 +208,10 @@ export function SentimentRiver() {
   const fmt = (n: number) => (mode === "value" ? compactUSD.format(n) : compactCount.format(Math.round(n)));
 
   return (
-    <section className="mb-4 overflow-hidden rounded-xl border border-line bg-panel sm:mb-6">
+    // h-full so the card fills its grid cell rather than leaving its wrapper
+    // stretched and itself short — beside the about card that showed as a step
+    // at the foot of the row.
+    <section className="mb-4 flex h-full flex-col overflow-hidden rounded-xl border border-line bg-panel sm:mb-6">
       <div className="flex flex-col gap-5 border-b border-line px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5">
         <div className="min-w-0">
           <p className="text-[10px] font-medium uppercase tracking-[0.09em] text-ink-faint">Congressional trading flow</p>

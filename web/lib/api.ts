@@ -54,6 +54,8 @@ export interface Stats {
 export interface DashboardTrade {
   id: number;
   member_name: string;
+  /** The member page this row links to, supplied by the API. */
+  member_slug: string | null;
   bioguide_id: string | null;
   state_district: string | null;
   asset_name: string;
@@ -73,6 +75,8 @@ export interface DashboardTrade {
 
 export interface DashboardPolitician {
   member_name: string;
+  /** The member page this row links to, supplied by the API. */
+  member_slug: string | null;
   bioguide_id: string | null;
   state_district: string | null;
   party: string | null;
@@ -84,6 +88,8 @@ export interface DashboardPolitician {
 
 export interface DashboardVolumeLeader {
   member_name: string;
+  /** The member page this row links to, supplied by the API. */
+  member_slug: string | null;
   bioguide_id: string | null;
   state_district: string | null;
   party: string | null;

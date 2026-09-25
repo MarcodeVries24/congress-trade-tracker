@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
+import { getMemberSlugsByName } from "@/lib/members";
 import { ASSET_TYPE_VALUES } from "@/lib/api";
 
 // members_history/member_terms resolve which specific person filed a trade
@@ -134,14 +135,22 @@ export async function GET() {
       ),
     ]);
 
+  // Every card that names a member links to that member's page, so each row
+  // needs the slug. Resolved from the grouped directory rather than derived
+  // from the one spelling on the row — the same reasoning as /api/trades, and
+  // cached, so it costs one query per instance per five minutes.
+  const slugs = await getMemberSlugsByName();
+  const withSlug = <T extends { member_name: string }>(rows: unknown) =>
+    (rows as T[]).map((row) => ({ ...row, member_slug: slugs.get(row.member_name) ?? null }));
+
   return NextResponse.json({
     data: {
-      latestTradesStocks,
-      latestTradesAll,
-      topPoliticians,
-      topByVolume,
+      latestTradesStocks: withSlug(latestTradesStocks),
+      latestTradesAll: withSlug(latestTradesAll),
+      topPoliticians: withSlug(topPoliticians),
+      topByVolume: withSlug(topByVolume),
       topStocks,
-      biggestTrades,
+      biggestTrades: withSlug(biggestTrades),
       chamberBreakdown,
       partyBreakdown,
     },

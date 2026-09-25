@@ -26,8 +26,9 @@ import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWith
 // Same free, ungated search param /trades already supports (ILIKE across
 // member_name/asset_name/ticker) — deliberately not the paid member/ticker
 // filters, so every dashboard link works for anonymous visitors too.
-function tradesSearchHref(query: string): string {
-  return `/trades?q=${encodeURIComponent(query)}`;
+/** Falls back to the old free-text search only for a row with no slug. */
+function memberHref(row: { member_slug: string | null; member_name: string }): string {
+  return row.member_slug ? `/politicians/${row.member_slug}` : `/trades?q=${encodeURIComponent(row.member_name)}`;
 }
 
 function memberLocationFromDashboard(row: { chamber: "house" | "senate"; state_district: string | null; member_state: string | null }): string | null {
@@ -153,7 +154,7 @@ export default function Home() {
                   return (
                     <li key={trade.id}>
                       <Link
-                        href={tradesSearchHref(trade.member_name)}
+                        href={memberHref(trade)}
                         className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5"
                       >
                         <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
@@ -187,7 +188,7 @@ export default function Home() {
                     const location = memberLocationFromDashboard(p);
                     return (
                       <li key={`${p.member_name}-${i}`}>
-                        <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                        <Link href={memberHref(p)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                           <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm text-ink">{memberDisplayName(p)}</div>
@@ -217,7 +218,7 @@ export default function Home() {
                     const location = memberLocationFromDashboard(p);
                     return (
                       <li key={`${p.member_name}-${i}`}>
-                        <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                        <Link href={memberHref(p)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                           <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm text-ink">{memberDisplayName(p)}</div>
@@ -271,7 +272,7 @@ export default function Home() {
               <ul className="divide-y divide-line/60">
                 {dashboard.biggestTrades.map((trade) => (
                   <li key={trade.id}>
-                    <Link href={tradesSearchHref(trade.member_name)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                    <Link href={memberHref(trade)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm text-ink">{memberDisplayName(trade)}</div>
@@ -335,12 +336,13 @@ export default function Home() {
           </Card>
         </div>
 
-        <div className="mt-4 lg:mt-6">
+        {/* A column of prose beside the chart rather than a band above it: at
+            full width the paragraphs stretch to a single unreadable line. */}
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-6 lg:grid-cols-3 lg:gap-6">
           <AboutCongTrade trades={stats?.totalTransactions} members={stats?.totalMembers} />
-        </div>
-
-        <div className="mt-4 lg:mt-6">
-          <SentimentRiver />
+          <div className="lg:col-span-2">
+            <SentimentRiver />
+          </div>
         </div>
       </main>
       <Footer />

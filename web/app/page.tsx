@@ -336,7 +336,7 @@ export default function Home() {
         </div>
 
         <div className="mt-4 lg:mt-6">
-          <AboutCongTrade />
+          <AboutCongTrade trades={stats?.totalTransactions} members={stats?.totalMembers} />
         </div>
 
         <div className="mt-4 lg:mt-6">

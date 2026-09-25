@@ -24,21 +24,35 @@ import type { AssetGroup } from "@/lib/issuers";
  *  uses, plus the everything option this list is long enough to want. */
 const ALL = -1;
 
+/** No "most politicians" here — see the note in the route. */
+const SORT_OPTIONS: { value: string; label: string; sort: string; order: "asc" | "desc" }[] = [
+  { value: "trade_count:desc", label: "Most traded", sort: "trade_count", order: "desc" },
+  { value: "trade_count:asc", label: "Least traded", sort: "trade_count", order: "asc" },
+  { value: "volume_sum:desc", label: "Highest est. volume", sort: "volume_sum", order: "desc" },
+  { value: "volume_sum:asc", label: "Lowest est. volume", sort: "volume_sum", order: "asc" },
+  { value: "last_traded:desc", label: "Most recently traded", sort: "last_traded", order: "desc" },
+  { value: "last_traded:asc", label: "Least recently traded", sort: "last_traded", order: "asc" },
+];
+
 export function OtherAssetsTable({ query }: { query: string }) {
   const [rows, setRows] = useState<AssetGroup[] | null>(null);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
+  const [sortValue, setSortValue] = useState("trade_count:desc");
+  const activeSort = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
 
   useEffect(() => {
     setPage(1);
-  }, [query, pageSize]);
+  }, [query, pageSize, sortValue]);
 
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams({
       limit: String(pageSize === ALL ? 5000 : pageSize),
       page: String(pageSize === ALL ? 1 : page),
+      sort: activeSort.sort,
+      order: activeSort.order,
     });
     if (query) params.set("q", query);
     fetch(`/api/other-assets?${params}`)
@@ -54,7 +68,7 @@ export function OtherAssetsTable({ query }: { query: string }) {
     return () => {
       cancelled = true;
     };
-  }, [query, pageSize, page]);
+  }, [query, pageSize, page, activeSort.sort, activeSort.order]);
 
   const totalPages = pageSize === ALL ? 1 : Math.max(1, Math.ceil(total / pageSize));
   const offset = pageSize === ALL ? 0 : (page - 1) * pageSize;
@@ -64,8 +78,8 @@ export function OtherAssetsTable({ query }: { query: string }) {
 
   return (
     <section className="mt-8 sm:mt-10">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <div>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink sm:text-lg">Everything else Congress trades</h2>
           <p className="mt-1 max-w-3xl text-xs text-ink-muted sm:text-[13px]">
             Municipal bonds, treasuries, corporate paper, funds and private partnerships — the assets that carry no
@@ -73,6 +87,18 @@ export function OtherAssetsTable({ query }: { query: string }) {
             maturity and coupon as its own name, so treat these as families rather than exact issuers.
           </p>
         </div>
+        <Select
+          aria-label="Sort other assets"
+          value={sortValue}
+          onChange={(e) => setSortValue(e.target.value)}
+          className="w-full shrink-0 sm:w-56"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">

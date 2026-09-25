@@ -1,5 +1,5 @@
 import { displayName } from "./api";
-import { MEMBER_DISPLAY_NAMES } from "./memberNames";
+import { MEMBER_DISPLAY_NAMES, MEMBER_NAME_BIOGUIDES } from "./memberNames";
 
 /**
  * How a member's name is rendered, for a single row.
@@ -22,6 +22,18 @@ import { MEMBER_DISPLAY_NAMES } from "./memberNames";
 export function memberDisplayName(row: { member_name: string; bioguide_id?: string | null }): string {
   const curated = row.bioguide_id ? MEMBER_DISPLAY_NAMES[row.bioguide_id] : undefined;
   return curated ?? titleCaseIfShouted(cleanName(displayName(row.member_name)));
+}
+
+/**
+ * The same name, resolved from a filed spelling alone.
+ *
+ * For anything holding a trade row, prefer memberDisplayName above — the row
+ * carries the bioguide id and that can never go stale. This is for the one
+ * place that has only the spelling: a saved alert's filters, which store the
+ * filed name because that is what the query matches on.
+ */
+export function memberDisplayNameFromFiledName(name: string): string {
+  return memberDisplayName({ member_name: name, bioguide_id: MEMBER_NAME_BIOGUIDES[name] ?? null });
 }
 
 // Tokens that are form-filling noise rather than part of a name: honorifics

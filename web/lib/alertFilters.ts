@@ -17,8 +17,9 @@
  * So: no `next/*`, no React, no database client in here or in anything it
  * imports. Keep the imports below to dependency-free sibling modules.
  */
-import { AMOUNT_RANGES, ASSET_TYPE_LABELS, ASSET_TYPE_VALUES, MARKET_CAP_TIERS, OWNER_LABELS, displayName } from "./api";
+import { AMOUNT_RANGES, ASSET_TYPE_LABELS, ASSET_TYPE_VALUES, MARKET_CAP_TIERS, OWNER_LABELS } from "./api";
 import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL } from "./sql";
+import { memberDisplayNameFromFiledName } from "./memberDisplay";
 
 export type AlertFrequency = "instant" | "daily" | "weekly";
 
@@ -308,7 +309,7 @@ export function describeAlert(filters: AlertFilters): string[] {
   }
   if (filters.parties?.length) chips.push(filters.parties.map((p) => `${p}s`).join(" or "));
   if (filters.states?.length) chips.push(joinCapped(filters.states, 4));
-  if (filters.members?.length) chips.push(joinCapped(filters.members.map(displayName), 2));
+  if (filters.members?.length) chips.push(joinCapped(filters.members.map(memberDisplayNameFromFiledName), 2));
   if (filters.types?.length) {
     chips.push(filters.types.map((t) => ({ P: "Purchases", S: "Sales", E: "Exchanges" })[t] ?? t).join(" or "));
   }

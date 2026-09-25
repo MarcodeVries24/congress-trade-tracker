@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { getMemberSlugsByName } from "@/lib/members";
 import { ASSET_TYPE_VALUES, MARKET_CAP_TIERS } from "@/lib/api";
 import { hasFeatureServer } from "@/lib/access";
 
@@ -167,8 +168,20 @@ export async function GET(req: NextRequest) {
 
   const total = (countRows as { count: number }[])[0]?.count ?? 0;
 
+  // The page each member's name links to. Resolved here rather than derived
+  // in the browser because a slug belongs to a *person*, and a person is the
+  // several spellings they file under — which only the grouped directory
+  // knows. Deriving it from the one spelling on a row would 404 for anyone
+  // whose canonical name comes from a different variant. Cached, so this
+  // costs one query per instance per five minutes, not one per request.
+  const slugsByName = await getMemberSlugsByName();
+  const data = (dataRows as Record<string, unknown>[]).map((row) => ({
+    ...row,
+    member_slug: slugsByName.get(String(row.member_name)) ?? null,
+  }));
+
   return NextResponse.json({
-    data: dataRows,
+    data,
     page: pageNum,
     limit: limitNum,
     total,

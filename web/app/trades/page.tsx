@@ -678,13 +678,17 @@ export default function Home() {
                         <div className="flex items-center gap-2.5">
                           <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                           <div>
-                            <button
-                              onClick={() => setMembers([trade.member_name])}
-                              className="text-left font-medium hover:underline"
-                              title={`Filter to ${memberDisplayName(trade)}`}
-                            >
-                              {memberDisplayName(trade)}
-                            </button>
+                            {trade.member_slug ? (
+                              <Link
+                                href={`/politicians/${trade.member_slug}`}
+                                className="text-left font-medium hover:underline"
+                                title={`${memberDisplayName(trade)} — all disclosed trades`}
+                              >
+                                {memberDisplayName(trade)}
+                              </Link>
+                            ) : (
+                              <span className="font-medium">{memberDisplayName(trade)}</span>
+                            )}
                             {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
                           </div>
                         </div>
@@ -773,13 +777,23 @@ export default function Home() {
               return (
                 <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <button onClick={() => setMembers([trade.member_name])} className="flex items-center gap-2.5 text-left">
-                      <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
-                      <div>
-                        <div className="font-medium">{memberDisplayName(trade)}</div>
-                        {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                    {trade.member_slug ? (
+                      <Link href={`/politicians/${trade.member_slug}`} className="flex items-center gap-2.5 text-left">
+                        <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                        <div>
+                          <div className="font-medium">{memberDisplayName(trade)}</div>
+                          {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2.5 text-left">
+                        <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
+                        <div>
+                          <div className="font-medium">{memberDisplayName(trade)}</div>
+                          {memberLocation(trade) && <div className="text-xs text-ink-faint">{memberLocation(trade)}</div>}
+                        </div>
                       </div>
-                    </button>
+                    )}
                     <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
                       {badge.label}
                     </span>

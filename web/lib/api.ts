@@ -3,6 +3,8 @@ export interface Trade {
   doc_id: string;
   member_name: string;
   bioguide_id: string | null;
+  /** The member page this row belongs to, supplied by the API — see PoliticianRow.slug. */
+  member_slug: string | null;
   state_district: string | null;
   asset_name: string;
   ticker: string | null;

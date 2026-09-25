@@ -145,14 +145,52 @@ export function groupMembers<T extends { member_name: string; bioguide_id: strin
   return entries.sort((a, b) => b.trades - a.trades);
 }
 
-export async function getMemberDirectory(): Promise<MemberDirectoryEntry[]> {
-  const rows = (await sql.query(
-    `SELECT t.member_name, f.bioguide_id, COUNT(*)::int AS trades
-     FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-     WHERE ${PUBLISHED_FILING_SQL}
-     GROUP BY 1, 2`
-  )) as { member_name: string; bioguide_id: string | null; trades: number }[];
-  return groupMembers(rows);
+/**
+ * Cached because this is now on hot paths, not just the sitemap: every issuer
+ * page resolves its members through it, and /api/trades attaches a page slug
+ * to every row with it. The underlying query aggregates all 65k transactions,
+ * which is far too much to repeat per request for an answer that changes only
+ * when someone files for the very first time.
+ *
+ * Per server instance, and only for as long as one stays warm — this is a
+ * latency cache, not a correctness one. Nothing depends on a new member
+ * appearing within the window; they get a page either way, just via the
+ * name-variant redirect until the cache turns over.
+ */
+const DIRECTORY_TTL_MS = 5 * 60 * 1000;
+let directoryCache: { at: number; value: Promise<MemberDirectoryEntry[]> } | null = null;
+
+export function getMemberDirectory(): Promise<MemberDirectoryEntry[]> {
+  const now = Date.now();
+  if (directoryCache && now - directoryCache.at < DIRECTORY_TTL_MS) return directoryCache.value;
+
+  const value = (async () => {
+    const rows = (await sql.query(
+      `SELECT t.member_name, f.bioguide_id, COUNT(*)::int AS trades
+       FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE ${PUBLISHED_FILING_SQL}
+       GROUP BY 1, 2`
+    )) as { member_name: string; bioguide_id: string | null; trades: number }[];
+    return groupMembers(rows);
+  })();
+
+  // A rejected promise must not be cached, or one database blip poisons every
+  // request for five minutes.
+  value.catch(() => {
+    if (directoryCache?.value === value) directoryCache = null;
+  });
+
+  directoryCache = { at: now, value };
+  return value;
+}
+
+/** name -> the slug of the page that name's trades belong to. */
+export async function getMemberSlugsByName(): Promise<Map<string, string>> {
+  const byName = new Map<string, string>();
+  for (const entry of await getMemberDirectory()) {
+    for (const name of entry.names) byName.set(name, entry.slug);
+  }
+  return byName;
 }
 
 /**

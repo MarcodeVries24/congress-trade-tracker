@@ -33,6 +33,16 @@ const TRADE_COLUMNS = `t.id, t.member_name, t.state_district, t.asset_name, t.ti
 const COMPANY_JOIN = `LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')`;
 
 // One row per member (their single most recent trade), rather than raw
+// Latest Trades sits beside a sidebar of two 8-row cards, and on a desktop
+// three-column layout the two columns end wherever their own content ends
+// (see the grid comment in app/page.tsx). Row heights are fixed — every row
+// truncates rather than wrapping — so the count is what decides whether the
+// columns finish level: 53px of card chrome + 66px per row against the
+// sidebar's 1028px means 15 rows lands within ~15px, where 12 rows left a
+// 183px hole under the card. Change this and the homepage gets that hole
+// back.
+const LATEST_TRADES_LIMIT = 15;
+
 // "last N rows" — a member who filed a dozen trades on the same day would
 // otherwise fill the entire card by themselves. DISTINCT ON picks each
 // member's latest row first, then the outer query re-sorts across members
@@ -50,7 +60,7 @@ function latestUniqueQuery(assetTypeFilter: string): string {
       ORDER BY t.member_name, f.filing_date DESC NULLS LAST, t.id DESC
     ) sub
     ORDER BY sub.filing_date DESC NULLS LAST, sub.id DESC
-    LIMIT 12`;
+    LIMIT ${LATEST_TRADES_LIMIT}`;
 }
 
 // Unlike /api/trades and /api/stats (House-only by default), the dashboard

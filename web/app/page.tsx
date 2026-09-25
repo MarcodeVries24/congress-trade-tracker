@@ -111,7 +111,13 @@ export default function Home() {
             equal-height stretching (via row-span + the default grid
             align-items: stretch), which left a large blank gap inside
             whichever card had less content. items-start here means each
-            column simply ends where its own content ends. */}
+            column simply ends where its own content ends.
+
+            The flip side is that the two columns only finish level if their
+            row counts are chosen to match: LATEST_TRADES_LIMIT in
+            api/dashboard/route.ts is set against the sidebar's two 8-row
+            cards for exactly that reason. Change either one and the other
+            needs re-checking, or a hole opens under the shorter column. */}
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:gap-6">
           {/* Latest Trades */}
           <Card

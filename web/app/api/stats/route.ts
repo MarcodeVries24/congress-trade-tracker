@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { groupMembers } from "@/lib/members";
 
 // A transaction dated after its own filing date is impossible (a source
 // document typo) — excluded here too, so stats match what the trade list
@@ -24,10 +25,16 @@ export async function GET(req: NextRequest) {
       chambers
     ),
     sql.query(`SELECT COUNT(*)::int as filings FROM filings f WHERE ${chamberFilter}`, chambers),
+    // Distinct *people*, not distinct spellings. COUNT(DISTINCT member_name)
+    // returned 291 where the politicians list showed 273, because the same
+    // member is filed under several names — Marjorie Taylor Greene twice,
+    // Scott Franklin four times. Grouped with the same function the
+    // leaderboard and the member pages use, so all three agree.
     sql.query(
-      `SELECT COUNT(DISTINCT t.member_name)::int as members
+      `SELECT t.member_name, f.bioguide_id, COUNT(*)::int AS trades
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
-       WHERE ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`,
+       WHERE ${chamberFilter} AND ${PUBLISHED_FILING_SQL}
+       GROUP BY 1, 2`,
       chambers
     ),
     // Amount is disclosed as a range, not an exact figure — this is the sum of
@@ -54,7 +61,7 @@ export async function GET(req: NextRequest) {
   ])) as [
     { transactions: number }[],
     { filings: number }[],
-    { members: number }[],
+    { member_name: string; bioguide_id: string | null; trades: number }[],
     { volume: number | null }[],
     { ticker: string; count: number }[],
     { last: string | null }[],
@@ -65,7 +72,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     totalTransactions: totals[0]?.transactions ?? 0,
     totalFilings: filings[0]?.filings ?? 0,
-    totalMembers: members[0]?.members ?? 0,
+    totalMembers: groupMembers(members).length,
     estimatedVolume: volume[0]?.volume ?? 0,
     topTickers,
     lastIngestedAt: lastIngested[0]?.last ?? null,

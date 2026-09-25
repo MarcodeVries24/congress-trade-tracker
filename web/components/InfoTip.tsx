@@ -63,7 +63,7 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
         aria-controls={id}
         aria-label={label}
         title={text}
-        className="relative -top-px ml-1 inline-flex h-[1.15em] w-[1.15em] shrink-0 items-center justify-center rounded-full border border-line-strong font-semibold leading-none text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-muted"
+        className="relative -top-px ml-[3px] inline-flex h-[1.05em] w-[1.05em] shrink-0 items-center justify-center rounded-full border border-line-strong font-semibold leading-none text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-muted"
       >
         <span className="text-[0.66em] leading-none">i</span>
       </button>
@@ -73,7 +73,7 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
           id={id}
           role="note"
           style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
-          className="absolute left-1/2 top-[calc(100%+7px)] z-30 w-64 max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-panel px-3 py-2.5 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-ink-muted shadow-lg sm:w-72"
+          className="absolute left-1/2 top-[calc(100%+7px)] z-30 block w-64 max-w-[calc(100vw-1rem)] whitespace-normal break-words rounded-lg border border-line bg-panel px-3 py-2.5 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-ink-muted shadow-lg sm:w-72"
         >
           {text}
         </span>

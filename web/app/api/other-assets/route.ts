@@ -8,9 +8,11 @@ export async function GET(req: NextRequest) {
   // No practical ceiling: the whole directory is ~3,200 rows, and the page
   // only asks for them when someone clicks "View all".
   const limit = Math.min(Number(sp.get("limit")) || 25, 5000);
+  const page = Math.max(Number(sp.get("page")) || 1, 1);
 
   let rows = await getOtherAssetDirectory();
   if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q) || (r.type ?? "").toLowerCase().includes(q));
 
-  return NextResponse.json({ data: rows.slice(0, limit), total: rows.length });
+  const offset = (page - 1) * limit;
+  return NextResponse.json({ data: rows.slice(offset, offset + limit), total: rows.length });
 }

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ASSET_TYPE_LABELS, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
+import { ASSET_TYPE_LABELS, PAGE_SIZE_OPTIONS, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
+import { Select } from "./Select";
 import { compactUSD, formatDate } from "@/lib/format";
 import type { AssetGroup } from "@/lib/issuers";
 
@@ -18,16 +19,27 @@ import type { AssetGroup } from "@/lib/issuers";
  * are. The page says so rather than implying a precision it hasn't got.
  */
 
-const PAGE = 25;
+/** "All" is a page size rather than a separate button, so one control governs
+ *  how much of the list you see — the same shape the companies table above
+ *  uses, plus the everything option this list is long enough to want. */
+const ALL = -1;
 
 export function OtherAssetsTable({ query }: { query: string }) {
   const [rows, setRows] = useState<AssetGroup[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [showAll, setShowAll] = useState(false);
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({ limit: String(showAll ? 5000 : PAGE) });
+    const params = new URLSearchParams({
+      limit: String(pageSize === ALL ? 5000 : pageSize),
+      page: String(pageSize === ALL ? 1 : page),
+    });
     if (query) params.set("q", query);
     fetch(`/api/other-assets?${params}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -42,7 +54,10 @@ export function OtherAssetsTable({ query }: { query: string }) {
     return () => {
       cancelled = true;
     };
-  }, [query, showAll]);
+  }, [query, pageSize, page]);
+
+  const totalPages = pageSize === ALL ? 1 : Math.max(1, Math.ceil(total / pageSize));
+  const offset = pageSize === ALL ? 0 : (page - 1) * pageSize;
 
   const typeLabel = (t: string | null) => (t ? (ASSET_TYPE_LABELS[t] ?? t) : "Unspecified");
   const tradesHref = (name: string) => `/trades?q=${encodeURIComponent(name.split(" ").slice(0, 3).join(" "))}&assetTypes=any`;
@@ -58,11 +73,6 @@ export function OtherAssetsTable({ query }: { query: string }) {
             maturity and coupon as its own name, so treat these as families rather than exact issuers.
           </p>
         </div>
-        {total > PAGE && (
-          <button onClick={() => setShowAll((v) => !v)} className="shrink-0 text-xs text-accent hover:underline">
-            {showAll ? "Show top 25" : `View all ${total.toLocaleString()} →`}
-          </button>
-        )}
       </div>
 
       <div className="hidden overflow-x-auto rounded-lg border border-line sm:block">
@@ -96,7 +106,7 @@ export function OtherAssetsTable({ query }: { query: string }) {
             )}
             {rows?.map((r, i) => (
               <tr key={r.name} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
-                <td className="px-4 py-3 text-ink-faint">{i + 1}</td>
+                <td className="px-4 py-3 text-ink-faint">{offset + i + 1}</td>
                 <td className="px-4 py-3">
                   <Link href={tradesHref(r.name)} className="text-ink hover:underline">
                     {r.name}
@@ -111,6 +121,48 @@ export function OtherAssetsTable({ query }: { query: string }) {
           </tbody>
         </table>
       </div>
+
+      {rows !== null && rows.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">
+          <div className="flex items-center gap-2">
+            <span>Show</span>
+            <Select
+              aria-label="Rows per page"
+              value={String(pageSize)}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="w-24"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+              <option value={ALL}>All</option>
+            </Select>
+            <span>
+              {pageSize === ALL ? "All" : `Page ${page} of ${totalPages}`} · {total.toLocaleString()} assets
+            </span>
+          </div>
+          {pageSize !== ALL && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2 sm:hidden">
         {rows === null && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import {
@@ -58,6 +58,11 @@ function sizeTier(amountLow: number | null): number {
 // "more gold" so they read as a distinct top tier, not just gold-plus-one-bar.
 const TIER_COLOR = ["bg-line-strong", "bg-[#C0C0C0]", "bg-[#D4AF37]", "bg-[#7DD3FC]"];
 const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"];
+
+// "No asset-type filter at all" and "the default Stocks view" are different
+// states, and a repeated URL parameter has no way to say "present but empty".
+// This stands in for the first one.
+const ANY_ASSET_TYPES = "any";
 
 function SizeIndicator({ amountLow }: { amountLow: number | null }) {
   const tier = sizeTier(amountLow);
@@ -150,25 +155,50 @@ export default function Home() {
     openSignIn({ forceRedirectUrl: target, signUpForceRedirectUrl: target });
   }
 
-  const [chamber, setChamber] = useState<"house" | "senate" | "both">("both");
-  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
-  const [members, setMembers] = useState<string[]>([]);
-  const [parties, setParties] = useState<string[]>([]);
-  const [states, setStates] = useState<string[]>([]);
-  const [tickers, setTickers] = useState<string[]>([]);
-  const [types, setTypes] = useState<string[]>([]);
-  const [owners, setOwners] = useState<string[]>([]);
-  const [assetTypes, setAssetTypes] = useState<string[]>(DEFAULT_ASSET_TYPES);
-  const [minAmount, setMinAmount] = useState<number | "">("");
-  const [amountRanges, setAmountRanges] = useState<string[]>([]);
-  const [marketCapTiers, setMarketCapTiers] = useState<string[]>([]);
-  const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sort, setSort] = useState("filing_date");
-  const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  // Every filter is hydrated from the URL and written back to it, so a
+  // refresh, a back button or a pasted link all land on the same view. The
+  // read happens once, in the lazy initialisers below; after that this
+  // component owns the state and only ever pushes to the URL, which is what
+  // keeps the two from fighting each other.
+  const initial = useRef(searchParams).current;
+  const one = (key: string, fallback = "") => initial.get(key) ?? fallback;
+  const many = (key: string) => initial.getAll(key);
+
+  const [chamber, setChamber] = useState<"house" | "senate" | "both">(() => {
+    const v = one("chamber");
+    return v === "house" || v === "senate" ? v : "both";
+  });
+  const [q, setQ] = useState(() => one("q"));
+  const [members, setMembers] = useState<string[]>(() => many("members"));
+  const [parties, setParties] = useState<string[]>(() => many("parties"));
+  const [states, setStates] = useState<string[]>(() => many("states"));
+  const [tickers, setTickers] = useState<string[]>(() => many("tickers"));
+  const [types, setTypes] = useState<string[]>(() => many("types"));
+  const [owners, setOwners] = useState<string[]>(() => many("owners"));
+  // Absent means "the default Stocks view", which is not the same as an empty
+  // selection — an empty one means every asset type. The URL can't express an
+  // empty repeated parameter, so ANY_ASSET_TYPES stands in for it.
+  const [assetTypes, setAssetTypes] = useState<string[]>(() => {
+    const v = many("assetTypes");
+    if (!v.length) return DEFAULT_ASSET_TYPES;
+    return v.length === 1 && v[0] === ANY_ASSET_TYPES ? [] : v;
+  });
+  const [minAmount, setMinAmount] = useState<number | "">(() => Number(one("minAmount")) || "");
+  const [amountRanges, setAmountRanges] = useState<string[]>(() => many("amountRanges"));
+  const [marketCapTiers, setMarketCapTiers] = useState<string[]>(() => many("marketCapTiers"));
+  const [filedStatus, setFiledStatus] = useState<"" | "onTime" | "late">(() => {
+    const v = one("filedStatus");
+    return v === "onTime" || v === "late" ? v : "";
+  });
+  const [dateFrom, setDateFrom] = useState(() => one("dateFrom"));
+  const [dateTo, setDateTo] = useState(() => one("dateTo"));
+  const [sort, setSort] = useState(() => one("sort", "filing_date"));
+  const [order, setOrder] = useState<"asc" | "desc">(() => (one("order") === "asc" ? "asc" : "desc"));
+  const [page, setPage] = useState(() => Math.max(Number(one("page")) || 1, 1));
+  const [pageSize, setPageSize] = useState(() => {
+    const v = Number(one("limit"));
+    return PAGE_SIZE_OPTIONS.includes(v) ? v : 50;
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [result, setResult] = useState<{ data: Trade[]; total: number; totalPages: number } | null>(null);
@@ -287,7 +317,14 @@ export default function Home() {
     ]
   );
 
+  // Changing a filter sends you back to page 1 — but not on the first render,
+  // which would throw away a page number just restored from the URL.
+  const hydrated = useRef(false);
   useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      return;
+    }
     setPage(1);
   }, [
     chamber,
@@ -307,6 +344,61 @@ export default function Home() {
     dateTo,
     sort,
     order,
+    pageSize,
+  ]);
+
+  // Mirror the current view into the address bar. replace(), not push(), so
+  // a dozen filter clicks don't become a dozen back-button steps; the browser
+  // still restores the last URL on reload, which is the point. Defaults are
+  // left out so a plain /trades link stays plain.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (chamber !== "both") params.set("chamber", chamber);
+    for (const v of members) params.append("members", v);
+    for (const v of parties) params.append("parties", v);
+    for (const v of states) params.append("states", v);
+    for (const v of tickers) params.append("tickers", v);
+    for (const v of types) params.append("types", v);
+    for (const v of owners) params.append("owners", v);
+    if (!assetTypesAreDefault) {
+      if (assetTypes.length) for (const v of assetTypes) params.append("assetTypes", v);
+      else params.set("assetTypes", ANY_ASSET_TYPES);
+    }
+    if (minAmount) params.set("minAmount", String(minAmount));
+    for (const v of amountRanges) params.append("amountRanges", v);
+    for (const v of marketCapTiers) params.append("marketCapTiers", v);
+    if (filedStatus) params.set("filedStatus", filedStatus);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    if (sort !== "filing_date") params.set("sort", sort);
+    if (order !== "desc") params.set("order", order);
+    if (page !== 1) params.set("page", String(page));
+    if (pageSize !== 50) params.set("limit", String(pageSize));
+
+    const query = params.toString();
+    router.replace(query ? `/trades?${query}` : "/trades", { scroll: false });
+  }, [
+    router,
+    debouncedQ,
+    chamber,
+    members,
+    parties,
+    states,
+    tickers,
+    types,
+    owners,
+    assetTypes,
+    assetTypesAreDefault,
+    minAmount,
+    amountRanges,
+    marketCapTiers,
+    filedStatus,
+    dateFrom,
+    dateTo,
+    sort,
+    order,
+    page,
     pageSize,
   ]);
 

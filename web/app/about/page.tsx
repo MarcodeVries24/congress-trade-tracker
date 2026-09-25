@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { fetchStats, Stats } from "@/lib/api";
+import { fetchStats, Stats, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { compactUSD, formatDateFromTimestamp, formatTimeWithZone } from "@/lib/format";
 
 const FAQ: { q: string; a: string }[] = [
@@ -73,7 +73,7 @@ export default function AboutPage() {
           <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:text-sm">
             <AboutStat value={stats.totalTransactions.toLocaleString()} label="Transactions" />
             <AboutStatDivider />
-            <AboutStat value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" />
+            <AboutStat value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" hint={VOLUME_ESTIMATE_NOTE} />
             <AboutStatDivider />
             <AboutStat value={stats.totalFilings.toLocaleString()} label="Filings" />
             <AboutStatDivider />
@@ -217,9 +217,9 @@ function Section({ title, id, children }: { title: string; id?: string; children
   );
 }
 
-function AboutStat({ value, label }: { value: string; label: string }) {
+function AboutStat({ value, label, hint }: { value: string; label: string; hint?: string }) {
   return (
-    <span className="whitespace-nowrap">
+    <span className="whitespace-nowrap" title={hint}>
       <span className="font-semibold text-ink">{value}</span> {label}
     </span>
   );

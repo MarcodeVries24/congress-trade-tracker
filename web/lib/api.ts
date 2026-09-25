@@ -237,6 +237,18 @@ export const OWNER_LABELS: Record<string, string> = {
 export const NOT_FILED = "Not filed";
 
 /**
+ * Shown wherever an "Est. volume" figure appears.
+ *
+ * The figure is a derived estimate, not a disclosed number, and a reader who
+ * doesn't know that will read it as one — so the method travels with it
+ * rather than living only on /about. One constant, because every surface
+ * must describe the same arithmetic (see VOLUME_MIDPOINT_SQL in lib/sql.ts,
+ * which is the arithmetic).
+ */
+export const VOLUME_ESTIMATE_NOTE =
+  "Trades are disclosed as value brackets, never exact figures \u2014 \u201CEst. volume\u201D sums the midpoint of each disclosed bracket.";
+
+/**
  * How a row's Owner column should read.
  *
  * NULL is *not* a gap: the House PTR's owner box is left blank when the asset

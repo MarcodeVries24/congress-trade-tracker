@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow } from "@/lib/api";
+import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { compactUSD, formatDate } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
 import { Header } from "@/components/Header";
@@ -43,7 +43,7 @@ export default function Politicians() {
   const searchParams = useSearchParams();
   // The dashboard's "Most Active Politicians" / "Top by Trading Volume"
   // cards link here with ?sort=trade_count or ?sort=volume_sum so the
-  // leaderboard opens already sorted the way the card that sent them here
+  // list opens already sorted the way the card that sent them here
   // was ranked, instead of always resetting to the default.
   const initialSort = searchParams.get("sort");
   const initialSortValue = SORT_OPTIONS.find((o) => o.sort === initialSort)?.value ?? "trade_count:desc";
@@ -99,10 +99,10 @@ export default function Politicians() {
       <Header />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Politicians — trading activity leaderboard</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Politicians — disclosed trading activity</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Every member of Congress with a disclosed trade, ranked by how often they trade and an estimated volume — the sum of each
-            trade&apos;s disclosed range midpoint, since exact amounts are never reported.
+            Every member of Congress with a disclosed trade, with how often they trade and an estimated volume. Trades are disclosed as
+            value brackets, never exact figures, so the volume shown is the sum of each trade&apos;s disclosed bracket midpoint.
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export default function Politicians() {
                 <th className="px-4 py-3">Member</th>
                 <th className="px-4 py-3">Chamber</th>
                 <th className="px-4 py-3">Trades</th>
-                <th className="px-4 py-3">Est. Volume</th>
+                <th className="px-4 py-3" title={VOLUME_ESTIMATE_NOTE}>Est. Volume</th>
                 <th className="px-4 py-3">Avg / Trade</th>
                 <th className="px-4 py-3">Last Filed</th>
               </tr>

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     // returned 291 where the politicians list showed 273, because the same
     // member is filed under several names — Marjorie Taylor Greene twice,
     // Scott Franklin four times. Grouped with the same function the
-    // leaderboard and the member pages use, so all three agree.
+    // politicians list and the member pages use, so all three agree.
     sql.query(
       `SELECT t.member_name, f.bioguide_id, COUNT(*)::int AS trades
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id

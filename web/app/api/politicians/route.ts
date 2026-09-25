@@ -4,7 +4,7 @@ import { groupMembers } from "@/lib/members";
 
 const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 
-// A politician leaderboard — free/ungated, like /api/members and
+// A per-politician activity list — free/ungated, like /api/members and
 // /api/dashboard.
 //
 // One row per *person*, keyed on bioguide_id. Grouping on the disclosed name
@@ -12,7 +12,7 @@ const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 // because the disclosure sites aren't consistent — Marjorie Taylor Greene as
 // both "Marjorie Taylor Greene" and "Marjorie Taylor Mrs Greene", Scott
 // Franklin four ways, Thomas Kean three, John Boozman once in capitals. Each
-// variant was its own leaderboard row with a share of the trades.
+// variant was its own row with a share of the trades.
 //
 // bioguide_id is assigned per person and resolved per filing, so it survives
 // spelling drift, honorifics, suffixes and redistricting alike (a redistricted
@@ -23,7 +23,7 @@ const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 // The merge happens in TypeScript rather than SQL, and the query returns every
 // group rather than a page of them, for one reason: /politicians/[slug] groups
 // the same people with the same function. A second implementation in SQL would
-// eventually disagree with it, and the symptom would be a leaderboard row
+// eventually disagree with it, and the symptom would be a list row
 // linking to a page showing different totals. There are fewer than 300 members,
 // so paginating in memory costs nothing.
 export async function GET(req: NextRequest) {

@@ -23,6 +23,7 @@ import {
   Stats,
   Trade,
   TradeFilters,
+  VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
 import { AlertFilters } from "@/lib/alertFilters";
 import { alertUpgradeHref } from "@/lib/alertsClient";
@@ -400,10 +401,10 @@ export default function Home() {
         </div>
 
         {stats && (
-          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:mb-6 sm:text-sm">
+          <div className="mb-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-panel px-4 py-2.5 text-xs text-ink-muted sm:text-sm">
             <StatItem value={stats.totalTransactions.toLocaleString()} label="Transactions" />
             <StatDivider />
-            <StatItem value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" />
+            <StatItem value={compactUSD.format(stats.estimatedVolume)} label="Est. volume" hint={VOLUME_ESTIMATE_NOTE} />
             <StatDivider />
             <StatItem value={stats.totalFilings.toLocaleString()} label="Filings" />
             <StatDivider />
@@ -415,6 +416,7 @@ export default function Home() {
             />
           </div>
         )}
+        {stats && <p className="mb-4 text-[11px] leading-snug text-ink-faint sm:mb-6">{VOLUME_ESTIMATE_NOTE}</p>}
 
         <div className="mb-4 sm:mb-6">
           <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
@@ -961,9 +963,9 @@ function SenateSourceInfo({ align = "center" }: { align?: "center" | "right" }) 
   );
 }
 
-function StatItem({ value, label }: { value: string; label: string }) {
+function StatItem({ value, label, hint }: { value: string; label: string; hint?: string }) {
   return (
-    <span className="whitespace-nowrap">
+    <span className="whitespace-nowrap" title={hint}>
       <span className="font-semibold text-ink">{value}</span> {label}
     </span>
   );

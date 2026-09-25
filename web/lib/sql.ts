@@ -39,12 +39,12 @@ export const PLAUSIBLE_DATES_SQL = `((NULLIF(f.filing_date, '')::date - NULLIF(t
  *
  * The STOCK Act discloses a bracket, never an exact figure, so any single
  * dollar number is an estimate — and *which* estimate has to be the same
- * everywhere, because these figures sit next to each other: a leaderboard row
+ * everywhere, because these figures sit next to each other: a list row
  * links straight to the member page showing the same label. They disagreed
  * once already (the member page summed each bracket's lower bound while every
  * other surface summed midpoints, so Ro Khanna read $160.6M on his own page
- * and $432.3M on the leaderboard — the same 25,846 trades, 2.7x apart), which
- * is what this constant exists to prevent. /about promises the midpoint by
+ * and $432.3M on the politicians list — the same 25,846 trades, 2.7x apart),
+ * which is what this constant exists to prevent. /about promises the midpoint by
  * name; this is that promise.
  *
  * COALESCE(amount_high, amount_low) keeps the open-ended top brackets

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow } from "@/lib/api";
+import { memberSlug } from "@/lib/memberSlug";
 import { compactUSD, formatDate } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
 import { Header } from "@/components/Header";
@@ -179,7 +180,7 @@ export default function Politicians() {
                     <tr key={`${p.member_name}-${i}`} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                       <td className="px-4 py-3 text-ink-faint">{(page - 1) * pageSize + i + 1}</td>
                       <td className="px-4 py-3">
-                        <Link href={tradesSearchHref(p.member_name)} className="flex items-center gap-2.5">
+                        <Link href={`/politicians/${memberSlug(p.member_name)}`} className="flex items-center gap-2.5">
                           <MemberPhoto name={p.member_name} photoUrl={p.photo_url} />
                           <div>
                             <div className="text-ink hover:underline">{displayName(p.member_name)}</div>
@@ -215,7 +216,7 @@ export default function Politicians() {
               return (
                 <Link
                   key={`${p.member_name}-${i}`}
-                  href={tradesSearchHref(p.member_name)}
+                  href={`/politicians/${memberSlug(p.member_name)}`}
                   className="flex items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3"
                 >
                   <span className="w-5 shrink-0 text-xs text-ink-faint">{(page - 1) * pageSize + i + 1}</span>

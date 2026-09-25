@@ -26,10 +26,10 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-export function InitialsAvatar({ name }: { name: string }) {
+export function InitialsAvatar({ name, className = "h-8 w-8 text-xs" }: { name: string; className?: string }) {
   return (
     <div
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarColor(name)}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${className} ${avatarColor(name)}`}
       aria-hidden
     >
       {initials(name)}
@@ -57,13 +57,25 @@ function fallbackPhotoUrl(photoUrl: string): string | null {
 // tried before giving up to an initials avatar (see bioguideIdFromPhotoUrl
 // above) — only if that's unavailable or itself fails to load does this
 // guess with initials instead.
-export function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+export function MemberPhoto({
+  name,
+  photoUrl,
+  // Sizing is a prop rather than fixed so a profile header can show a real
+  // portrait while list rows keep their 32px avatar. Passed through to the
+  // initials fallback too, or a failed photo would change the layout.
+  className = "h-8 w-8",
+}: {
+  name: string;
+  photoUrl: string | null;
+  className?: string;
+}) {
   const [stage, setStage] = useState<"primary" | "fallback" | "failed">("primary");
-  if (!photoUrl || stage === "failed") return <InitialsAvatar name={name} />;
+  const initialsClass = `${className} ${className.includes("h-8") ? "text-xs" : "text-lg"}`;
+  if (!photoUrl || stage === "failed") return <InitialsAvatar name={name} className={initialsClass} />;
 
   const fallback = fallbackPhotoUrl(photoUrl);
   const src = stage === "primary" ? photoUrl : fallback;
-  if (!src) return <InitialsAvatar name={name} />;
+  if (!src) return <InitialsAvatar name={name} className={initialsClass} />;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -71,7 +83,7 @@ export function MemberPhoto({ name, photoUrl }: { name: string; photoUrl: string
       src={src}
       alt=""
       onError={() => setStage((s) => (s === "primary" && fallback ? "fallback" : "failed"))}
-      className="h-8 w-8 shrink-0 rounded-full bg-panel-muted object-cover"
+      className={`shrink-0 rounded-full bg-panel-muted object-cover ${className}`}
     />
   );
 }

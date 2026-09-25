@@ -1,20 +1,27 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
+import { getMemberDirectory } from "@/lib/members";
 
 /**
- * Every indexable page. /account and /unsubscribe are omitted on purpose —
- * both are `noindex`, and listing a page you've asked not to be indexed is a
- * contradiction search engines resolve by trusting neither signal.
+ * Every indexable page: seven fixed routes plus one per member who has traded.
  *
- * It is a short list, and that is the honest state of the site: seven URLs for
- * an archive of 65,000+ transactions across 291 members, because the data is
- * reached through filters on one page rather than through pages of its own.
- * Per-member pages would turn one thin URL into a few hundred substantial
- * ones; until then this lists what genuinely exists.
+ * The member pages come from a query, not a list, which is what makes this
+ * self-maintaining — a politician filing for the first time appears here on
+ * the next revalidation without anyone touching the code.
+ *
+ * /account and /unsubscribe are omitted on purpose: both are `noindex`, and
+ * listing a page you've asked not to be indexed is a contradiction search
+ * engines resolve by trusting neither signal.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+
+// Rebuilt at most hourly. The member list changes only when the ingest finds a
+// filing from someone new, which is rare — no reason to run ~300 rows of
+// aggregation on every crawler request.
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  return [
+  const fixed: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/trades`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/politicians`, lastModified: now, changeFrequency: "daily", priority: 0.8 },
@@ -23,4 +30,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
   ];
+
+  let members: MetadataRoute.Sitemap = [];
+  try {
+    members = (await getMemberDirectory()).map((m) => ({
+      url: `${SITE_URL}/politicians/${m.slug}`,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+  } catch {
+    // A sitemap listing the fixed routes beats a 500 that tells Google the
+    // whole file is broken, so a database blip degrades rather than fails.
+  }
+
+  return [...fixed, ...members];
 }

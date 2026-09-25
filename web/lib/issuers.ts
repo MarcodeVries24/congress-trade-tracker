@@ -1,6 +1,7 @@
 import { sql } from "./db";
 import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { ISSUER_SLUG_SQL, issuerSlug } from "./issuerSlug";
+import { getTradeFlow, type TradeFlowQuarter } from "./tradeFlow";
 
 /**
  * Issuer pages — one per traded company, the asset-side counterpart to the
@@ -93,6 +94,15 @@ export interface IssuerTrader {
   photo_url: string | null;
   trade_count: number;
   volume_sum: number;
+}
+
+/**
+ * Quarterly buy/sell flow for one issuer — the same chart the member pages
+ * carry, asking the other question: who moved in and out of this company, and
+ * did the public hear about it inside the 45 days the law allows.
+ */
+export function getIssuerTradeFlow(ticker: string): Promise<TradeFlowQuarter[]> {
+  return getTradeFlow("t.ticker = $1", [ticker]);
 }
 
 /** How many trades an issuer page lists before pointing at the full filter UI. */

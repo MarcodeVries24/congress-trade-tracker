@@ -15,7 +15,8 @@ import {
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
-import { getIssuerBySlug, ISSUER_PAGE_TRADE_LIMIT } from "@/lib/issuers";
+import { getIssuerBySlug, getIssuerTradeFlow, ISSUER_PAGE_TRADE_LIMIT } from "@/lib/issuers";
+import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { memberDisplayName } from "@/lib/memberDisplay";
 
 /**
@@ -64,6 +65,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
   if (!found) notFound();
 
   const { issuer, traders, trades } = found;
+  const flow = await getIssuerTradeFlow(issuer.ticker);
   const name = issuer.company_name ?? issuer.ticker;
   const tradesHref = `/trades?tickers=${encodeURIComponent(issuer.ticker)}`;
   const cap = formatMarketCap(issuer.market_cap);
@@ -134,6 +136,8 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
               </div>
             </div>
           )}
+
+          <TradeFlowChart quarters={flow} subject={`${name} (${issuer.ticker})`} />
         </div>
 
         <div className="my-6">

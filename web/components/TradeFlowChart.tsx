@@ -1,8 +1,8 @@
-import type { MemberFlowQuarter } from "@/lib/members";
+import type { TradeFlowQuarter } from "@/lib/tradeFlow";
 import { compactUSD } from "@/lib/format";
 
 /**
- * A member's disclosed trading, quarter by quarter.
+ * A member's, or an issuer's, disclosed trading quarter by quarter.
  *
  * Deliberately not a price chart. Everyone draws one of those, it needs a
  * market-data feed this project doesn't have, and it mostly tells you what
@@ -16,9 +16,11 @@ import { compactUSD } from "@/lib/format";
  *    the STOCK Act gives them.
  *
  * That second band is the point. Only 8.8% of the corpus is late, so most
- * members' bars are solid and the chart reads as pure activity — and then
- * someone like Alan Armstrong (701 of 707 trades late) renders almost
- * entirely hatched, and the page says so at a glance.
+ * bars are solid and the chart reads as pure activity — and then someone like
+ * Alan Armstrong (701 of 707 trades late) renders almost entirely hatched,
+ * and the page says so at a glance. On an issuer it asks the other side of
+ * the same question: who moved in and out of this company, and was the public
+ * told in time.
  *
  * Plain SVG, rendered on the server. These pages exist to be crawled, and a
  * client-side chart library would leave a hole in the HTML on exactly the
@@ -46,7 +48,7 @@ function quarterLabel(q: string): string {
   return `${quarter} ’${year.slice(2)}`;
 }
 
-export function TradeFlowChart({ quarters, memberName }: { quarters: MemberFlowQuarter[]; memberName: string }) {
+export function TradeFlowChart({ quarters, subject }: { quarters: TradeFlowQuarter[]; subject: string }) {
   if (quarters.length < MIN_QUARTERS) return null;
 
   const peak = Math.max(...quarters.map((q) => Math.max(q.buy, q.sell)), 1);
@@ -95,7 +97,7 @@ export function TradeFlowChart({ quarters, memberName }: { quarters: MemberFlowQ
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mt-3 h-auto w-full"
         role="img"
-        aria-label={`Quarterly disclosed trading by ${memberName}: purchases above the line, sales below, with the portion filed more than 45 days late hatched.`}
+        aria-label={`Quarterly disclosed trading in ${subject}: purchases above the line, sales below, with the portion filed more than 45 days late hatched.`}
       >
         <defs>
           {/* The late portion is drawn as a hatch rather than a second colour

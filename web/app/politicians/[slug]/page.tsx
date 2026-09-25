@@ -109,7 +109,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
             </div>
           )}
 
-          <TradeFlowChart quarters={flow} memberName={profile.display} />
+          <TradeFlowChart quarters={flow} subject={profile.display} />
         </div>
 
         <div className="my-6">

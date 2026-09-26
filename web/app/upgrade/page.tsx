@@ -91,7 +91,7 @@ export default async function UpgradePage({
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-lg font-bold tracking-tight text-ink">Pricing</h2>
             {pricing?.annualSavingPercent ? (
-              <p className="text-xs font-medium text-accent">
+              <p className="pr-4 text-xs font-medium text-accent">
                 Save {pricing.annualSavingPercent}% on annual billing: {pricing.currencySymbol}
                 {pricing.annualMonthly}/mo instead of {pricing.currencySymbol}
                 {pricing.monthly}
@@ -106,8 +106,15 @@ export default async function UpgradePage({
           </div>
           {/* Ticks rather than middots between the items: a separator only
               works while the row is one line, and at most widths this one
-              wraps, leaving a stray dot hanging at the end of a line. */}
-          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-ink-muted">
+              wraps, leaving a stray dot hanging at the end of a line.
+              
+              The 16px inset, the 12px tick and the 8px gap are Clerk's own
+              card metrics, measured off the rendered table: these ticks land
+              in the same column as the ones inside the Pro card, and the line
+              above ends where the card's content ends. Without it the row sat
+              three pixels adrift of the cards, which reads as a mistake
+              rather than as a separate element. */}
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 px-4 text-xs text-ink-muted">
             {[
               <>
                 <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro
@@ -135,17 +142,17 @@ export default async function UpgradePage({
                 filings
               </>,
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-1.5">
+              <li key={i} className="flex items-start gap-2">
                 <svg
-                  width="13"
-                  height="13"
+                  width="12"
+                  height="12"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="mt-[3px] shrink-0 text-accent"
+                  className="mt-[3.5px] shrink-0 text-accent"
                   aria-hidden
                 >
                   <path d="M20 6 9 17l-5-5" />

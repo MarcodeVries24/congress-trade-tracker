@@ -5,7 +5,6 @@ import { Footer } from "@/components/Footer";
 import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
 import { AlertEmailPreview } from "@/components/AlertEmailPreview";
 import { UpgradeFaq } from "@/components/UpgradeFaq";
-import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { MemberFaces } from "@/components/MemberFaces";
 import { PersonalNote } from "@/components/PersonalNote";
 import { getUpgradeProof } from "@/lib/upgradeProof";
@@ -182,16 +181,6 @@ export default async function UpgradePage() {
               <AlertEmailPreview trades={proof.sample} />
             </div>
           </section>
-        )}
-
-        {/* Who is actually behind this. On a page asking for a card number,
-            "independent project, not funded by anyone with a position to talk
-            up" is doing more work than any badge would. Held to a narrow
-            column: the card is written for one, and its own comment says so. */}
-        {proof && (
-          <div className="mt-14 max-w-lg">
-            <AboutCongTrade trades={proof.transactions} members={proof.members} />
-          </div>
         )}
 
         <UpgradeFaq />

@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
 import { AlertEmailPreview } from "@/components/AlertEmailPreview";
 import { UpgradeFaq } from "@/components/UpgradeFaq";
+import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
 import { formatDateFromTimestamp } from "@/lib/format";
@@ -59,10 +60,66 @@ export default async function UpgradePage() {
           <UpgradeDraftHandoff />
         </div>
 
+        {/* The price sits above everything that argues for it. Most people
+            arriving here clicked a locked control and already know what they
+            want; making them scroll past a case they have accepted is a tax
+            on the ones most likely to pay. The argument still follows, for
+            everyone who does want it. */}
+        <section className="mt-7">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-lg font-bold tracking-tight text-ink">Pricing</h2>
+            {pricing?.annualSavingPercent ? (
+              <p className="text-xs font-medium text-accent">
+                Save {pricing.annualSavingPercent}% on annual billing — {pricing.currencySymbol}
+                {pricing.annualMonthly}/mo instead of {pricing.currencySymbol}
+                {pricing.monthly}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-4">
+            <PricingTable />
+          </div>
+          {/* The separators are decoration that only works on one line, so
+              they go when the row wraps — same trick as the home page strip. */}
+          <ul className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-muted">
+            <li>
+              <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro
+            </li>
+            <li aria-hidden className="hidden text-ink-faint/60 lg:inline">
+              ·
+            </li>
+            <li>Cancel any time from your account page</li>
+            <li aria-hidden className="hidden text-ink-faint/60 lg:inline">
+              ·
+            </li>
+            <li>
+              Sourced from{" "}
+              <a
+                href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-line-strong hover:text-ink-muted"
+              >
+                House Clerk
+              </a>{" "}
+              and{" "}
+              <a
+                href="https://efdsearch.senate.gov/search/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-line-strong hover:text-ink-muted"
+              >
+                Senate eFD
+              </a>{" "}
+              filings
+            </li>
+          </ul>
+        </section>
+
         {/* Read from the same tables the site serves. If ingestion stalls,
             this goes stale in public — which is the right incentive. */}
         {proof && (
-          <div className="mt-8 grid grid-cols-2 divide-x divide-y divide-line rounded-xl border border-line bg-panel sm:grid-cols-4 sm:divide-y-0">
+          <div className="mt-12 grid grid-cols-2 divide-x divide-y divide-line rounded-xl border border-line bg-panel sm:grid-cols-4 sm:divide-y-0">
             <Stat value={proof.transactions.toLocaleString("en-US")} label="disclosed trades" />
             <Stat value={proof.filings.toLocaleString("en-US")} label="filings parsed" />
             <Stat value={proof.members.toLocaleString("en-US")} label="members covered" />
@@ -113,19 +170,15 @@ export default async function UpgradePage() {
           </section>
         )}
 
-        <section className="mt-14">
-          <h2 className="text-lg font-bold tracking-tight text-ink">Pricing</h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-            Join 4,500+ people already using CongTrade Pro.
-            {pricing?.annualSavingPercent
-              ? ` Paying annually works out at ${pricing.currencySymbol}${pricing.annualMonthly} a month instead of ${pricing.currencySymbol}${pricing.monthly} — ${pricing.annualSavingPercent}% less.`
-              : ""}{" "}
-            Cancel any time from your account page.
-          </p>
-          <div className="mt-5">
-            <PricingTable />
+        {/* Who is actually behind this. On a page asking for a card number,
+            "independent project, not funded by anyone with a position to talk
+            up" is doing more work than any badge would. Held to a narrow
+            column: the card is written for one, and its own comment says so. */}
+        {proof && (
+          <div className="mt-14 max-w-lg">
+            <AboutCongTrade trades={proof.transactions} members={proof.members} />
           </div>
-        </section>
+        )}
 
         <UpgradeFaq />
       </main>

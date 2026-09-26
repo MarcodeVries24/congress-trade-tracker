@@ -7,6 +7,7 @@ import { AlertEmailPreview } from "@/components/AlertEmailPreview";
 import { UpgradeFaq } from "@/components/UpgradeFaq";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { MemberFaces } from "@/components/MemberFaces";
+import { PersonalNote } from "@/components/PersonalNote";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
 import { formatDateFromTimestamp } from "@/lib/format";
@@ -122,6 +123,12 @@ export default async function UpgradePage() {
             </li>
           </ul>
         </section>
+
+        {/* Directly under the buttons: this is where someone stalls, and what
+            stalls them is "who am I giving a card number to". */}
+        <div className="mt-8">
+          <PersonalNote />
+        </div>
 
         {/* Read from the same tables the site serves. If ingestion stalls,
             this goes stale in public — which is the right incentive. */}

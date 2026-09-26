@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   try {
     const revoked = await enforceSessionLimit(userId);
     if (revoked.length) {
-      console.log(`session limit: signed ${userId} out of ${revoked.length} older browser(s), keeping ${MAX_CONCURRENT_SESSIONS}`);
+      console.log(`session limit: signed ${userId} out of ${revoked.length} idle browser(s), keeping ${MAX_CONCURRENT_SESSIONS}`);
     }
   } catch (err) {
     // A 500 makes Clerk retry, which is right: the cap should hold even if

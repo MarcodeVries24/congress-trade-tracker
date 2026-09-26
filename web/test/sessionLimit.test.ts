@@ -2,12 +2,12 @@
 //
 //   npx tsx --tsconfig web/test/tsconfig.json web/test/sessionLimit.test.ts
 //
-// Reaching the interesting branch for real would need a live Clerk instance, a
+// Reaching the branch that revokes anything would need a live Clerk instance, a
 // paid subscription and four signed-in browsers, so the client is faked; the
 // shape of the fake is checked by the compiler, because lib/sessionLimit.ts
 // assigns the real client to the same type with no cast.
 //
-// Prints one line per assertion and exits non-zero on the first failure.
+// Prints one line per assertion and exits non-zero if any failed.
 
 import {
   enforceSessionLimit,
@@ -18,12 +18,14 @@ import {
 const PRO = { subscriptionItems: [{ status: "active", plan: { features: [{ slug: "filters" }] } }] };
 const FREE = { subscriptionItems: [{ status: "active", plan: { features: [] } }] };
 
+type Session = { id: string; lastActiveAt: number; createdAt: number };
+
 type Opts = {
   metadata?: unknown;
   subscription?: unknown;
   userError?: { status?: number };
   billingError?: { status?: number };
-  sessions?: { id: string; createdAt: number }[];
+  sessions?: Session[];
   failRevoke?: string[];
 };
 
@@ -62,21 +64,26 @@ function fakeClerk(opts: Opts) {
   return { client, calls };
 }
 
-/** Six browsers, deliberately out of chronological order in the response. */
-const six = [
-  { id: "s_3rd_newest", createdAt: 400 },
-  { id: "s_oldest", createdAt: 100 },
-  { id: "s_newest", createdAt: 600 },
-  { id: "s_2nd_oldest", createdAt: 200 },
-  { id: "s_2nd_newest", createdAt: 500 },
-  { id: "s_3rd_oldest", createdAt: 300 },
+// Six browsers whose sign-in order is the exact reverse of their last-used
+// order, which is the whole point of sorting on lastActiveAt: the browser
+// signed into first is the one still in daily use, and the one signed into
+// most recently has sat idle since. Deliberately unsorted in the response.
+const six: Session[] = [
+  { id: "s_idle_2", lastActiveAt: 200, createdAt: 50 },
+  { id: "s_used_today", lastActiveAt: 600, createdAt: 10 },
+  { id: "s_idle_longest", lastActiveAt: 100, createdAt: 60 },
+  { id: "s_used_last_week", lastActiveAt: 400, createdAt: 30 },
+  { id: "s_idle_1", lastActiveAt: 300, createdAt: 40 },
+  { id: "s_used_yesterday", lastActiveAt: 500, createdAt: 20 },
 ];
 
 let failures = 0;
 function check(name: string, got: unknown, want: unknown) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) failures++;
-  console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : `\n       got  ${JSON.stringify(got)}\n       want ${JSON.stringify(want)}`}`);
+  console.log(
+    `${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : `\n       got  ${JSON.stringify(got)}\n       want ${JSON.stringify(want)}`}`
+  );
 }
 
 async function main() {
@@ -89,7 +96,11 @@ async function main() {
     check("free account: never even lists sessions", calls.list, 0);
   }
   {
-    const { client, calls } = fakeClerk({ metadata: { admin: true }, subscription: PRO, sessions: six });
+    const { client, calls } = fakeClerk({
+      metadata: { admin: true },
+      subscription: PRO,
+      sessions: six,
+    });
     check("comped admin, 6 browsers: revokes nothing", await enforceSessionLimit("u", client), []);
     check("comped admin: never asks billing", calls.billing, 0);
   }
@@ -100,37 +111,66 @@ async function main() {
     check("pro, 3 browsers: revokes nothing", await enforceSessionLimit("u", client), []);
   }
   {
-    const four = [
-      { id: "s_newest", createdAt: 400 },
-      { id: "s_oldest", createdAt: 100 },
-      { id: "s_mid", createdAt: 200 },
-      { id: "s_mid2", createdAt: 300 },
-    ];
-    const { client } = fakeClerk({ subscription: PRO, sessions: four });
-    check("pro, 4 browsers: revokes the oldest only", await enforceSessionLimit("u", client), ["s_oldest"]);
+    const { client } = fakeClerk({ subscription: PRO, sessions: six.slice(0, 4) });
+    check(
+      "pro, 4 browsers: revokes the one idle longest",
+      await enforceSessionLimit("u", client),
+      ["s_idle_longest"]
+    );
   }
   {
     const { client, calls } = fakeClerk({ subscription: PRO, sessions: six });
     const revoked = await enforceSessionLimit("u", client);
-    check("pro, 6 browsers: revokes the 3 oldest, newest first", revoked, [
-      "s_3rd_oldest",
-      "s_2nd_oldest",
-      "s_oldest",
+    check("pro, 6 browsers: revokes the 3 idlest, least idle first", revoked, [
+      "s_idle_1",
+      "s_idle_2",
+      "s_idle_longest",
     ]);
     check("pro, 6 browsers: those are the ones actually revoked", calls.revoked, revoked);
+    check(
+      "the browsers still in use survive, however long ago they signed in",
+      six.filter((s) => !revoked.includes(s.id)).map((s) => s.id).sort(),
+      ["s_used_last_week", "s_used_today", "s_used_yesterday"]
+    );
   }
   {
-    const pastDue = { subscriptionItems: [{ status: "past_due", plan: { features: [{ slug: "notifications" }] } }] };
+    // Same six, judged on sign-in date instead: the survivors would have been
+    // the three idle ones. Sorting on the wrong field is not a near miss.
+    const byCreated = [...six].sort((a, b) => b.createdAt - a.createdAt).slice(MAX_CONCURRENT_SESSIONS);
+    check(
+      "sanity: sorting on createdAt would have revoked the opposite three",
+      byCreated.map((s) => s.id),
+      ["s_used_last_week", "s_used_yesterday", "s_used_today"]
+    );
+  }
+  {
+    const tied: Session[] = [
+      { id: "s_a", lastActiveAt: 500, createdAt: 90 },
+      { id: "s_b", lastActiveAt: 500, createdAt: 80 },
+      { id: "s_c", lastActiveAt: 500, createdAt: 70 },
+      { id: "s_oldest_signin", lastActiveAt: 500, createdAt: 60 },
+    ];
+    const { client } = fakeClerk({ subscription: PRO, sessions: tied });
+    check(
+      "equally active browsers: sign-in date breaks the tie",
+      await enforceSessionLimit("u", client),
+      ["s_oldest_signin"]
+    );
+  }
+  {
+    const pastDue = {
+      subscriptionItems: [{ status: "past_due", plan: { features: [{ slug: "notifications" }] } }],
+    };
     const { client } = fakeClerk({ subscription: pastDue, sessions: six });
     check("past_due pro: still capped", (await enforceSessionLimit("u", client)).length, 3);
   }
 
   // --- resilience ---
   {
-    const { client } = fakeClerk({ subscription: PRO, sessions: six, failRevoke: ["s_2nd_oldest"] });
+    const { client } = fakeClerk({ subscription: PRO, sessions: six, failRevoke: ["s_idle_2"] });
     check("one revoke fails: the other two still go", await enforceSessionLimit("u", client), [
-      "s_3rd_oldest",
-      "s_oldest",
+      "s_idle_1",
+      "s_idle_longest",
     ]);
   }
 

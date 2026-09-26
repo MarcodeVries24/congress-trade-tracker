@@ -18,7 +18,7 @@ export type SessionLimitClient = {
       userId: string;
       status: "active";
       limit: number;
-    }): Promise<{ data: readonly { id: string; createdAt: number }[] }>;
+    }): Promise<{ data: readonly { id: string; lastActiveAt: number; createdAt: number }[] }>;
     revokeSession(sessionId: string): Promise<unknown>;
   };
 };
@@ -73,13 +73,19 @@ async function isPayingAccount(client: SessionLimitClient, userId: string): Prom
 }
 
 /**
- * Signs the user out of their oldest browsers until only the newest
+ * Signs the user out of their least recently used browsers until only
  * MAX_CONCURRENT_SESSIONS remain.
  *
- * Revoking the oldest rather than refusing the newest is deliberate: someone
+ * Revoking the stalest rather than refusing the newest is deliberate: someone
  * signing in on a new laptop should get in, and lose the phone they last used
  * three weeks ago. The alternative locks a person out of the device in front
  * of them, which reads as a broken login rather than a policy.
+ *
+ * Stale means last used, not first signed in. Sorting on sign-in date would
+ * revoke the browser someone opens every morning but signed into a year ago,
+ * ahead of one they signed into last week and abandoned — wrong for a real
+ * person, and a weaker signal for a shared password, where it's the idle
+ * logins that are the giveaway.
  */
 export async function enforceSessionLimit(
   userId: string,
@@ -100,9 +106,10 @@ export async function enforceSessionLimit(
   });
   if (sessions.length <= MAX_CONCURRENT_SESSIONS) return [];
 
-  // Newest first, so the ones past the limit are the stalest.
+  // Most recently used first, so the ones past the limit are the stalest.
+  // Sign-in date only breaks a tie, which keeps the pick deterministic.
   const stale = [...sessions]
-    .sort((a, b) => b.createdAt - a.createdAt)
+    .sort((a, b) => b.lastActiveAt - a.lastActiveAt || b.createdAt - a.createdAt)
     .slice(MAX_CONCURRENT_SESSIONS);
 
   const revoked: string[] = [];

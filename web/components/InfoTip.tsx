@@ -79,10 +79,18 @@ export function InfoTip({ text, label = "What this means" }: { text: string; lab
         // doing the layout. appearance-none drops the native control box for
         // the same reason.
         //
+        // `middle` centres the ring on the x-height, which is the optical
+        // centre of lowercase words but reads low beside figures like "$3.6B"
+        // that stand a full cap tall. -0.09em is the measured distance between
+        // those two centres in this typeface (half the cap height minus half
+        // the x-height), so the ring sits on the centre of the number it
+        // annotates. It stays in em, so it holds at 12px and 14px alike, and
+        // it is a paint-time offset — no engine gets to reinterpret it.
+        //
         // The glyph stays out of flow so it can be centred in a ring smaller
         // than its own line box, and before:-inset-2 restores a finger-sized
         // target around something only ~10px across.
-        className="relative ml-[3px] inline-block h-[0.72em] w-[0.72em] shrink-0 appearance-none rounded-full border border-line-strong align-middle text-ink-faint transition-colors before:absolute before:-inset-2 before:content-[''] hover:border-ink-faint hover:text-ink-muted"
+        className="relative -top-[0.09em] ml-[3px] inline-block h-[0.72em] w-[0.72em] shrink-0 appearance-none rounded-full border border-line-strong align-middle text-ink-faint transition-colors before:absolute before:-inset-2 before:content-[''] hover:border-ink-faint hover:text-ink-muted"
       >
         <span className="absolute inset-0 flex items-center justify-center text-[0.52em] font-semibold leading-none">i</span>
       </button>

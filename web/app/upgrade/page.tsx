@@ -9,6 +9,7 @@ import { MemberFaces } from "@/components/MemberFaces";
 import { PersonalNote } from "@/components/PersonalNote";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
+import { ALERT_DRAFT_PARAM } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -36,7 +37,21 @@ function Feature({ title, body, children }: { title: string; body: string; child
   );
 }
 
-export default async function UpgradePage() {
+export default async function UpgradePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Where checkout lets them out. Left to itself it returns them here, to a
+  // pricing page that now reads "subscribed" — the one page a new subscriber
+  // has no further use for. A half-built alert goes back to itself; everyone
+  // else lands on their account, where the alerts live.
+  const draft = (await searchParams)[ALERT_DRAFT_PARAM];
+  const afterCheckout =
+    typeof draft === "string" && draft
+      ? `/account?${ALERT_DRAFT_PARAM}=${encodeURIComponent(draft)}`
+      : "/account";
+
   // Both are decoration on a page whose job is to take payment: a database
   // hiccup should cost the proof strip, never the pricing table.
   const [proof, pricing] = await Promise.all([
@@ -83,43 +98,61 @@ export default async function UpgradePage() {
               </p>
             ) : null}
           </div>
+          {/* ctaPosition="top" puts each Subscribe directly under its price
+              instead of at the foot of the card, so the free plan's shorter
+              card doesn't strand its button under a screen of nothing. */}
           <div className="mt-4">
-            <PricingTable />
+            <PricingTable ctaPosition="top" newSubscriptionRedirectUrl={afterCheckout} />
           </div>
-          {/* The separators are decoration that only works on one line, so
-              they go when the row wraps — same trick as the home page strip. */}
-          <ul className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-muted">
-            <li>
-              <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro
-            </li>
-            <li aria-hidden className="hidden text-ink-faint/60 lg:inline">
-              ·
-            </li>
-            <li>Cancel any time from your account page</li>
-            <li aria-hidden className="hidden text-ink-faint/60 lg:inline">
-              ·
-            </li>
-            <li>
-              Sourced from{" "}
-              <a
-                href="https://disclosures-clerk.house.gov/FinancialDisclosure"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-line-strong hover:text-ink-muted"
-              >
-                House Clerk
-              </a>{" "}
-              and{" "}
-              <a
-                href="https://efdsearch.senate.gov/search/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-line-strong hover:text-ink-muted"
-              >
-                Senate eFD
-              </a>{" "}
-              filings
-            </li>
+          {/* Ticks rather than middots between the items: a separator only
+              works while the row is one line, and at most widths this one
+              wraps, leaving a stray dot hanging at the end of a line. */}
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-ink-muted">
+            {[
+              <>
+                <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro
+              </>,
+              <>Cancel any time from your account page</>,
+              <>
+                Sourced from{" "}
+                <a
+                  href="https://disclosures-clerk.house.gov/FinancialDisclosure"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-line-strong hover:text-ink"
+                >
+                  House Clerk
+                </a>{" "}
+                and{" "}
+                <a
+                  href="https://efdsearch.senate.gov/search/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-line-strong hover:text-ink"
+                >
+                  Senate eFD
+                </a>{" "}
+                filings
+              </>,
+            ].map((item, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mt-[3px] shrink-0 text-accent"
+                  aria-hidden
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
         </section>
 

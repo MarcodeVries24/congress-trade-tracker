@@ -29,7 +29,7 @@ import Link from "next/link";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters, ALERT_PARTIES, MIN_AMOUNT_OPTIONS, US_STATES } from "@/lib/alertFilters";
-import { alertUpgradeHref } from "@/lib/alertsClient";
+import { alertDraftHref, alertUpgradeHref } from "@/lib/alertsClient";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { MultiSelect } from "@/components/MultiSelect";
 import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
@@ -148,12 +148,14 @@ export default function Home() {
     setUpgradeIntent("alert");
     setUpgradeModalOpen(true);
   }
-  // Where to land someone who signs in rather than signs up: back on this
-  // view, filters and all, with a marker the effect below acts on. An alert
-  // draft keeps its own route, which already forwards a paying member
-  // straight to their alert instead of showing them a pricing table.
+  // Where to land someone who signs in rather than signs up. Both routes go
+  // to the thing they were doing, never to a pricing page: an existing account
+  // may already be paying, and /account decides what a half-built alert gets —
+  // the editor for a member, the upsell (carrying the draft on to checkout)
+  // for everyone else. Signing *up* is the other case, and still goes straight
+  // to pricing, because a brand-new account has nothing to check.
   function signInTarget() {
-    if (upgradeIntent === "alert") return alertUpgradeHref(alertFilters);
+    if (upgradeIntent === "alert") return alertDraftHref(alertFilters);
     const url = new URL(window.location.href);
     url.searchParams.set(RESUME_PARAM, "filters");
     return url.pathname + url.search;

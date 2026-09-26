@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ALERT_FREQUENCIES, describeAlert } from "@/lib/alertFilters";
 import { AlertFilters, summarizeAlert } from "@/lib/alertFilters";
-import { AlertsResponse, SavedAlert, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";
+import { AlertsResponse, SavedAlert, alertUpgradeHref, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
 import { AlertDraft, AlertEditor } from "./AlertEditor";
 
@@ -39,16 +39,17 @@ export function AlertsManager() {
 
   useEffect(() => {
     const handover = readAlertDraft(window.location.search);
+    // Kept whether or not they can save it: a free visitor doesn't get the
+    // editor, but the upsell below hands their draft on to checkout, so what
+    // they were half-way through building isn't lost at the till.
+    if (handover) setDraft(handover);
     fetchAlerts()
       .then((loaded) => {
         setState(loaded);
         // Only open the editor for someone who can actually save — a free
         // visitor arriving on this link sees the upsell instead of a form
         // that would 403 on submit.
-        if (handover && loaded.isPro) {
-          setDraft(handover);
-          setEditing("new");
-        }
+        if (handover && loaded.isPro) setEditing("new");
       })
       .catch((err: Error) => setLoadError(err.message));
   }, []);
@@ -138,8 +139,11 @@ export function AlertsManager() {
             Build a filter as specific as you like — a chamber, a party, a member, a ticker, a minimum trade size — and get
             an email the moment a new disclosure matches it.
           </p>
+          {/* Carries a draft they arrived with through checkout, which hands
+              it back to this page afterwards — the same handover the trades
+              page uses, so upgrading finishes the alert they started. */}
           <Link
-            href="/upgrade"
+            href={draft ? alertUpgradeHref(draft) : "/upgrade"}
             className="mt-4 inline-block rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
             Upgrade to Pro

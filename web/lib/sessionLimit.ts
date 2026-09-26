@@ -1,6 +1,27 @@
 import { clerkClient } from "@clerk/nextjs/server";
 
-import { isProSubscription } from "./proPlan";
+import { isProSubscription, type BillingItems } from "./proPlan";
+
+/**
+ * The slice of Clerk's backend client this module touches.
+ *
+ * Named so the logic below can be exercised against a stand-in: the real
+ * client needs a live instance, a paid subscription and four signed-in
+ * browsers to reach the interesting branch, and none of that is something a
+ * test can arrange.
+ */
+export type SessionLimitClient = {
+  users: { getUser(userId: string): Promise<{ publicMetadata: unknown }> };
+  billing: { getUserBillingSubscription(userId: string): Promise<BillingItems> };
+  sessions: {
+    getSessionList(params: {
+      userId: string;
+      status: "active";
+      limit: number;
+    }): Promise<{ data: readonly { id: string; createdAt: number }[] }>;
+    revokeSession(sessionId: string): Promise<unknown>;
+  };
+};
 
 /**
  * How many browsers one account may stay signed in on at once.
@@ -28,9 +49,7 @@ export const MAX_CONCURRENT_SESSIONS = 3;
  * the cost of guessing wrong is signing a real customer out of their own
  * laptop.
  */
-async function isPayingAccount(userId: string): Promise<boolean> {
-  const client = await clerkClient();
-
+async function isPayingAccount(client: SessionLimitClient, userId: string): Promise<boolean> {
   // A comped operator account ({"admin": true} in public metadata) is exempt
   // rather than capped: it's the owner's own account, not a shared login.
   try {
@@ -62,14 +81,18 @@ async function isPayingAccount(userId: string): Promise<boolean> {
  * three weeks ago. The alternative locks a person out of the device in front
  * of them, which reads as a broken login rather than a policy.
  */
-export async function enforceSessionLimit(userId: string): Promise<string[]> {
+export async function enforceSessionLimit(
+  userId: string,
+  injected?: SessionLimitClient
+): Promise<string[]> {
+  const client: SessionLimitClient = injected ?? (await clerkClient());
+
   // The cap exists to stop one paid login being shared, so it only applies to
   // paid logins. A free account signing in on six browsers costs nothing and
   // gains nothing by being cut off; capping it would just be a worse free
   // tier for no reason.
-  if (!(await isPayingAccount(userId))) return [];
+  if (!(await isPayingAccount(client, userId))) return [];
 
-  const client = await clerkClient();
   const { data: sessions } = await client.sessions.getSessionList({
     userId,
     status: "active",

@@ -65,6 +65,14 @@ const TIER_LABEL = ["Unknown size", "Small trade", "Medium trade", "Large trade"
 // This stands in for the first one.
 const ANY_ASSET_TYPES = "any";
 
+// Marks a return from the sign-in that the upgrade wall opened. Someone
+// signing in already has an account, and an account may already be paying, so
+// they come back to the view they were filtering rather than to the pricing
+// page. The check below sends them on to /upgrade only if they turn out not to
+// hold Pro. The parameter is dropped from the address bar by the URL sync,
+// which rebuilds the query from the filters alone.
+const RESUME_PARAM = "resume";
+
 function SizeIndicator({ amountLow }: { amountLow: number | null }) {
   const tier = sizeTier(amountLow);
   const color = TIER_COLOR[tier];
@@ -140,20 +148,31 @@ export default function Home() {
     setUpgradeIntent("alert");
     setUpgradeModalOpen(true);
   }
+  // Where to land someone who signs in rather than signs up: back on this
+  // view, filters and all, with a marker the effect below acts on. An alert
+  // draft keeps its own route, which already forwards a paying member
+  // straight to their alert instead of showing them a pricing table.
+  function signInTarget() {
+    if (upgradeIntent === "alert") return alertUpgradeHref(alertFilters);
+    const url = new URL(window.location.href);
+    url.searchParams.set(RESUME_PARAM, "filters");
+    return url.pathname + url.search;
+  }
   function continueUpgrade() {
     setUpgradeModalOpen(false);
     const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
     if (isSignedIn) router.push(target);
     // `redirectUrl` is deprecated in this Clerk version and gets silently
     // ignored — forceRedirectUrl is what actually lands them on /upgrade
-    // after sign-up; signInForceRedirectUrl covers it too if they instead
-    // click "Already have an account? Sign in" inside the same modal.
-    else openSignUp({ forceRedirectUrl: target, signInForceRedirectUrl: target });
+    // after sign-up. Someone who clicks "Already have an account? Sign in"
+    // inside that same modal is a different person entirely: they may well be
+    // paying already, so signInForceRedirectUrl sends them back here instead.
+    else openSignUp({ forceRedirectUrl: target, signInForceRedirectUrl: signInTarget() });
   }
   function continueSignIn() {
     setUpgradeModalOpen(false);
     const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
-    openSignIn({ forceRedirectUrl: target, signUpForceRedirectUrl: target });
+    openSignIn({ forceRedirectUrl: signInTarget(), signUpForceRedirectUrl: target });
   }
 
   // Every filter is hydrated from the URL and written back to it, so a
@@ -402,6 +421,26 @@ export default function Home() {
     page,
     pageSize,
   ]);
+
+  // Someone who signed in from the upgrade wall lands back here, because an
+  // existing account may already be a paying one — showing a member the
+  // pricing table for something they already bought is the worst moment to
+  // get wrong. Only once Clerk has reported the plan, and only if it really
+  // is missing, do they go on to /upgrade. Declared after the sync effect so
+  // its replace() is the one that sticks; the marker itself never survives,
+  // since the sync rebuilds the query from the filters alone.
+  const resumedFromSignIn = initial.get(RESUME_PARAM) === "filters";
+  useEffect(() => {
+    if (!resumedFromSignIn || !authLoaded || !filtersLocked) return;
+    // Held for a moment rather than fired at once, because Clerk can hand back
+    // a signed-in session a beat before the plan claims reach it. If they do
+    // arrive, filtersLocked flips, this effect re-runs and the timer is
+    // cleared. A free visitor waits about a second to reach pricing; a member
+    // is never shown a price for what they already pay for. That asymmetry is
+    // the whole point of the wait.
+    const timer = setTimeout(() => router.replace("/upgrade"), 1200);
+    return () => clearTimeout(timer);
+  }, [resumedFromSignIn, authLoaded, filtersLocked, router]);
 
   useEffect(() => {
     let cancelled = false;

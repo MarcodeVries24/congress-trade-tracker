@@ -28,7 +28,7 @@ export function UnsubscribeConfirm({ token }: { token: string }) {
       <div className="mt-4 rounded-lg border border-line bg-panel p-4">
         <p className="text-sm text-ink">This alert is off. You won&apos;t get any more emails from it.</p>
         <p className="mt-2 text-sm text-ink-muted">
-          It&apos;s paused, not deleted — turn it back on any time from your{" "}
+          It&apos;s paused, not deleted. Turn it back on any time from your{" "}
           <a href="/account" className="text-accent underline decoration-line-strong hover:decoration-current">
             account screen
           </a>

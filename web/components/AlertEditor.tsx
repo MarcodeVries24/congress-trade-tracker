@@ -189,7 +189,7 @@ export function AlertEditor({
 
         <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:px-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name" hint="Only you see this — it's the email's subject line too.">
+            <Field label="Name" hint="Only you see this. It's the email's subject line too.">
               <input
                 type="text"
                 value={name}
@@ -296,7 +296,7 @@ export function AlertEditor({
             </div>
             {sizeMode === "min" && (
               <p className="mt-2 text-xs text-ink-faint">
-                Disclosures give a bracket, never an exact figure — so these are the real bracket edges, not round numbers.
+                Disclosures give a bracket, never an exact figure, so these are the real bracket edges, not round numbers.
               </p>
             )}
           </section>
@@ -337,7 +337,7 @@ export function AlertEditor({
               ) : preview ? (
                 <>
                   <strong className="text-ink">{preview.recent.toLocaleString()}</strong> trade{preview.recent === 1 ? "" : "s"} filed in the
-                  last 90 days{preview.recent === 0 ? " — this may be narrower than you meant." : "."}
+                  last 90 days{preview.recent === 0 ? ". This may be narrower than you meant." : "."}
                 </>
               ) : (
                 "Couldn't check right now."
@@ -361,7 +361,7 @@ export function AlertEditor({
             )}
             <p className="mt-3 text-xs text-ink-faint">
               This looks backwards through the archive to show what the filter does. The alert itself only emails trades from
-              filings that arrive after you save it — you won&apos;t get a backlog.
+              filings that arrive after you save it; you won&apos;t get a backlog.
             </p>
           </section>
 

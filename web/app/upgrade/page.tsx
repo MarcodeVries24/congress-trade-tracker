@@ -12,7 +12,7 @@ import { getProPricing } from "@/lib/plans";
 import { formatDateFromTimestamp } from "@/lib/format";
 
 export const metadata: Metadata = {
-  title: "Upgrade — CongTrade",
+  title: "Upgrade | CongTrade",
   description:
     "Filter every disclosed Congress trade by member, ticker, size and market cap, and get an email the moment a new filing matches. Built from the filings themselves.",
 };
@@ -77,7 +77,7 @@ export default async function UpgradePage() {
             <h2 className="text-lg font-bold tracking-tight text-ink">Pricing</h2>
             {pricing?.annualSavingPercent ? (
               <p className="text-xs font-medium text-accent">
-                Save {pricing.annualSavingPercent}% on annual billing — {pricing.currencySymbol}
+                Save {pricing.annualSavingPercent}% on annual billing: {pricing.currencySymbol}
                 {pricing.annualMonthly}/mo instead of {pricing.currencySymbol}
                 {pricing.monthly}
               </p>
@@ -139,7 +139,7 @@ export default async function UpgradePage() {
             <Stat
               value="every 4h"
               label={
-                proof.lastCheckedAt ? `checked — last on ${formatDateFromTimestamp(proof.lastCheckedAt)}` : "checked"
+                proof.lastCheckedAt ? `checked, last on ${formatDateFromTimestamp(proof.lastCheckedAt)}` : "checked"
               }
             />
           </div>
@@ -166,7 +166,7 @@ export default async function UpgradePage() {
             />
             <Feature
               title="The same data, either way"
-              body="Nothing is held back from free visitors. Every trade, member and issuer page stays open to everyone — Pro pays for the tools on top, not for access to public records."
+              body="Nothing is held back from free visitors. Every trade, member and issuer page stays open to everyone. Pro pays for the tools on top, not for access to public records."
             />
           </div>
         </section>

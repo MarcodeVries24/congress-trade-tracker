@@ -128,7 +128,7 @@ export function TradeFlowChart({ quarters, subject }: { quarters: TradeFlowQuart
           const buyLateH = scale(Math.min(q.buyLate, q.buy));
           const sellLateH = scale(Math.min(q.sellLate, q.sell));
           const title =
-            `${quarterLabel(q.quarter)} — ${q.trades.toLocaleString()} trade${q.trades === 1 ? "" : "s"}` +
+            `${quarterLabel(q.quarter)}: ${q.trades.toLocaleString()} trade${q.trades === 1 ? "" : "s"}` +
             `\nBought ${compactUSD.format(q.buy)} · Sold ${compactUSD.format(q.sell)}` +
             (q.lateTrades > 0 ? `\n${q.lateTrades.toLocaleString()} filed late` : "\nAll filed on time");
           return (
@@ -154,7 +154,7 @@ export function TradeFlowChart({ quarters, subject }: { quarters: TradeFlowQuart
 
       <p className="mt-2 text-[11px] leading-snug text-ink-faint">
         Purchases above the line, sales below, sized by the midpoint of each disclosed bracket. Hatching marks value the
-        public learned about more than 45 days after the trade, the deadline the STOCK Act sets —{" "}
+        public learned about more than 45 days after the trade, the deadline the STOCK Act sets.{" "}
         {latePct > 0 ? (
           <>
             <span className="text-amber-500">{latePct}% of these trades were filed late</span>.

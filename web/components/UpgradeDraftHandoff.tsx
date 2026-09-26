@@ -46,7 +46,7 @@ export function UpgradeDraftHandoff() {
         <span className="font-medium">{describeAlert(draft).join(" · ")}</span>.
       </p>
       <p className="mt-1 text-xs text-ink-muted">
-        It&apos;s saved in this link — finish upgrading and we&apos;ll take you straight back to it.
+        It&apos;s saved in this link, so finish upgrading and we&apos;ll take you straight back to it.
       </p>
       <button
         type="button"

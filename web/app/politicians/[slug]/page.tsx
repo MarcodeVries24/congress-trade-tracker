@@ -36,7 +36,7 @@ function subtitle(p: { chamber: string | null; state: string | null; state_distr
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const member = await getMemberBySlug(slug);
-  if (!member) return { title: "Member not found — CongTrade" };
+  if (!member) return { title: "Member not found | CongTrade" };
 
   const { profile } = member;
   const description =
@@ -45,10 +45,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     `${profile.last_filed ? `. Most recent filing ${formatDate(profile.last_filed)}.` : "."}`;
 
   return {
-    title: `${profile.display} — stock trades and disclosures | CongTrade`,
+    title: `${profile.display}: stock trades and disclosures | CongTrade`,
     description,
     alternates: { canonical: `/politicians/${profile.slug}` },
-    openGraph: { title: `${profile.display} — disclosed trades`, description, type: "profile" },
+    openGraph: { title: `${profile.display}: disclosed trades`, description, type: "profile" },
   };
 }
 
@@ -225,7 +225,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
 
         <p className="mt-4 text-xs leading-relaxed text-ink-faint">
           Figures come from {profile.display}&rsquo;s own Periodic Transaction Reports, which disclose a value{" "}
-          <em>bracket</em> rather than an exact amount — the volume above sums the midpoint of each bracket, the same
+          <em>bracket</em> rather than an exact amount. The volume above sums the midpoint of each bracket, the same
           estimate used everywhere on the site. Every row links to the original filing. Nothing here is investment
           advice.
         </p>

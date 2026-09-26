@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { UnsubscribeConfirm } from "@/components/UnsubscribeConfirm";
 
 export const metadata: Metadata = {
-  title: "Unsubscribe — CongTrade",
+  title: "Unsubscribe | CongTrade",
   description: "Turn off a CongTrade email alert.",
   // An unsubscribe link should never be followed by a crawler, and there is
   // nothing here worth indexing.

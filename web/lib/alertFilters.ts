@@ -28,7 +28,7 @@ export const ALERT_FREQUENCIES: { value: AlertFrequency; label: string; hint: st
   // hours — .github/workflows/ingest.yml), and that's the honest label:
   // there is no faster signal to forward, since the source disclosure sites
   // are only polled on that schedule.
-  { value: "instant", label: "As it happens", hint: "Emailed on the next ingest run — at most 4 hours after a filing appears." },
+  { value: "instant", label: "As it happens", hint: "Emailed on the next ingest run, at most 4 hours after a filing appears." },
   { value: "daily", label: "Daily digest", hint: "At most one email a day, bundling everything that matched." },
   { value: "weekly", label: "Weekly digest", hint: "At most one email a week. Nothing matched, nothing sent." },
 ];

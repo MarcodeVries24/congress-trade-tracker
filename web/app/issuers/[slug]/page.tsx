@@ -42,7 +42,7 @@ function partyColor(party: string | null): string {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const found = await getIssuerBySlug(slug);
-  if (!found) return { title: "Issuer not found — CongTrade" };
+  if (!found) return { title: "Issuer not found | CongTrade" };
 
   const { issuer } = found;
   const name = issuer.company_name ?? issuer.ticker;
@@ -53,10 +53,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     `${issuer.last_traded ? `. Most recent trade ${formatDate(issuer.last_traded)}.` : "."}`;
 
   return {
-    title: `${name} (${issuer.ticker}) — Congress stock trades | CongTrade`,
+    title: `${name} (${issuer.ticker}): Congress stock trades | CongTrade`,
     description,
     alternates: { canonical: `/issuers/${issuer.slug}` },
-    openGraph: { title: `${name} (${issuer.ticker}) — Congress trades`, description, type: "website" },
+    openGraph: { title: `${name} (${issuer.ticker}): Congress trades`, description, type: "website" },
   };
 }
 

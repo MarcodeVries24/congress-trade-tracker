@@ -29,7 +29,7 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
 
       <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
         Members of Congress have to disclose what they trade. In practice that means a PDF, filed weeks later, on a
-        government site almost nobody visits. The information is public and nearly unusable — so we made it usable.
+        government site almost nobody visits. The information is public and nearly unusable, so we made it usable.
       </p>
       <p className="mt-2.5 text-[13px] leading-relaxed text-ink-muted">
         CongTrade is an independent project, not a company and not funded by anyone with a position to talk up. It reads
@@ -37,7 +37,7 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
         {trades && members ? (
           <>
             {" "}
-            — <span className="text-ink">{trades.toLocaleString("en-US")}</span> trades by{" "}
+            : <span className="text-ink">{trades.toLocaleString("en-US")}</span> trades by{" "}
             <span className="text-ink">{members.toLocaleString("en-US")}</span> members so far
           </>
         ) : null}

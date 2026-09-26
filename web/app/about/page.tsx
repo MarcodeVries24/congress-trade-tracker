@@ -13,7 +13,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why don't trades show an exact dollar amount?",
-    a: 'The law only requires a member to disclose which bracket a trade falls into — "$1,001–$15,000," "$50,001–$100,000," and so on, up through "Over $50,000,000" — not the exact figure. CongTrade always shows the disclosed range as filed. Where a single number is more useful, such as the "Est. volume" figure on the dashboard, we use the midpoint of that range and label it clearly as an estimate.',
+    a: 'The law only requires a member to disclose which bracket a trade falls into: "$1,001–$15,000," "$50,001–$100,000," and so on, up through "Over $50,000,000." It never requires the exact figure. CongTrade always shows the disclosed range as filed. Where a single number is more useful, such as the "Est. volume" figure on the dashboard, we use the midpoint of that range and label it clearly as an estimate.',
   },
   {
     q: "How often is the data updated?",
@@ -21,22 +21,22 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Is CongTrade an official government site?",
-    a: "No. CongTrade is an independent, unofficial project. It is not affiliated with, endorsed by, sponsored by, or operated on behalf of the U.S. Congress, the House Clerk, the Senate, or any government agency. All underlying disclosure data is public record produced by the government — CongTrade only collects, parses, and presents it.",
+    a: "No. CongTrade is an independent, unofficial project. It is not affiliated with, endorsed by, sponsored by, or operated on behalf of the U.S. Congress, the House Clerk, the Senate, or any government agency. All underlying disclosure data is public record produced by the government; CongTrade only collects, parses, and presents it.",
   },
   {
     q: "Can I trust the numbers?",
-    a: 'We aim for high accuracy, but a meaningful share of filings — hand-filed paper forms, in particular — are scanned images that have to be read with optical character recognition (OCR) rather than extracted as text, which is inherently less certain. Rows recovered this way carry a visible "OCR" badge that links straight back to the original scan, so you can check the source yourself. Anything the parser can\'t confidently read is left blank and logged rather than guessed at.',
+    a: 'We aim for high accuracy, but a meaningful share of filings, hand-filed paper forms in particular, are scanned images that have to be read with optical character recognition (OCR) rather than extracted as text, which is inherently less certain. Rows recovered this way carry a visible "OCR" badge that links straight back to the original scan, so you can check the source yourself. Anything the parser can\'t confidently read is left blank and logged rather than guessed at.',
   },
   {
     q: "How do I check a trade against the original filing?",
-    a: "Every trade on CongTrade links back to its source document — the PDF for House filings, the report page for Senate filings — directly from the trade row, so you can compare our parsed data against the government's own filing at any time.",
+    a: "Every trade on CongTrade links back to its source document (the PDF for House filings, the report page for Senate filings) directly from the trade row, so you can compare our parsed data against the government's own filing at any time.",
   },
   {
     q: "Is this investment advice?",
     a: "No. Nothing on CongTrade is financial, investment, legal, or tax advice, and the fact that a member of Congress traded a security is not a recommendation or endorsement of it. See our Terms of Service for the full detail.",
   },
   {
-    q: "I found an error, or have a question — who do I contact?",
+    q: "I found an error, or have a question. Who do I contact?",
     a: "Email contact@congtrade.com. Corrections, questions about methodology, and general feedback are all welcome, and we look into every report.",
   },
 ];
@@ -66,7 +66,7 @@ export default function AboutPage() {
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">About CongTrade</h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-muted sm:text-base">
           CongTrade is an independent, searchable archive of stock and asset trades disclosed by members of the U.S.
-          House and Senate — built directly from their own government filings, not a third-party data feed.
+          House and Senate, built directly from their own government filings, not a third-party data feed.
         </p>
 
         {stats && (
@@ -90,7 +90,7 @@ export default function AboutPage() {
           <Section title="What is a Periodic Transaction Report?">
             <p>
               The STOCK Act of 2012 requires members of Congress, and senior staff, to publicly report most
-              securities transactions — stocks, bonds, options, and similar assets — worth more than $1,000, within
+              securities transactions (stocks, bonds, options, and similar assets) worth more than $1,000, within
               45 days of the trade. That disclosure is filed on a standard form called a{" "}
               <strong className="text-ink">Periodic Transaction Report</strong>, or PTR. It's the same underlying
               document behind every row on this site.
@@ -100,13 +100,13 @@ export default function AboutPage() {
           <Section title="Where the data comes from">
             <p>
               House PTRs are filed as PDFs with the Office of the Clerk. CongTrade downloads the Clerk&rsquo;s public
-              filing index directly and parses each PDF&rsquo;s transaction table — asset, ticker, buy or sell, dates,
+              filing index directly and parses each PDF&rsquo;s transaction table: asset, ticker, buy or sell, dates,
               and disclosed amount range.
             </p>
             <p>
               Senate PTRs are filed with the Office of Public Records. Electronic filings are parsed straight from
-              their HTML transaction table. A portion of both chambers&rsquo; filings — mostly hand-delivered paper
-              forms — arrive as scanned images with no extractable text; those are read with a purpose-built OCR
+              their HTML transaction table. A portion of both chambers&rsquo; filings, mostly hand-delivered paper
+              forms, arrive as scanned images with no extractable text; those are read with a purpose-built OCR
               pipeline that locates each form&rsquo;s own gridlines from the scan and reads every cell and checkbox
               mark individually, rather than a single pass over the whole page.
             </p>
@@ -126,11 +126,11 @@ export default function AboutPage() {
 
           <Section title="How dollar amounts are estimated">
             <p>
-              The STOCK Act only requires a member to disclose which bracket a trade&rsquo;s value falls into — from
-              &ldquo;$1,001&ndash;$15,000&rdquo; up to &ldquo;Over $50,000,000&rdquo; — never an exact figure.
+              The STOCK Act only requires a member to disclose which bracket a trade&rsquo;s value falls into, from
+              &ldquo;$1,001&ndash;$15,000&rdquo; up to &ldquo;Over $50,000,000&rdquo;, never an exact figure.
               CongTrade always shows that disclosed range as filed. Where a single number is more useful for
-              comparison — like the total &ldquo;Est. volume&rdquo; figure shown on the dashboard and on each
-              member&rsquo;s profile — we take the midpoint of the disclosed range and sum it across trades, and
+              comparison, like the total &ldquo;Est. volume&rdquo; figure shown on the dashboard and on each
+              member&rsquo;s profile, we take the midpoint of the disclosed range and sum it across trades, and
               label it as an estimate everywhere it appears.
             </p>
           </Section>
@@ -138,7 +138,7 @@ export default function AboutPage() {
           <Section title="How often the data updates">
             <p>
               An automated pipeline checks the House Clerk&rsquo;s and Senate&rsquo;s disclosure systems every 4
-              hours and ingests any newly filed PTRs it finds — nothing about the schedule depends on any single
+              hours and ingests any newly filed PTRs it finds. Nothing about the schedule depends on any single
               machine staying on. The &ldquo;Last checked&rdquo; timestamp in the stat strip above, and elsewhere
               across the site, reflects the most recent of those runs.
             </p>
@@ -152,7 +152,7 @@ export default function AboutPage() {
                 <strong className="text-ink">OCR</strong> badge, linking to the original scan, wherever it appears.
               </li>
               <li>A line the parser can&rsquo;t confidently match to an asset, amount, or date is logged and left out rather than guessed at.</li>
-              <li>Dates are stored exactly as filed, even on the rare filing with an internal typo — we don&rsquo;t silently correct the source document.</li>
+              <li>Dates are stored exactly as filed, even on the rare filing with an internal typo; we don&rsquo;t silently correct the source document.</li>
               <li>Company names, tickers, and market caps are matched programmatically and can occasionally be wrong or missing.</li>
             </ul>
             <p>
@@ -168,7 +168,7 @@ export default function AboutPage() {
           <Section title="Who runs CongTrade">
             <p>
               CongTrade is built and maintained independently. It isn&rsquo;t funded by, affiliated with, or run on
-              behalf of any political party, campaign, PAC, member of Congress, or government body — it exists to
+              behalf of any political party, campaign, PAC, member of Congress, or government body. It exists to
               make disclosures that are already public record easier to search and cross-reference. See the{" "}
               <a href="/privacy" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
                 Privacy Policy
@@ -193,8 +193,8 @@ export default function AboutPage() {
 
           <Section title="Contact" id="contact">
             <p>
-              Questions, corrections, or feedback — about a specific trade, the data pipeline, legal or privacy
-              matters, or anything else — can be sent to{" "}
+              Questions, corrections, or feedback, whether about a specific trade, the data pipeline, legal or
+              privacy matters, or anything else, can be sent to{" "}
               <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
                 contact@congtrade.com
               </a>

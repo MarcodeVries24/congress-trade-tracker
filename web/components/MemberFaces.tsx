@@ -21,7 +21,7 @@ export function MemberFaces({ faces, total }: { faces: ProofFace[]; total: numbe
       <ul className="flex -space-x-2">
         {faces.map((face) => (
           <li key={face.slug} className="transition-transform hover:z-10 hover:-translate-y-0.5">
-            <Link href={`/politicians/${face.slug}`} title={`${face.name} — ${face.trades.toLocaleString("en-US")} trades`}>
+            <Link href={`/politicians/${face.slug}`} title={`${face.name}: ${face.trades.toLocaleString("en-US")} trades`}>
               <MemberPhoto
                 name={face.name}
                 photoUrl={face.photoUrl}

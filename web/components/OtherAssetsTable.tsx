@@ -83,7 +83,7 @@ export function OtherAssetsTable({ query }: { query: string }) {
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink sm:text-lg">Everything else Congress trades</h2>
           <p className="mt-1 max-w-3xl text-xs text-ink-muted sm:text-[13px]">
-            Municipal bonds, treasuries, corporate paper, funds and private partnerships — the assets that carry no
+            Municipal bonds, treasuries, corporate paper, funds and private partnerships: the assets that carry no
             ticker, so they can&apos;t sit in the table above. Grouped from the text of each filing, which writes every
             maturity and coupon as its own name, so treat these as families rather than exact issuers.
           </p>

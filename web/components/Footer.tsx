@@ -28,7 +28,7 @@ export function Footer() {
               <span className="text-accent">Trade</span>
             </span>
             <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-              An independent, searchable archive of U.S. Congress stock and asset trade disclosures — built directly
+              An independent, searchable archive of U.S. Congress stock and asset trade disclosures, built directly
               from official Periodic Transaction Reports.
             </p>
           </div>
@@ -90,7 +90,7 @@ export function Footer() {
           <strong className="text-ink-muted">Not financial advice.</strong> CongTrade is an independent, unofficial
           project and is not affiliated with, endorsed by, or operated on behalf of the U.S. Congress, the House
           Clerk, the Senate, or any government agency. Trade data is parsed automatically from public filings
-          (including OCR of scanned PDFs) and may contain errors, omissions, or delays — always verify against the
+          (including OCR of scanned PDFs) and may contain errors, omissions, or delays. Always verify against the
           original filing before relying on it. Nothing on this site is investment, legal, or tax advice, and a
           member of Congress trading a security is not a recommendation or endorsement of it. Fact-checking and due
           diligence remain the visitor's own responsibility.

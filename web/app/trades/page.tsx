@@ -891,7 +891,7 @@ export default function Home() {
                               <Link
                                 href={`/politicians/${trade.member_slug}`}
                                 className="text-left font-medium hover:underline"
-                                title={`${memberDisplayName(trade)} — all disclosed trades`}
+                                title={`${memberDisplayName(trade)}: all disclosed trades`}
                               >
                                 {memberDisplayName(trade)}
                               </Link>
@@ -912,7 +912,7 @@ export default function Home() {
                             <Link
                               href={`/issuers/${issuerSlug(trade.ticker)}`}
                               className="font-mono hover:text-ink hover:underline"
-                              title={`${trade.company_name ?? trade.ticker} — all disclosed trades`}
+                              title={`${trade.company_name ?? trade.ticker}: all disclosed trades`}
                             >
                               {trade.ticker}
                             </Link>
@@ -1136,7 +1136,7 @@ function OcrBadge() {
           role="tooltip"
           className="absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-md border border-line bg-panel p-2.5 text-xs font-normal normal-case leading-snug text-ink-muted shadow-lg"
         >
-          Automatically read from a scanned PDF, not typed text — details here may not be exactly correct.
+          Automatically read from a scanned PDF, not typed text; details here may not be exactly correct.
         </span>
       )}
     </span>

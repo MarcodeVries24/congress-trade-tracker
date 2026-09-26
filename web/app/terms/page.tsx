@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { LegalDocument, LegalSection } from "@/components/LegalDocument";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — CongTrade",
+  title: "Terms of Service | CongTrade",
   description: "The terms that govern use of CongTrade.",
 };
 
@@ -25,7 +25,7 @@ export default function TermsPage() {
         <LegalSection title="2. What CongTrade is">
           <p>
             CongTrade is an independent, unofficial tool that aggregates and presents publicly available financial
-            disclosure data — specifically, Periodic Transaction Reports (PTRs) that members of the U.S. House of
+            disclosure data: specifically, the Periodic Transaction Reports (PTRs) that members of the U.S. House of
             Representatives and Senate are required to file. We collect this data directly from the House Clerk&rsquo;s
             public disclosure site and the Senate&rsquo;s eFD system, and present it in a searchable, filterable
             format.
@@ -39,16 +39,16 @@ export default function TermsPage() {
 
         <LegalSection title="3. Accounts and paid plans">
           <p>
-            Some features — filters, email alerts, and an ad-free view — require a free account and a paid
+            Some features, namely filters, email alerts, and an ad-free view, require a free account and a paid
             CongTrade Pro subscription. Accounts are handled by our authentication provider, Clerk; you can sign up
             with an email address or a Google account. Subscriptions are billed by Stripe through Clerk&rsquo;s
-            billing integration — we never see or store your card details ourselves.
+            billing integration; we never see or store your card details ourselves.
           </p>
           <p>
             Email alerts send to the address on your account. Each alert email carries a one-click unsubscribe link
             that switches that alert off; you can also pause or delete any alert from your account screen, with or
             without an active subscription. Alerts run on the same schedule as our data collection, so &ldquo;as it
-            happens&rdquo; means on the next collection run — we don&rsquo;t promise any particular delivery time,
+            happens&rdquo; means on the next collection run. We don&rsquo;t promise any particular delivery time,
             and an alert is a convenience rather than a guarantee that you&rsquo;ll be told about every filing.
           </p>
           <p>
@@ -111,10 +111,10 @@ export default function TermsPage() {
 
         <LegalSection title="8. Third-party services and links">
           <p>
-            The Site links to third-party sites — including the House Clerk, the Senate eFD system, and individual
-            source filings — that we don&rsquo;t control. We&rsquo;re not responsible for the content, accuracy, or
-            practices of those sites. The Site also relies on third-party services to operate — Clerk (accounts),
-            Stripe (payment processing), and Google AdSense (advertising) — each governed by its own terms and
+            The Site links to third-party sites that we don&rsquo;t control, including the House Clerk, the Senate
+            eFD system, and individual source filings. We&rsquo;re not responsible for the content, accuracy, or
+            practices of those sites. The Site also relies on third-party services to operate: Clerk (accounts),
+            Stripe (payment processing), and Google AdSense (advertising). Each is governed by its own terms and
             privacy policy.
           </p>
         </LegalSection>
@@ -132,7 +132,7 @@ export default function TermsPage() {
           <p>
             To the fullest extent permitted by law, CongTrade and its operators won&rsquo;t be liable for any
             indirect, incidental, special, or consequential damages, or any loss of profits or data, arising from
-            your use of, or inability to use, the Site or the data it presents — including any financial decision
+            your use of, or inability to use, the Site or the data it presents, including any financial decision
             made in reliance on it.
           </p>
         </LegalSection>

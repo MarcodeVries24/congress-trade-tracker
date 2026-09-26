@@ -219,7 +219,7 @@ export function SentimentRiver() {
           <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-ink-muted sm:text-sm">
             {mode === "value"
               ? "Purchases swell above the line, sales below, both sized by the value disclosed. The line through the middle is how far the balance has tipped over the previous eight weeks."
-              : "The same weeks, but every trade counts once regardless of size — the balance of decisions rather than dollars."}
+              : "The same weeks, but every trade counts once regardless of size: the balance of decisions rather than dollars."}
           </p>
         </div>
 
@@ -270,7 +270,7 @@ export function SentimentRiver() {
 
         <p className="mt-3 text-[11px] leading-snug text-ink-faint">
           {mode === "value"
-            ? "Read by money: one large sale outweighs dozens of small purchases, so this moves when someone large moves. Figures are the midpoint of each disclosed bracket — Congress never reports an exact amount."
+            ? "Read by money: one large sale outweighs dozens of small purchases, so this moves when someone large moves. Figures are the midpoint of each disclosed bracket; Congress never reports an exact amount."
             : "Read by decisions: forty small purchases now outweigh one large sale. Where this and the value reading disagree, a few big trades are pulling against the crowd."}{" "}
           The chart ends at {data.settled.settledThrough}: Congress has 45 days to disclose, so more recent weeks are
           still filling in and would read as a fall in trading that hasn&rsquo;t happened.

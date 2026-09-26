@@ -8,7 +8,7 @@ import { AlertsManager } from "@/components/AlertsManager";
 import { hasProServer } from "@/lib/access";
 
 export const metadata: Metadata = {
-  title: "Your account — CongTrade",
+  title: "Your account | CongTrade",
   description: "Manage your CongTrade plan and email alerts.",
   robots: { index: false, follow: false },
 };
@@ -45,10 +45,10 @@ export default async function AccountPage() {
                 <p className="mt-1 text-sm text-ink-muted">
                   {isPro ? (
                     <>
-                      <span className="font-medium text-accent">CongTrade Pro</span> — filters, email alerts, and no ads.
+                      <span className="font-medium text-accent">CongTrade Pro</span>: filters, email alerts, and no ads.
                     </>
                   ) : (
-                    <>Free — search and browse. Filters, email alerts and an ad-free view are Pro.</>
+                    <>Free: search and browse. Filters, email alerts and an ad-free view are Pro.</>
                   )}
                 </p>
                 {user?.primaryEmailAddress?.emailAddress && (
@@ -71,8 +71,8 @@ export default async function AccountPage() {
           <section className="mt-8">
             <h2 className="text-lg font-bold tracking-tight text-ink">Email alerts</h2>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-muted">
-              Tell CongTrade exactly which disclosures matter to you — a chamber, a party, a member, a ticker, a minimum
-              trade size — and get an email when a new filing matches.
+              Tell CongTrade exactly which disclosures matter to you (a chamber, a party, a member, a ticker, a minimum
+              trade size) and get an email when a new filing matches.
             </p>
             <AlertsManager />
           </section>

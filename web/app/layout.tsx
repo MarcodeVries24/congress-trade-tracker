@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   // Without a metadataBase, Next emits relative URLs in metadata and warns at
   // build time; it's also what makes the canonical below absolute.
   metadataBase: new URL(SITE_URL),
-  title: "CongTrade — Congress Trade Tracker",
+  title: "CongTrade | Congress Trade Tracker",
   description: "Searchable U.S. Congress (House & Senate) asset trade disclosures (Periodic Transaction Reports)",
   // No `alternates.canonical` here on purpose: metadata is inherited, so a
   // canonical set in the root layout would make every page declare the

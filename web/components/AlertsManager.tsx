@@ -110,7 +110,7 @@ export function AlertsManager() {
         <p className="text-sm text-ink-muted">
           {state.email ? (
             <>
-              Delivered to <span className="text-ink">{state.email}</span> — change it in your profile and it follows.
+              Delivered to <span className="text-ink">{state.email}</span>; change it in your profile and it follows.
             </>
           ) : (
             "Add an email address to your account to receive alerts."
@@ -136,8 +136,8 @@ export function AlertsManager() {
         <div className="mt-4 rounded-lg border border-line bg-panel p-5">
           <h3 className="text-sm font-semibold text-ink">Email alerts are a CongTrade Pro feature</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-            Build a filter as specific as you like — a chamber, a party, a member, a ticker, a minimum trade size — and get
-            an email the moment a new disclosure matches it.
+            Build a filter as specific as you like (a chamber, a party, a member, a ticker, a minimum trade size) and
+            get an email the moment a new disclosure matches it.
           </p>
           {/* Carries a draft they arrived with through checkout, which hands
               it back to this page afterwards — the same handover the trades
@@ -168,7 +168,7 @@ export function AlertsManager() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-sm font-semibold text-ink">{alert.name}</h3>
-                    {!alert.active && <Chip>{alert.paused_reason === "subscription-ended" ? "Paused — Pro ended" : "Paused"}</Chip>}
+                    {!alert.active && <Chip>{alert.paused_reason === "subscription-ended" ? "Paused · Pro ended" : "Paused"}</Chip>}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {describeAlert(alert.filters).map((chip) => (
@@ -222,7 +222,7 @@ export function AlertsManager() {
 
               {alert.paused_reason === "subscription-ended" && (
                 <p className="mt-3 rounded-md border border-line bg-panel-muted px-3 py-2 text-xs leading-relaxed text-ink-muted">
-                  This stopped because your CongTrade Pro subscription ended. Nothing has been lost — the filter is
+                  This stopped because your CongTrade Pro subscription ended. Nothing has been lost; the filter is
                   exactly as you left it, and resubscribing turns it straight back on.
                 </p>
               )}

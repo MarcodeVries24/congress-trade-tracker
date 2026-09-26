@@ -115,7 +115,7 @@ export function SearchableMultiSelect({
                 </label>
               ))}
             {!loading && filtered.length > MAX_VISIBLE && (
-              <div className="px-2 py-1 text-xs text-ink-faint">and {filtered.length - MAX_VISIBLE} more — keep typing to narrow it down</div>
+              <div className="px-2 py-1 text-xs text-ink-faint">and {filtered.length - MAX_VISIBLE} more. Keep typing to narrow it down</div>
             )}
           </div>
         </div>

@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { LegalDocument, LegalSection } from "@/components/LegalDocument";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — CongTrade",
+  title: "Privacy Policy | CongTrade",
   description: "How CongTrade handles data.",
 };
 
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <p>
             All of the trading data shown on the Site is public government filing data, not personal data about
             visitors. Browsing and searching the Site doesn&rsquo;t require an account. If you create an account to
-            use paid features, we collect the minimum needed to run that account and subscription — mostly handled by
+            use paid features, we collect the minimum needed to run that account and subscription, mostly handled by
             our providers (Clerk for accounts, Stripe for payment) rather than stored by us directly. The one
             exception is email alerts, which need your address and your saved criteria in our own database in order
             to send anything. The sections below cover what that involves, plus the ordinary technical data
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <LegalSection title="2. Accounts">
           <p>
             Creating an account is optional and only needed for paid features (filters, alerts, an ad-free view).
-            Accounts are handled by our authentication provider, Clerk — you can sign up with an email address or a
+            Accounts are handled by our authentication provider, Clerk. You can sign up with an email address or a
             Google account. Clerk stores your email address, authentication method, and account metadata, and sets
             cookies needed to keep you signed in. See{" "}
             <a href="https://clerk.com/privacy" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
 
         <LegalSection title="3. Email alerts">
           <p>
-            CongTrade Pro subscribers can save alerts &mdash; a saved set of filter criteria &mdash; and be emailed
+            CongTrade Pro subscribers can save alerts, each one a set of filter criteria, and be emailed
             when a new public filing matches. To send those emails we store, in our own database: the criteria you
             chose, your Clerk account ID, and a copy of your account&rsquo;s email address (kept in step with
             whatever address Clerk holds, so that the sending job, which runs outside Clerk, has somewhere to
@@ -52,7 +52,7 @@ export default function PrivacyPage() {
           <p>
             Every alert email includes a one-click unsubscribe link that switches that alert off without signing in.
             Deleting an alert deletes its criteria and its sent-history with it. Alerts are the only thing we use
-            your email address for &mdash; we don&rsquo;t send marketing, and we don&rsquo;t share the address with
+            your email address for. We don&rsquo;t send marketing, and we don&rsquo;t share the address with
             anyone beyond our email delivery provider, Resend, which transmits the message.
           </p>
         </LegalSection>
@@ -60,7 +60,7 @@ export default function PrivacyPage() {
         <LegalSection title="4. Payments">
           <p>
             Subscription payments are processed by Stripe through Clerk&rsquo;s billing integration. We never see or
-            store your full card details — Stripe handles that directly. We do retain a record that your account has
+            store your full card details; Stripe handles that directly. We do retain a record that your account has
             an active (or past) subscription, needed to grant access to paid features.
           </p>
         </LegalSection>
@@ -68,9 +68,9 @@ export default function PrivacyPage() {
         <LegalSection title="5. Cookies and local storage">
           <p>Depending on how you use the Site, it can set:</p>
           <ul>
-            <li>An authentication session cookie (Clerk), if you create an account — keeps you signed in.</li>
-            <li>A theme preference (light/dark) in your browser&rsquo;s local storage — stays on your device, never sent to us.</li>
-            <li>Advertising cookies (Google AdSense), for visitors on the free tier — see the next section. CongTrade Pro subscribers don&rsquo;t see ads and shouldn&rsquo;t get these cookies.</li>
+            <li>An authentication session cookie (Clerk), if you create an account. It keeps you signed in.</li>
+            <li>A theme preference (light/dark) in your browser&rsquo;s local storage. It stays on your device, never sent to us.</li>
+            <li>Advertising cookies (Google AdSense), for visitors on the free tier. See the next section. CongTrade Pro subscribers don&rsquo;t see ads and shouldn&rsquo;t get these cookies.</li>
           </ul>
         </LegalSection>
 
@@ -96,7 +96,7 @@ export default function PrivacyPage() {
           <p>
             The Site is hosted on Vercel, with its data stored in a Neon Postgres database. Like virtually every
             website, our hosting provider automatically logs standard technical information for security and
-            reliability purposes — things like IP address, browser type, and request timestamps. We don&rsquo;t
+            reliability purposes: things like IP address, browser type, and request timestamps. We don&rsquo;t
             personally review this data; it&rsquo;s processed under our infrastructure providers&rsquo; own privacy
             and security practices.
           </p>
@@ -104,8 +104,8 @@ export default function PrivacyPage() {
 
         <LegalSection title="8. Third-party services and sites">
           <p>
-            The Site links out to third-party sites — the House Clerk&rsquo;s disclosure portal, the Senate eFD
-            system, and individual source filings — to let you verify data at the source. It also relies on Clerk,
+            The Site links out to third-party sites, such as the House Clerk&rsquo;s disclosure portal, the Senate
+            eFD system, and individual source filings, to let you verify data at the source. It also relies on Clerk,
             Stripe, Resend (which delivers alert emails), and Google AdSense to operate, as described above. None of
             these are under our control, and each has its own privacy practices.
           </p>

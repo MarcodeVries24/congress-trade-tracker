@@ -142,7 +142,7 @@ export default function Politicians() {
       <Header />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Politicians — disclosed trading activity</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Politicians: disclosed trading activity</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
             Every member of Congress with a disclosed trade, with how often they trade and an estimated volume.
           </p>

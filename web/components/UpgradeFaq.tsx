@@ -17,7 +17,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Why are the amounts ranges rather than exact figures?",
-    a: "Because that's all members disclose. A filing says a trade was worth $15,001–$50,000, never $31,240. Where CongTrade shows a total, it adds up the midpoint of each range — a reasonable estimate, and clearly not a precise number.",
+    a: "Because that's all members disclose. A filing says a trade was worth $15,001–$50,000, never $31,240. Where CongTrade shows a total, it adds up the midpoint of each range: a reasonable estimate, and clearly not a precise number.",
   },
   {
     q: "What can I do without paying?",
@@ -25,7 +25,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What exactly do the filters add?",
-    a: "They narrow the same data by member, ticker, party, state, chamber, trade type, owner, trade size, market-cap tier and filing date, in any combination — and the URL keeps them, so a view you build is a link you can save or share.",
+    a: "They narrow the same data by member, ticker, party, state, chamber, trade type, owner, trade size, market-cap tier and filing date, in any combination, and the URL keeps them, so a view you build is a link you can save or share.",
   },
   {
     q: "Can I cancel?",

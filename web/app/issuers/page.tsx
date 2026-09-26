@@ -119,9 +119,9 @@ export default function Issuers() {
       <Header />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Issuers — what Congress trades</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Issuers: what Congress trades</h1>
           <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Companies first, then everything else — bonds, treasuries, funds and private holdings.
+            Companies first, then everything else: bonds, treasuries, funds and private holdings.
           </p>
         </div>
 

@@ -50,27 +50,16 @@ ins.adsbygoogle[data-ad-status="unfilled"] {
   display: none !important;
 }
 
-/* Two corrections to Clerk's pricing table, both keyed on the per-plan
- * classes it emits (cl-pricingTableCard__<plan slug>) rather than on child
- * order, so adding a plan can't silently retarget them.
+/* Clerk stacks its pricing cards cheapest first. On a phone that puts the
+ * plan nobody came for above the fold and the one they did below it; side by
+ * side on a wider screen the cheap-to-dear order reads as a progression, so
+ * the flip applies only while stacked.
  *
- * 1. On a phone the cards stack, and Clerk stacks them cheapest first, which
- *    puts the plan nobody is here to buy above the fold and the one they came
- *    for below it. Side by side on a wider screen the order reads as a
- *    progression, so it only flips while stacked.
- *
- * 2. A signed-out visitor has nothing to subscribe to on the free plan: every
- *    free feature listed on that card already works without an account. The
- *    whole footer goes rather than just the button, or the card keeps an empty
- *    bordered strip where it was. Signed in, this class is absent and Clerk's
- *    own handling stands: it badges the plan you are on as "Current plan".
+ * Keyed on the per-plan class Clerk emits (cl-pricingTableCard__<plan slug>)
+ * rather than on child order, so adding a plan can't silently retarget it.
  */
 @media (max-width: 639px) {
   .cl-pricingTableCard__pro_congtrade {
     order: -1;
   }
-}
-
-.upgrade-anon .cl-pricingTableCard__free_user .cl-pricingTableCardFooter {
-  display: none;
 }

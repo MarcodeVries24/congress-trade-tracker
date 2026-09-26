@@ -34,6 +34,12 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
         baseTheme: isDark ? dark : undefined,
         variables: { colorPrimary: isDark ? DARK_ACCENT : LIGHT_ACCENT, borderRadius: "0.375rem" },
       }}
+      // The pricing table badges the plan you're on as "Active", which reads
+      // as a status light rather than as an answer to "which one am I on?".
+      // The key is Clerk's own (badge__activePlan), so this is a relabel, not
+      // a behaviour change: it still appears only for a signed-in subscriber,
+      // on the plan they actually hold.
+      localization={{ badge__activePlan: "Current plan" }}
     >
       {children}
     </ClerkProvider>

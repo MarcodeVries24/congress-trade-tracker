@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { PricingTable } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
@@ -47,8 +46,7 @@ export default async function UpgradePage({
   // pricing page that now reads "subscribed" — the one page a new subscriber
   // has no further use for. A half-built alert goes back to itself; everyone
   // else lands on their account, where the alerts live.
-  const [{ userId }, params] = await Promise.all([auth(), searchParams]);
-  const draft = params[ALERT_DRAFT_PARAM];
+  const draft = (await searchParams)[ALERT_DRAFT_PARAM];
   const afterCheckout =
     typeof draft === "string" && draft
       ? `/account?${ALERT_DRAFT_PARAM}=${encodeURIComponent(draft)}`
@@ -100,13 +98,11 @@ export default async function UpgradePage({
               </p>
             ) : null}
           </div>
-          {/* ctaPosition="top" puts each Subscribe directly under its price
-              instead of at the foot of the card, so the free plan's shorter
-              card doesn't strand its button under a screen of nothing. */}
-          {/* upgrade-anon drops the free plan's Subscribe button for visitors
-              who aren't signed in — see globals.css. */}
-          <div className={`mt-4${userId ? "" : " upgrade-anon"}`}>
-            <PricingTable ctaPosition="top" newSubscriptionRedirectUrl={afterCheckout} />
+          {/* Features above the button, and Clerk's own footer left alone:
+              hiding it on the free plan also hid the "Current plan" state it
+              puts there for whoever is already on that plan. */}
+          <div className="mt-4">
+            <PricingTable newSubscriptionRedirectUrl={afterCheckout} />
           </div>
           {/* Ticks rather than middots between the items: a separator only
               works while the row is one line, and at most widths this one

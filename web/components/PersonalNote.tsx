@@ -12,7 +12,7 @@ import Image from "next/image";
 export function PersonalNote() {
   return (
     <section className="rounded-xl border border-line bg-panel p-5 sm:p-6">
-      <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
+      <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-6">
         <div className="shrink-0">
           <Image
             src="/stock-portrait.jpg"
@@ -20,7 +20,11 @@ export function PersonalNote() {
             width={426}
             height={640}
             sizes="160px"
-            className="h-32 w-32 rounded-full object-cover object-top sm:h-40 sm:w-40"
+            // The subject sits high in the frame, so cropping from the very top
+            // leaves a band of shoulder under the chin and the face riding the
+            // rim. Taking the square from 12% down pulls the image up in the
+            // circle and puts the face where the eye looks first.
+            className="h-32 w-32 rounded-full object-cover object-[center_12%] sm:h-40 sm:w-40"
           />
         </div>
 

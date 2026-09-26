@@ -6,6 +6,7 @@ import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
 import { AlertEmailPreview } from "@/components/AlertEmailPreview";
 import { UpgradeFaq } from "@/components/UpgradeFaq";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
+import { MemberFaces } from "@/components/MemberFaces";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
 import { formatDateFromTimestamp } from "@/lib/format";
@@ -52,6 +53,12 @@ export default async function UpgradePage() {
           Every trade on CongTrade is free to read. Pro is for following it closely: filter the whole archive down to
           what you care about, and get an email the moment a new filing matches.
         </p>
+
+        {proof && proof.faces.length > 0 && (
+          <div className="mt-5">
+            <MemberFaces faces={proof.faces} total={proof.members} />
+          </div>
+        )}
 
         {/* Renders only for someone who arrived mid-way through building an
             alert — see UpgradeDraftHandoff. Kept high on the page: it names

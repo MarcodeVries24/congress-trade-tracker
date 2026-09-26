@@ -23,6 +23,13 @@ export type ProofTrade = {
   filing_date: string | null;
 };
 
+export type ProofFace = {
+  name: string;
+  slug: string;
+  photoUrl: string | null;
+  trades: number;
+};
+
 export type UpgradeProof = {
   transactions: number;
   filings: number;
@@ -30,6 +37,8 @@ export type UpgradeProof = {
   lastCheckedAt: string | null;
   /** Real filings, shown as an example alert. Empty if the query finds none. */
   sample: ProofTrade[];
+  /** The most active members, with their official portraits. */
+  faces: ProofFace[];
 };
 
 let cached: { at: number; value: Promise<UpgradeProof> } | null = null;
@@ -65,7 +74,7 @@ function distinctMembers(rows: ProofTrade[], limit: number): ProofTrade[] {
 }
 
 async function load(): Promise<UpgradeProof> {
-  const [transactions, filings, members, lastChecked, sample] = (await Promise.all([
+  const [transactions, filings, members, lastChecked, sample, photos] = (await Promise.all([
     sql.query(
       `SELECT COUNT(*)::int AS n
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
@@ -98,19 +107,46 @@ async function load(): Promise<UpgradeProof> {
        ORDER BY f.filing_date DESC NULLS LAST, t.id DESC
        LIMIT 12`
     ),
+    // Official portraits, keyed by bioguide id so the name spellings don't
+    // matter — the same person filed three ways still has one photo.
+    sql.query(
+      `SELECT f.bioguide_id,
+              (ARRAY_AGG(COALESCE(mh.photo_url, mr.photo_url) ORDER BY f.filing_date DESC NULLS LAST))[1] AS photo_url
+       FROM transactions t
+       JOIN filings f ON f.doc_id = t.doc_id
+       LEFT JOIN members_reference mr ON mr.state_district = t.state_district
+       LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
+       WHERE ${PUBLISHED_FILING_SQL} AND f.bioguide_id IS NOT NULL
+       GROUP BY f.bioguide_id`
+    ),
   ])) as [
     { n: number }[],
     { n: number }[],
     { member_name: string; bioguide_id: string | null; trades: number }[],
     { checked_at: string }[],
     ProofTrade[],
+    { bioguide_id: string; photo_url: string | null }[],
   ];
+
+  const photoByBioguide = new Map(photos.map((row) => [row.bioguide_id, row.photo_url]));
+  const directory = groupMembers(members);
 
   return {
     transactions: transactions[0]?.n ?? 0,
     filings: filings[0]?.n ?? 0,
-    members: groupMembers(members).length,
+    members: directory.length,
     lastCheckedAt: lastChecked[0]?.checked_at ?? null,
     sample: distinctMembers(sample, 3),
+    // Busiest first, and only those with a portrait: a row of faces broken by
+    // three grey initials circles makes the product look half-built.
+    faces: directory
+      .filter((m) => m.bioguideId && photoByBioguide.get(m.bioguideId))
+      .slice(0, 10)
+      .map((m) => ({
+        name: m.display,
+        slug: m.slug,
+        photoUrl: photoByBioguide.get(m.bioguideId as string) ?? null,
+        trades: m.trades,
+      })),
   };
 }

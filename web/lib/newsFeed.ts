@@ -1,4 +1,5 @@
 import { fetchFeed, type FeedItem } from "./feeds";
+import { articleImage } from "./articleImage";
 
 /**
  * The two commercial feeds, kept apart from the agency releases on purpose.
@@ -32,6 +33,13 @@ const SOURCES = [
     url: "https://www.cnbc.com/id/20910258/device/rss/rss.html",
   },
   {
+    key: "cnbc-markets",
+    publisher: "CNBC",
+    homepage: "https://www.cnbc.com/investing/",
+    blurb: "Markets and investing",
+    url: "https://www.cnbc.com/id/15839069/device/rss/rss.html",
+  },
+  {
     key: "marketwatch",
     publisher: "MarketWatch",
     homepage: "https://www.marketwatch.com/",
@@ -45,7 +53,7 @@ export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
     SOURCES.map((s) => fetchFeed(s.url, s.publisher, { limit, revalidate: 1800 }))
   );
 
-  return SOURCES.map((source, i) => {
+  const sections = SOURCES.map((source, i) => {
     const result = results[i];
     return {
       key: source.key,
@@ -55,4 +63,24 @@ export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
       items: result.status === "fulfilled" ? result.value : [],
     };
   }).filter((section) => section.items.length > 0);
+
+  await Promise.all(sections.map((section) => illustrate(section.items)));
+  return sections;
+}
+
+/**
+ * Fills in the pictures a feed didn't carry, from each article's own og:image.
+ *
+ * MarketWatch ships one per item and skips this entirely. CNBC ships none, so
+ * every card there would otherwise fall back to type, which reads as a feed
+ * that half-loaded. Fetched in parallel and individually optional: an article
+ * that won't answer in four seconds simply keeps the typographic card.
+ */
+async function illustrate(items: FeedItem[]): Promise<void> {
+  const missing = items.filter((item) => !item.image);
+  if (missing.length === 0) return;
+  const found = await Promise.all(missing.map((item) => articleImage(item.url)));
+  missing.forEach((item, i) => {
+    item.image = found[i];
+  });
 }

@@ -63,11 +63,10 @@ export default async function NewsPage() {
         )}
 
         {sections.map((section) => (
-          <Group
-            key={section.key}
-            title={section.publisher}
-            note={`${section.blurb} · published by ${section.publisher}`}
-          >
+          // Two CNBC desks run here, so the desk belongs in the heading:
+          // twin headings reading "CNBC" with the difference hidden in the
+          // note beside them is a worse answer than a longer title.
+          <Group key={section.key} title={`${section.publisher} · ${section.blurb}`} note={`Published by ${section.publisher}`}>
             {section.items.map((item) => (
               <NewsCard key={item.url} item={item} accent={section.key === "cnbc" ? "accent" : "amber"} />
             ))}

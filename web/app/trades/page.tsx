@@ -705,7 +705,11 @@ export default function Home() {
               </Select>
               <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
                 <MultiSelect
-                  placeholder="All types"
+                  // "All types" left people guessing what a type was. The
+                  // other placeholders all read "Any X", so this one names
+                  // the two that matter rather than breaking the pattern.
+                  // Exchange is the third option and shows on opening it.
+                  placeholder="Any buy or sell"
                   selected={types}
                   onChange={setTypes}
                   options={[

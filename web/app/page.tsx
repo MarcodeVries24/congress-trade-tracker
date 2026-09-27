@@ -129,7 +129,11 @@ export default function Home() {
           {/* Latest Trades */}
           <Card
             title="Latest Trades"
-            href="/trades"
+            // Carries the toggle through to the full list. Without it "All
+            // assets" then "View all" landed on /trades, which defaults to
+            // stocks, so the one click that widened the view was undone by
+            // the next one.
+            href={assetFilter === "all" ? "/trades?assetTypes=any" : "/trades"}
             className="h-full lg:col-span-2"
             actions={
               <div className="flex items-center gap-1 text-[11px]">

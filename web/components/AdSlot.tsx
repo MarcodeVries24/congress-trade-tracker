@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useProMirror } from "@/lib/useProMirror";
 
 // The account-level adsbygoogle.js script (no slot, just the client ID) is
 // loaded site-wide in app/layout.tsx, not here — Google needs it present on
@@ -27,12 +27,16 @@ declare global {
 
 export function AdSlot({ slot }: { slot?: string } = {}) {
   const adSlot = slot ?? DEFAULT_AD_SLOT;
-  const { isLoaded, has } = useAuth();
-  const { user } = useUser();
-  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
+  // Reads the plan mirrored onto the Clerk user by the Stripe webhook. It
+  // used to ask Clerk Billing whether the account held a "no_ads" feature,
+  // which now always answers no — so a subscriber would have been shown ads.
+  // Nothing rendered this while ads were off; it would have surfaced the day
+  // the placements came back.
+  //
   // Same UX-nicety default as the filter gate: don't flash the ad in for a
   // pro user during the brief moment auth is still loading.
-  const noAds = isLoaded && (has({ feature: "no_ads" }) || isAdmin);
+  const { loaded, isPro } = useProMirror();
+  const noAds = loaded && isPro;
   const requested = useRef(false);
   const insRef = useRef<HTMLModElement>(null);
 

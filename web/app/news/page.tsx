@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NewsCard } from "@/components/NewsCard";
+import { AgencyList } from "@/components/AgencyList";
 import { getGeneralNews } from "@/lib/newsFeed";
 import { getPolicyFeed } from "@/lib/policyFeed";
 
@@ -23,10 +24,13 @@ function Group({
   title,
   note,
   children,
+  /** Cards want a grid; the agency list brings its own. */
+  grid = true,
 }: {
   title: string;
   note: string;
   children: React.ReactNode;
+  grid?: boolean;
 }) {
   return (
     <section className="mt-10 first:mt-8">
@@ -34,15 +38,20 @@ function Group({
         <h2 className="text-lg font-bold tracking-tight text-ink">{title}</h2>
         <p className="text-xs text-ink-faint">{note}</p>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+      {grid ? <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div> : children}
     </section>
   );
 }
 
 export default async function NewsPage() {
   // Independent: one publisher being down shouldn't cost the others their
-  // section, and both helpers already resolve to empty on failure.
-  const [agencies, sections] = await Promise.all([getPolicyFeed(12), getGeneralNews(9)]);
+  // section, and both helpers already resolve to empty on failure. The agency
+  // list takes three per body here rather than the home page's one, since a
+  // page with room shouldn't show five lines and stop.
+  const [agencies, sections] = await Promise.all([getPolicyFeed(18, 3), getGeneralNews(9)]);
+  const desk = (key: string) => sections.find((s) => s.key === key);
+  const markets = desk("cnbc-markets");
+  const economy = desk("cnbc");
 
   return (
     <>
@@ -54,24 +63,28 @@ export default async function NewsPage() {
           headline links to whoever published it. None of it is CongTrade&rsquo;s own writing.
         </p>
 
-        {agencies.length > 0 && (
-          <Group title="News from the agencies" note="Official releases, unedited">
-            {agencies.map((item) => (
+        {/* Markets first: it is the half of this page people come back for. */}
+        {markets && (
+          <Group title={`${markets.publisher} · ${markets.blurb}`} note={`Published by ${markets.publisher}`}>
+            {markets.items.map((item) => (
               <NewsCard key={item.url} item={item} />
             ))}
           </Group>
         )}
 
-        {sections.map((section) => (
-          // Two CNBC desks run here, so the desk belongs in the heading:
-          // twin headings reading "CNBC" with the difference hidden in the
-          // note beside them is a worse answer than a longer title.
-          <Group key={section.key} title={`${section.publisher} · ${section.blurb}`} note={`Published by ${section.publisher}`}>
-            {section.items.map((item) => (
-              <NewsCard key={item.url} item={item} accent={section.key === "cnbc" ? "accent" : "amber"} />
+        {agencies.length > 0 && (
+          <Group title="News from the agencies" note="Official releases, unedited" grid={false}>
+            <AgencyList items={agencies} />
+          </Group>
+        )}
+
+        {economy && (
+          <Group title={`${economy.publisher} · ${economy.blurb}`} note={`Published by ${economy.publisher}`}>
+            {economy.items.map((item) => (
+              <NewsCard key={item.url} item={item} />
             ))}
           </Group>
-        ))}
+        )}
 
         {agencies.length === 0 && sections.length === 0 && (
           <p className="mt-10 rounded-lg border border-dashed border-line px-5 py-8 text-center text-sm text-ink-muted">

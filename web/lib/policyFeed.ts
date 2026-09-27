@@ -22,24 +22,26 @@ const SOURCES: { url: string; source: string }[] = [
 ];
 
 /**
- * Newest first, at most one item per source.
+ * Newest first, capped per source.
  *
  * The cap matters: the Fed publishes bank-merger orders several times a week
  * and would otherwise crowd out the monthly CPI print, which is the item
- * anyone actually wants. One each keeps the strip reading as a dashboard of
- * agencies rather than as a Fed feed with visitors.
+ * anyone actually wants. One each keeps the home page strip reading as a
+ * dashboard of agencies rather than as a Fed feed with visitors; the news
+ * page, which has room, takes three each and still reads evenly.
  */
-export async function getPolicyFeed(limit = 5): Promise<FeedItem[]> {
-  const results = await Promise.allSettled(SOURCES.map((s) => fetchFeed(s.url, s.source, { limit: 4 })));
+export async function getPolicyFeed(limit = 5, perSource = 1): Promise<FeedItem[]> {
+  const results = await Promise.allSettled(
+    SOURCES.map((s) => fetchFeed(s.url, s.source, { limit: Math.max(perSource, 4) }))
+  );
 
-  const newest: FeedItem[] = [];
+  const picked: FeedItem[] = [];
   for (const result of results) {
     if (result.status !== "fulfilled") continue;
-    const [first] = result.value;
-    if (first) newest.push(first);
+    picked.push(...result.value.slice(0, perSource));
   }
 
-  return newest
+  return picked
     .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))
     .slice(0, limit);
 }

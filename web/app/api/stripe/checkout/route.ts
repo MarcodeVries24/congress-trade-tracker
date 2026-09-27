@@ -39,24 +39,38 @@ export async function POST(req: NextRequest) {
   // currency could name the cheaper one.
   const currency = await currencyForRequest();
 
-  const session = await stripe().checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: priceIdFor(period, currency), quantity: 1 }],
-    ...(existing ? { customer: existing.stripe_customer_id } : email ? { customer_email: email } : {}),
-    // The link back to the Clerk user. Stripe echoes this on every event for
-    // the resulting subscription, which is what lets the webhook know whose
-    // access to open without a lookup table of its own.
-    client_reference_id: userId,
-    subscription_data: { metadata: { clerk_user_id: userId } },
-    metadata: { clerk_user_id: userId },
-    allow_promotion_codes: true,
-    // Stripe collects and remits EU VAT when Tax is switched on in the
-    // dashboard; without it this is simply ignored.
-    automatic_tax: { enabled: true },
-    billing_address_collection: "auto",
-    success_url: `${SITE_URL}${returnTo}${returnTo.includes("?") ? "&" : "?"}checkout=success`,
-    cancel_url: `${SITE_URL}/upgrade?checkout=cancelled`,
-  });
+  // Stripe Tax is not ignored when it is unconfigured: asking for it on an
+  // account with no registered origin address fails the whole session, which
+  // is a dead Subscribe button rather than a missing VAT line. So it is opt-in,
+  // switched on once Tax is actually set up in the dashboard.
+  const automaticTax = process.env.STRIPE_AUTOMATIC_TAX === "true";
 
-  return NextResponse.json({ url: session.url });
+  try {
+    const session = await stripe().checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceIdFor(period, currency), quantity: 1 }],
+      ...(existing ? { customer: existing.stripe_customer_id } : email ? { customer_email: email } : {}),
+      // The link back to the Clerk user. Stripe echoes this on every event for
+      // the resulting subscription, which is what lets the webhook know whose
+      // access to open without a lookup table of its own.
+      client_reference_id: userId,
+      subscription_data: { metadata: { clerk_user_id: userId } },
+      metadata: { clerk_user_id: userId },
+      allow_promotion_codes: true,
+      automatic_tax: { enabled: automaticTax },
+      billing_address_collection: automaticTax ? "required" : "auto",
+      success_url: `${SITE_URL}${returnTo}${returnTo.includes("?") ? "&" : "?"}checkout=success`,
+      cancel_url: `${SITE_URL}/upgrade?checkout=cancelled`,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    // Stripe refuses a session for reasons that are ours to fix and are
+    // invisible from the browser: an unactivated account, a price id from the
+    // other mode, Tax without an origin address. Say which, in the log and to
+    // the buyer, rather than letting it become an opaque 500.
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[stripe] checkout session failed", { userId, period, currency, message });
+    return NextResponse.json({ error: `Checkout could not be started: ${message}` }, { status: 502 });
+  }
 }

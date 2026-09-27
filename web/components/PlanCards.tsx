@@ -69,11 +69,21 @@ export function PlanCards({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ period: annual ? "annual" : "monthly", returnTo }),
       });
-      const data = (await res.json()) as { url?: string; error?: string };
+      // Parsed by hand rather than with res.json(): a route that crashes
+      // answers with an HTML error page, and letting that throw here reported
+      // every server-side failure as "could not reach", which sent us looking
+      // at the network when the request had arrived and been answered.
+      const body = await res.text();
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = JSON.parse(body) as { url?: string; error?: string };
+      } catch {
+        data = {};
+      }
       if (data.url) window.location.href = data.url;
-      else setError(data.error ?? "Could not start checkout. Please try again.");
+      else setError(data.error ?? `Could not start checkout (error ${res.status}). Please try again.`);
     } catch {
-      setError("Could not reach the payment page. Please try again.");
+      setError("Could not reach the payment page. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -83,6 +93,38 @@ export function PlanCards({
 
   return (
     <div>
+      {/* One control for both cards. It sits above them because the price
+          shown inside the Pro card is what it changes, and a switch placed
+          after the number it rewrites reads as an afterthought. */}
+      <div className="mb-4 flex justify-center">
+        <div role="group" aria-label="Billing period" className="inline-flex rounded-lg border border-line bg-panel p-1">
+          {([
+            { value: false, label: "Monthly" },
+            { value: true, label: "Yearly" },
+          ] as const).map((option) => {
+            const selected = annual === option.value;
+            return (
+              <button
+                key={option.label}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setAnnual(option.value)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  selected ? "bg-accent text-white" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {option.label}
+                {option.value && savingPercent ? (
+                  <span className={`ml-1.5 text-xs font-semibold ${selected ? "text-white/80" : "text-accent"}`}>
+                    &minus;{savingPercent}%
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-line bg-panel p-5">
           <h3 className="text-sm font-semibold text-ink">Free</h3>
@@ -112,14 +154,6 @@ export function PlanCards({
             {annual ? "Billed annually" : "Billed monthly"}
             {annual && savingPercent ? `, saving ${savingPercent}%` : ""}
           </p>
-
-          <button
-            type="button"
-            onClick={() => setAnnual((v) => !v)}
-            className="mt-3 text-xs text-accent underline decoration-line-strong hover:decoration-current"
-          >
-            {annual ? "Switch to monthly billing" : "Switch to annual billing"}
-          </button>
 
           <ul className="mt-4 space-y-2 text-sm text-ink-muted">
             {PRO_FEATURES.map((f) => (

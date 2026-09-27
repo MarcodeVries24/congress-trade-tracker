@@ -27,7 +27,25 @@ export interface AlertEmailInput {
   unsubscribeUrl: string;
 }
 
-const MAX_ROWS_SHOWN = 40;
+/**
+ * Every match goes in the email. The only ceiling is Gmail's: it clips a
+ * message over roughly 102KB behind a "View entire message" link, and what
+ * gets hidden is the end — which is where the unsubscribe link lives. An
+ * email that buries its own unsubscribe is worse than one that says a few
+ * rows are missing.
+ *
+ * So the cards are laid in until the document approaches that limit rather
+ * than until some round number of rows is reached. The sender already caps a
+ * run at 200 matches, and at this budget a run of that size is the only one
+ * that ever spills.
+ */
+const MAX_HTML_BYTES = 92_000;
+
+/** Roughly what the header, button and footer cost, kept off the card budget. */
+const CHROME_BYTES = 4_000;
+
+/** Written once and reused, because it appears on every line of every card. */
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -81,7 +99,6 @@ export function alertEmailSubject(input: Pick<AlertEmailInput, "alertName" | "to
 
 export function alertEmailHtml(input: AlertEmailInput): string {
   const { alertName, filters, trades, totalMatched, siteUrl, unsubscribeUrl } = input;
-  const shown = trades.slice(0, MAX_ROWS_SHOWN);
 
   const chips = describeAlert(filters)
     .map(
@@ -92,76 +109,109 @@ export function alertEmailHtml(input: AlertEmailInput): string {
     )
     .join("");
 
-  // One card per trade rather than a table row. An alert is read on a phone as
-  // often as not, where five columns either scroll sideways or squeeze a
-  // bond's name into four characters — which is exactly what the first cut of
-  // this did. Each card leads with the person and the amount, because that is
-  // the pair a reader scans for, and closes with the link to the filing.
-  const cards = shown
-    .map((row) => {
-      const type = typeLabel(row.transaction_type);
-      const asset = assetLabel(row);
-      const company = row.company_name && row.company_name !== asset ? row.company_name : null;
-      return `
-      <tr>
-        <td style="padding:0 0 12px 0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e3e8ee;border-radius:10px;background:#ffffff;">
-            <tr>
-              <td style="padding:16px 18px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="font-size:16px;font-weight:700;color:#10161d;line-height:1.3;">${escapeHtml(
-                      memberDisplayName(row)
-                    )}</td>
-                    <td align="right" style="font-size:15px;font-weight:700;color:#10161d;white-space:nowrap;padding-left:12px;">${escapeHtml(
-                      amountLabel(row.amount_range)
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding-top:2px;font-size:12px;color:#8a95a1;">${escapeHtml(
-                      memberContext(row)
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding-top:12px;">
-                      <span style="display:inline-block;background:${type.tint};color:${type.color};border-radius:6px;padding:4px 9px;font-size:12px;font-weight:700;line-height:1;">${escapeHtml(
-                        type.label
-                      )}</span>
-                      <span style="display:inline-block;padding-left:8px;font-size:15px;font-weight:700;color:#10161d;">${escapeHtml(
-                        asset
-                      )}</span>
-                      ${
-                        company
-                          ? `<span style="display:inline-block;padding-left:6px;font-size:13px;color:#5b6773;">${escapeHtml(
-                              company
-                            )}</span>`
-                          : ""
-                      }
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding-top:12px;border-top:1px solid #f0f3f7;font-size:12px;color:#8a95a1;">
-                      <span style="padding-top:10px;display:inline-block;">Traded ${escapeHtml(
-                        formatDate(row.transaction_date)
-                      )} &nbsp;&middot;&nbsp; Filed ${escapeHtml(formatDate(row.filing_date))} &nbsp;&middot;&nbsp;
-                      <a href="${row.pdf_url}" style="color:#0369a1;text-decoration:none;font-weight:600;white-space:nowrap;">Original filing &rarr;</a></span>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>`;
-    })
-    .join("");
+  // Cards where they fit, dense lines where they don't. A batch big enough to
+  // overflow is one where the reader wants to see the whole shape of it
+  // anyway, and dropping two thirds of a run to keep the layout roomy is the
+  // wrong trade for an alert whose job is to tell you what was filed.
+  const rendered: string[] = [];
+  let budget = MAX_HTML_BYTES - CHROME_BYTES;
+  const asCards = trades.reduce((n, row) => n + renderCard(row).length, 0) <= budget;
+  for (const row of trades) {
+    const block = asCards ? renderCard(row) : renderRow(row);
+    if (rendered.length > 0 && block.length > budget) break;
+    rendered.push(block);
+    budget -= block.length;
+  }
 
+  // Cards carry their own box; the dense rows need one put round them, or the
+  // list reads as loose text dropped under the header.
+  const body = asCards
+    ? rendered.join("")
+    : `<tr><td style="background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;padding:2px 16px 4px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rendered.join(
+        ""
+      )}</table></td></tr>`;
+
+  const missing = totalMatched - rendered.length;
   const more =
-    totalMatched > shown.length
-      ? `<tr><td style="padding:2px 0 14px 0;font-size:13px;color:#5b6773;">and ${
-          totalMatched - shown.length
-        } more in this batch.</td></tr>`
+    missing > 0
+      ? `<tr><td style="padding:2px 0 14px 0;font-size:13px;color:#5b6773;">and ${missing} more in this batch &mdash; <a href="${siteUrl}/trades" style="color:#0369a1;font-weight:600;text-decoration:none;">see them on CongTrade</a>.</td></tr>`
       : "";
+
+  return document({ alertName, totalMatched, chips, cards: body, more, siteUrl, unsubscribeUrl });
+}
+
+/**
+ * One trade, as a card.
+ *
+ * A card rather than a table row: an alert is read on a phone as often as
+ * not, where five columns either scroll sideways or squeeze a bond's name
+ * into four characters, which is exactly what the first cut of this did. It
+ * leads with the person and the amount, the pair a reader scans for, and
+ * closes with the link to the filing.
+ */
+function renderCard(row: AlertTradeRow): string {
+  const type = typeLabel(row.transaction_type);
+  const asset = assetLabel(row);
+  const company = row.company_name && row.company_name !== asset ? row.company_name : null;
+
+  // Only the name-and-amount line needs a table; Outlook wants one for two
+  // columns on a row, but handles stacked divs. Keeping the other three lines
+  // as divs halves the card's bytes, which is not housekeeping here: it is
+  // twice as many trades before Gmail's clip limit bites.
+  return `<tr><td style="padding:0 0 10px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e3e8ee;border-radius:10px;background:#ffffff;"><tr><td style="padding:14px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="font:700 16px/1.3 ${FONT};color:#10161d;">${escapeHtml(memberDisplayName(row))}</td>
+<td align="right" style="font:700 15px/1.3 ${FONT};color:#10161d;white-space:nowrap;padding-left:12px;">${escapeHtml(
+    amountLabel(row.amount_range)
+  )}</td></tr></table>
+<div style="padding-top:2px;font:400 12px/1.5 ${FONT};color:#8a95a1;">${escapeHtml(memberContext(row))}</div>
+<div style="padding-top:11px;">
+<span style="background:${type.tint};color:${type.color};border-radius:6px;padding:4px 9px;font:700 12px/1 ${FONT};">${escapeHtml(
+    type.label
+  )}</span>
+<span style="padding-left:8px;font:700 15px/1.4 ${FONT};color:#10161d;">${escapeHtml(asset)}</span>${
+    company ? `<span style="padding-left:6px;font:400 13px/1.4 ${FONT};color:#5b6773;">${escapeHtml(company)}</span>` : ""
+  }</div>
+<div style="margin-top:12px;padding-top:10px;border-top:1px solid #f0f3f7;font:400 12px/1.5 ${FONT};color:#8a95a1;">Traded ${escapeHtml(
+    formatDate(row.transaction_date)
+  )} &nbsp;&middot;&nbsp; Filed ${escapeHtml(
+    formatDate(row.filing_date)
+  )} &nbsp;&middot;&nbsp; <a href="${row.pdf_url}" style="color:#0369a1;text-decoration:none;font-weight:600;white-space:nowrap;">Original filing &rarr;</a></div>
+</td></tr></table></td></tr>`;
+}
+
+/**
+ * One trade as a single dense line, for batches too large to card.
+ *
+ * Roughly a fifth of a card's bytes, which is what lets a 200-match run show
+ * every one of its matches instead of the first forty-odd and an apology. The
+ * information is the same; only the room it gets is smaller.
+ */
+function renderRow(row: AlertTradeRow): string {
+  const type = typeLabel(row.transaction_type);
+  return `<tr><td style="padding:9px 2px;border-bottom:1px solid #e9edf2;font:400 13px/1.5 ${FONT};color:#5b6773;">
+<span style="color:${type.color};font-weight:700;">${escapeHtml(type.label)}</span>
+<a href="${row.pdf_url}" style="color:#10161d;font-weight:700;text-decoration:none;">${escapeHtml(
+    assetLabel(row)
+  )}</a> ${escapeHtml(amountLabel(row.amount_range))}
+<div style="font:400 12px/1.5 ${FONT};color:#8a95a1;">${escapeHtml(memberDisplayName(row))} &middot; ${escapeHtml(
+    memberContext(row)
+  )} &middot; filed ${escapeHtml(formatDate(row.filing_date))}</div></td></tr>`;
+}
+
+/** The shell the cards sit in: header, stack, button, footer. */
+function document(parts: {
+  alertName: string;
+  totalMatched: number;
+  chips: string;
+  cards: string;
+  more: string;
+  siteUrl: string;
+  unsubscribeUrl: string;
+}): string {
+  const { alertName, totalMatched, chips, cards, more, siteUrl, unsubscribeUrl } = parts;
+  const plural = totalMatched === 1 ? "" : "s";
 
   return `<!doctype html>
 <html lang="en">
@@ -177,9 +227,9 @@ export function alertEmailHtml(input: AlertEmailInput): string {
 <body style="margin:0;padding:0;background:#f4f6f8;">
 <!-- Preheader: the line a client prints beside the subject. Hidden in the
      body itself, or it would read twice. -->
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${totalMatched} new disclosed trade${
-    totalMatched === 1 ? "" : "s"
-  } matched ${escapeHtml(alertName)}.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${totalMatched} new disclosed trade${plural} matched ${escapeHtml(
+    alertName
+  )}.</div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f6f8;">
   <tr>
@@ -196,7 +246,7 @@ export function alertEmailHtml(input: AlertEmailInput): string {
           <td style="background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;padding:20px 18px;">
             <div style="font-size:20px;font-weight:800;color:#10161d;line-height:1.25;">${escapeHtml(alertName)}</div>
             <div style="padding-top:4px;font-size:14px;color:#5b6773;">
-              ${totalMatched} new disclosed trade${totalMatched === 1 ? "" : "s"} matched this alert.
+              ${totalMatched} new disclosed trade${plural} matched this alert.
             </div>
             ${chips ? `<div style="padding-top:12px;">${chips}</div>` : ""}
           </td>
@@ -226,7 +276,7 @@ export function alertEmailHtml(input: AlertEmailInput): string {
         </tr>
 
         <tr>
-          <td style="padding:22px 6px 0 6px;border-top:1px solid #e3e8ee;margin-top:20px;font-size:12px;line-height:1.7;color:#8a95a1;">
+          <td style="padding:22px 6px 0 6px;border-top:1px solid #e3e8ee;font-size:12px;line-height:1.7;color:#8a95a1;">
             <div style="padding-bottom:8px;">
               You're getting this because you set up the &ldquo;${escapeHtml(
                 alertName
@@ -249,8 +299,9 @@ export function alertEmailHtml(input: AlertEmailInput): string {
 
 export function alertEmailText(input: AlertEmailInput): string {
   const { alertName, filters, trades, totalMatched, siteUrl, unsubscribeUrl } = input;
-  const shown = trades.slice(0, MAX_ROWS_SHOWN);
-  const lines = shown.map((row) => {
+  // No cap here: the size limit that shapes the HTML is a Gmail rendering
+  // quirk, and the text alternative doesn't hit it.
+  const lines = trades.map((row) => {
     const type = typeLabel(row.transaction_type).label;
     return `  ${memberDisplayName(row)} (${row.chamber === "house" ? "House" : "Senate"})
     ${type}  ${assetLabel(row)}  ${amountLabel(row.amount_range)}
@@ -264,7 +315,7 @@ ${totalMatched} new disclosed trade${totalMatched === 1 ? "" : "s"} matched this
 Watching: ${describeAlert(filters).join(" · ")}
 
 ${lines.join("\n\n")}
-${totalMatched > shown.length ? `\nand ${totalMatched - shown.length} more — ${siteUrl}/trades\n` : ""}
+${totalMatched > trades.length ? `\nand ${totalMatched - trades.length} more: ${siteUrl}/trades\n` : ""}
 Manage your alerts: ${siteUrl}/account
 Turn this alert off:  ${unsubscribeUrl}
 

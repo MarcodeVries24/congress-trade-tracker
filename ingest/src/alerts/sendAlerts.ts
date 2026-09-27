@@ -54,8 +54,16 @@ const ALERT_FROM = process.env.ALERT_FROM_EMAIL;
  * Per-alert ceiling for one email. Anything beyond this stays unsent and is
  * picked up by the next run, which both keeps a single email readable and
  * stops any one alert turning a bulk re-ingest into a thousand-row message.
+ *
+ * Set to what one email can actually show, and no higher. recordSent() marks
+ * every match it is handed as sent, so a match fetched here but dropped by the
+ * renderer is never emailed at all — it just quietly becomes a row the
+ * subscriber has to find on the site. At 200 that was happening to everything
+ * past the fortieth. The renderer fits 120 comfortably in its dense mode
+ * (75KB against a 92KB budget), so 120 it is; the rest waits four hours for
+ * the next run, which is what this comment always claimed.
  */
-const MAX_MATCHES_PER_RUN = 200;
+const MAX_MATCHES_PER_RUN = 120;
 
 /**
  * Two independent brakes on what counts as "new", because `ingested_at`

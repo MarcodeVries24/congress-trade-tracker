@@ -119,7 +119,7 @@ export default function AboutPage() {
               >
                 unitedstates/congress-legislators
               </a>{" "}
-              dataset. Ticker market caps, where shown, are resolved and refreshed monthly via Finnhub.
+              dataset. Ticker market caps, where shown, are resolved and refreshed monthly.
             </p>
           </Section>
 

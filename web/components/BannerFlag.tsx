@@ -23,7 +23,7 @@ export function BannerFlag({ className = "", style }: { className?: string; styl
       src="/american.png"
       alt=""
       aria-hidden
-      className={`object-cover object-center ${className}`}
+      className={`object-cover object-right ${className}`}
       style={style}
     />
   );

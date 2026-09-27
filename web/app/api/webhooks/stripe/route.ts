@@ -18,12 +18,24 @@ import { claimEvent, upsertSubscription, userIdForCustomer } from "@/lib/subscri
  */
 const SIGNING_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-/** The events that can change whether someone may use paid features. */
+/**
+ * The events that can change whether someone may use paid features.
+ *
+ * paused and resumed are here because grantsAccess() treats 'paused' as no
+ * access: without them a paused subscription would keep working until some
+ * unrelated update happened to arrive. They need no handler of their own —
+ * both carry the subscription, and the row is written from whatever it says.
+ *
+ * Deliberately absent: invoice.payment_failed, which reaches us anyway as an
+ * update to 'past_due', and trial_will_end, which changes nothing.
+ */
 const HANDLED = new Set([
   "checkout.session.completed",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
+  "customer.subscription.paused",
+  "customer.subscription.resumed",
 ]);
 
 export async function POST(req: NextRequest) {
@@ -75,9 +87,10 @@ async function apply(event: Stripe.Event): Promise<void> {
     return;
   }
 
-  // created / updated / deleted all carry the subscription itself. 'deleted'
-  // arrives with status 'canceled', so it needs no special case: the row is
-  // written with that status and grantsAccess() decides what it means.
+  // Every other handled event carries the subscription itself. 'deleted'
+  // arrives with status 'canceled' and 'paused' with status 'paused', so none
+  // of them needs a special case: the row is written with whatever status
+  // came, and grantsAccess() decides what it means.
   await record(event.data.object as Stripe.Subscription, null);
 }
 

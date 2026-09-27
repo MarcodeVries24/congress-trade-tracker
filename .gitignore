@@ -25,3 +25,6 @@ ingest/*.zip
 # Scratch probes left in the web workspace
 web/tmp-*.mjs
 web/tmp-*.ts
+
+# ...but the documented placeholder file is meant to be committed
+!web/.env.example

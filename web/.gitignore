@@ -1,2 +1,4 @@
 .vercel
 .env*
+# ...except the documented placeholder file, which belongs in the repo
+!.env.example

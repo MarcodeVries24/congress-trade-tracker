@@ -40,12 +40,25 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-function typeLabel(type: string): { label: string; color: string } {
+/**
+ * The badge for a transaction type: text, ink and a tint to sit it on.
+ *
+ * Tints rather than solid fills, because a solid green block is the visual
+ * weight of a call to action and this is a label. Every pair was checked for
+ * contrast at the text size it's used at.
+ */
+function typeLabel(type: string): { label: string; color: string; tint: string } {
   const t = type.toUpperCase();
-  if (t.startsWith("P")) return { label: "Purchase", color: "#0a7d3c" };
-  if (t.startsWith("S")) return { label: type.includes("partial") ? "Sale (partial)" : "Sale", color: "#a12b2b" };
-  if (t.startsWith("E")) return { label: "Exchange", color: "#a35c00" };
-  return { label: type, color: "#666" };
+  if (t.startsWith("P")) return { label: "Purchase", color: "#0a7d3c", tint: "#e7f5ec" };
+  if (t.startsWith("S"))
+    return { label: type.includes("partial") ? "Sale (partial)" : "Sale", color: "#a12b2b", tint: "#fcebea" };
+  if (t.startsWith("E")) return { label: "Exchange", color: "#a35c00", tint: "#fdf3e3" };
+  return { label: type, color: "#555", tint: "#f0f0f0" };
+}
+
+/** "House · NJ · Democrat", minus whichever parts the filing didn't carry. */
+function memberContext(row: AlertTradeRow): string {
+  return [row.chamber === "house" ? "House" : "Senate", row.member_state, row.party].filter(Boolean).join(" \u00b7 ");
 }
 
 /** The asset as a recipient would name it: ticker if there is one, else the asset name. */
@@ -69,68 +82,169 @@ export function alertEmailSubject(input: Pick<AlertEmailInput, "alertName" | "to
 export function alertEmailHtml(input: AlertEmailInput): string {
   const { alertName, filters, trades, totalMatched, siteUrl, unsubscribeUrl } = input;
   const shown = trades.slice(0, MAX_ROWS_SHOWN);
+
   const chips = describeAlert(filters)
     .map(
       (chip) =>
-        `<span style="display:inline-block;border:1px solid #e5e5e5;border-radius:999px;padding:2px 10px;margin:0 4px 4px 0;font-size:12px;color:#555;">${escapeHtml(chip)}</span>`
+        `<span style="display:inline-block;background:#eef2f6;border-radius:999px;padding:4px 10px;margin:0 6px 6px 0;font-size:12px;line-height:1;color:#42505f;">${escapeHtml(
+          chip
+        )}</span>`
     )
     .join("");
 
-  // One block per trade rather than a five-column table: an alert email is
-  // read on a phone as often as not, and a wide table either scrolls
-  // sideways or squeezes a bond's name into a four-character column (which
-  // is exactly what the first cut of this did).
-  const rows = shown
+  // One card per trade rather than a table row. An alert is read on a phone as
+  // often as not, where five columns either scroll sideways or squeeze a
+  // bond's name into four characters — which is exactly what the first cut of
+  // this did. Each card leads with the person and the amount, because that is
+  // the pair a reader scans for, and closes with the link to the filing.
+  const cards = shown
     .map((row) => {
       const type = typeLabel(row.transaction_type);
-      const where = [row.chamber === "house" ? "House" : "Senate", row.member_state, row.party].filter(Boolean).join(" · ");
-      return `<tr>
-        <td style="padding:12px 0;border-bottom:1px solid #eee;">
-          <div style="font-size:15px;font-weight:600;color:#111;">${escapeHtml(memberDisplayName(row))}</div>
-          <div style="font-size:12px;color:#888;margin-top:1px;">${escapeHtml(where)}</div>
-          <div style="font-size:14px;color:#111;margin-top:6px;">
-            <span style="color:${type.color};font-weight:600;">${type.label}</span>
-            &nbsp;${escapeHtml(assetLabel(row))}
-            &nbsp;<span style="color:#555;">${escapeHtml(amountLabel(row.amount_range))}</span>
-          </div>
-          <div style="font-size:12px;color:#888;margin-top:4px;">
-            traded ${formatDate(row.transaction_date)} · filed ${formatDate(row.filing_date)} ·
-            <a href="${row.pdf_url}" style="color:#0070f3;">original filing</a>
-          </div>
+      const asset = assetLabel(row);
+      const company = row.company_name && row.company_name !== asset ? row.company_name : null;
+      return `
+      <tr>
+        <td style="padding:0 0 12px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e3e8ee;border-radius:10px;background:#ffffff;">
+            <tr>
+              <td style="padding:16px 18px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-size:16px;font-weight:700;color:#10161d;line-height:1.3;">${escapeHtml(
+                      memberDisplayName(row)
+                    )}</td>
+                    <td align="right" style="font-size:15px;font-weight:700;color:#10161d;white-space:nowrap;padding-left:12px;">${escapeHtml(
+                      amountLabel(row.amount_range)
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:2px;font-size:12px;color:#8a95a1;">${escapeHtml(
+                      memberContext(row)
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:12px;">
+                      <span style="display:inline-block;background:${type.tint};color:${type.color};border-radius:6px;padding:4px 9px;font-size:12px;font-weight:700;line-height:1;">${escapeHtml(
+                        type.label
+                      )}</span>
+                      <span style="display:inline-block;padding-left:8px;font-size:15px;font-weight:700;color:#10161d;">${escapeHtml(
+                        asset
+                      )}</span>
+                      ${
+                        company
+                          ? `<span style="display:inline-block;padding-left:6px;font-size:13px;color:#5b6773;">${escapeHtml(
+                              company
+                            )}</span>`
+                          : ""
+                      }
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:12px;border-top:1px solid #f0f3f7;font-size:12px;color:#8a95a1;">
+                      <span style="padding-top:10px;display:inline-block;">Traded ${escapeHtml(
+                        formatDate(row.transaction_date)
+                      )} &nbsp;&middot;&nbsp; Filed ${escapeHtml(formatDate(row.filing_date))} &nbsp;&middot;&nbsp;
+                      <a href="${row.pdf_url}" style="color:#0369a1;text-decoration:none;font-weight:600;white-space:nowrap;">Original filing &rarr;</a></span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>`;
     })
     .join("");
 
-  return `
-    <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111;">
-      <h2 style="margin-bottom:2px;">${escapeHtml(alertName)}</h2>
-      <p style="color:#666;margin-top:0;font-size:14px;">
-        ${totalMatched} new disclosed trade${totalMatched === 1 ? "" : "s"} matched this alert.
-      </p>
-      <div style="margin:12px 0 4px;">${chips}</div>
+  const more =
+    totalMatched > shown.length
+      ? `<tr><td style="padding:2px 0 14px 0;font-size:13px;color:#5b6773;">and ${
+          totalMatched - shown.length
+        } more in this batch.</td></tr>`
+      : "";
 
-      <table style="width:100%;border-collapse:collapse;">${rows}</table>
-      ${
-        totalMatched > shown.length
-          ? `<p style="color:#666;font-size:13px;">and ${totalMatched - shown.length} more — <a href="${siteUrl}/trades" style="color:#0070f3;">see them all on CongTrade</a>.</p>`
-          : ""
-      }
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Light only: half these greys inverted by a client's own dark mode stop
+     carrying the meaning the colour was doing. -->
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${escapeHtml(alertName)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;">
+<!-- Preheader: the line a client prints beside the subject. Hidden in the
+     body itself, or it would read twice. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${totalMatched} new disclosed trade${
+    totalMatched === 1 ? "" : "s"
+  } matched ${escapeHtml(alertName)}.</div>
 
-      <p style="margin-top:24px;font-size:14px;">
-        <a href="${siteUrl}/trades" style="color:#0070f3;">Browse every trade</a> ·
-        <a href="${siteUrl}/account" style="color:#0070f3;">Manage your alerts</a>
-      </p>
-      <hr style="border:none;border-top:1px solid #eee;margin:20px 0;" />
-      <p style="color:#999;font-size:12px;line-height:1.6;">
-        You're getting this because you set up the \u201C${escapeHtml(alertName)}\u201D alert on CongTrade.
-        <a href="${unsubscribeUrl}" style="color:#999;">Turn this alert off</a> ·
-        <a href="${siteUrl}/account" style="color:#999;">All your alerts</a><br/>
-        Figures come straight from the members' own Periodic Transaction Reports, which disclose a value
-        <em>bracket</em>, never an exact amount. Nothing here is investment advice.
-      </p>
-    </div>
-  `;
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f6f8;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+
+        <tr>
+          <td style="padding:0 2px 14px 2px;font-size:17px;font-weight:800;letter-spacing:-0.2px;">
+            <a href="${siteUrl}" style="text-decoration:none;"><span style="color:#10161d;">Cong</span><span style="color:#0284c7;">Trade</span></a>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;padding:20px 18px;">
+            <div style="font-size:20px;font-weight:800;color:#10161d;line-height:1.25;">${escapeHtml(alertName)}</div>
+            <div style="padding-top:4px;font-size:14px;color:#5b6773;">
+              ${totalMatched} new disclosed trade${totalMatched === 1 ? "" : "s"} matched this alert.
+            </div>
+            ${chips ? `<div style="padding-top:12px;">${chips}</div>` : ""}
+          </td>
+        </tr>
+
+        <tr><td style="height:16px;line-height:16px;font-size:0;">&nbsp;</td></tr>
+
+        <tr>
+          <td>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              ${cards}
+              ${more}
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:6px 0 4px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#0284c7;border-radius:8px;">
+                  <a href="${siteUrl}/trades" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">See every match on CongTrade</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:22px 6px 0 6px;border-top:1px solid #e3e8ee;margin-top:20px;font-size:12px;line-height:1.7;color:#8a95a1;">
+            <div style="padding-bottom:8px;">
+              You're getting this because you set up the &ldquo;${escapeHtml(
+                alertName
+              )}&rdquo; alert on CongTrade.
+              <a href="${unsubscribeUrl}" style="color:#5b6773;">Turn this alert off</a> &nbsp;&middot;&nbsp;
+              <a href="${siteUrl}/account" style="color:#5b6773;">All your alerts</a>
+            </div>
+            Figures come from the members&rsquo; own Periodic Transaction Reports, which disclose a value
+            <em>bracket</em>, never an exact amount. Nothing here is investment advice.
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
 }
 
 export function alertEmailText(input: AlertEmailInput): string {

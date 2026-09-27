@@ -9,6 +9,7 @@ import { MemberFaces } from "@/components/MemberFaces";
 import { PersonalNote } from "@/components/PersonalNote";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
+import { currencyForRequest } from "@/lib/currency";
 import { ALERT_DRAFT_PARAM } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
 
@@ -57,7 +58,7 @@ export default async function UpgradePage({
   // Both are decoration on a page whose job is to take payment: a database
   // hiccup should cost the proof strip, never the pricing table.
   const proof = await getUpgradeProof().catch(() => null);
-  const pricing = getProPricing();
+  const pricing = getProPricing(await currencyForRequest());
 
   return (
     <>
@@ -105,6 +106,7 @@ export default async function UpgradePage({
             <PlanCards
               monthly={pricing.monthly}
               annualMonthly={pricing.annualMonthly}
+              symbol={pricing.currencySymbol}
               savingPercent={pricing.annualSavingPercent}
               returnTo={afterCheckout}
             />

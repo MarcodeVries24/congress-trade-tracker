@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { stripe, priceIdFor, billingConfigured, type BillingPeriod } from "@/lib/stripe";
+import { currencyForRequest } from "@/lib/currency";
 import { getSubscription } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
 
@@ -33,9 +34,14 @@ export async function POST(req: NextRequest) {
   // their account, never to the pricing page they just bought from.
   const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/") ? body.returnTo : "/account";
 
+  // Decided here rather than taken from the request body, and by the same
+  // rule the pricing page used to render: a client that could name its own
+  // currency could name the cheaper one.
+  const currency = await currencyForRequest();
+
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: priceIdFor(period), quantity: 1 }],
+    line_items: [{ price: priceIdFor(period, currency), quantity: 1 }],
     ...(existing ? { customer: existing.stripe_customer_id } : email ? { customer_email: email } : {}),
     // The link back to the Clerk user. Stripe echoes this on every event for
     // the resulting subscription, which is what lets the webhook know whose

@@ -36,11 +36,14 @@ function Tick() {
 export function PlanCards({
   monthly,
   annualMonthly,
+  symbol,
   savingPercent,
   returnTo,
 }: {
   monthly: string;
   annualMonthly: string;
+  /** Currency is decided server-side from the visitor's country. */
+  symbol: string;
   savingPercent: number | null;
   returnTo?: string;
 }) {
@@ -83,7 +86,7 @@ export function PlanCards({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-line bg-panel p-5">
           <h3 className="text-sm font-semibold text-ink">Free</h3>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-ink">€0</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-ink">{symbol}0</p>
           <p className="mt-0.5 text-xs text-ink-faint">Always free, no account needed</p>
           <ul className="mt-4 space-y-2 text-sm text-ink-muted">
             {FREE_FEATURES.map((f) => (
@@ -101,7 +104,8 @@ export function PlanCards({
             {isPro && <span className="text-[11px] font-medium text-accent">Current plan</span>}
           </div>
           <p className="mt-2 text-2xl font-bold tracking-tight text-ink">
-            €{price}
+            {symbol}
+            {price}
             <span className="text-sm font-normal text-ink-faint"> /month</span>
           </p>
           <p className="mt-0.5 text-xs text-ink-faint">

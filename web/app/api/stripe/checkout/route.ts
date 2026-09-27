@@ -24,28 +24,32 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { period?: BillingPeriod; returnTo?: string };
   const period: BillingPeriod = body.period === "annual" ? "annual" : "monthly";
 
-  // Reuse the customer if this person has ever paid, so Stripe keeps one
-  // customer per human rather than one per checkout.
-  const existing = await getSubscription(userId);
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress;
-
-  // Where checkout lets them out: back to the alert they were building, or to
-  // their account, never to the pricing page they just bought from.
-  const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/") ? body.returnTo : "/account";
-
-  // Decided here rather than taken from the request body, and by the same
-  // rule the pricing page used to render: a client that could name its own
-  // currency could name the cheaper one.
-  const currency = await currencyForRequest();
-
-  // Stripe Tax is not ignored when it is unconfigured: asking for it on an
-  // account with no registered origin address fails the whole session, which
-  // is a dead Subscribe button rather than a missing VAT line. So it is opt-in,
-  // switched on once Tax is actually set up in the dashboard.
-  const automaticTax = process.env.STRIPE_AUTOMATIC_TAX === "true";
-
+  // Everything from here on is inside the catch. The first version wrapped
+  // only the Stripe call, and the failure that actually broke checkout was the
+  // subscriptions lookup a line above it, which left the browser with a bare
+  // 500 and no way to tell which step had gone.
   try {
+    // Reuse the customer if this person has ever paid, so Stripe keeps one
+    // customer per human rather than one per checkout.
+    const existing = await getSubscription(userId);
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress;
+
+    // Where checkout lets them out: back to the alert they were building, or to
+    // their account, never to the pricing page they just bought from.
+    const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/") ? body.returnTo : "/account";
+
+    // Decided here rather than taken from the request body, and by the same
+    // rule the pricing page used to render: a client that could name its own
+    // currency could name the cheaper one.
+    const currency = await currencyForRequest();
+
+    // Stripe Tax is not ignored when it is unconfigured: asking for it on an
+    // account with no registered origin address fails the whole session, which
+    // is a dead Subscribe button rather than a missing VAT line. So it is
+    // opt-in, switched on once Tax is actually set up in the dashboard.
+    const automaticTax = process.env.STRIPE_AUTOMATIC_TAX === "true";
+
     const session = await stripe().checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceIdFor(period, currency), quantity: 1 }],
@@ -65,12 +69,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    // Stripe refuses a session for reasons that are ours to fix and are
-    // invisible from the browser: an unactivated account, a price id from the
-    // other mode, Tax without an origin address. Say which, in the log and to
-    // the buyer, rather than letting it become an opaque 500.
+    // Checkout fails for reasons that are ours to fix and invisible from the
+    // browser: a table the web app has never been migrated for, an unactivated
+    // Stripe account, a price id from the other mode, Tax without an origin
+    // address. Say which, in the log and to the buyer, rather than letting it
+    // become an opaque 500.
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[stripe] checkout session failed", { userId, period, currency, message });
+    console.error("[stripe] checkout session failed", { userId, period, message });
     return NextResponse.json({ error: `Checkout could not be started: ${message}` }, { status: 502 });
   }
 }

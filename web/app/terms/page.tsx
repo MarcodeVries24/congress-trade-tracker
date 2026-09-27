@@ -77,8 +77,9 @@ export default function TermsPage() {
           </p>
           <ul>
             <li>
-              Some filings (notably paper House filings) are scanned documents processed with optical character
-              recognition (OCR), which can misread names, tickers, amounts, or dates.
+              Some filings (notably paper House filings) are scans with no machine-readable text. Those are
+              transcribed and checked against the scan by hand before they appear here, but a transcription can
+              still contain a mistake.
             </li>
             <li>Filings are refreshed on a periodic schedule, not in real time, so there can be a delay before a new filing appears.</li>
             <li>Reported trade amounts are disclosed as ranges (e.g. &ldquo;$1,001–$15,000&rdquo;), not exact figures, because that&rsquo;s how the underlying law requires them to be reported.</li>

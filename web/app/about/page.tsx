@@ -25,7 +25,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I trust the numbers?",
-    a: 'We aim for high accuracy, but a meaningful share of filings, hand-filed paper forms in particular, are scanned images that have to be read with optical character recognition (OCR) rather than extracted as text, which is inherently less certain. Rows recovered this way carry a visible "OCR" badge that links straight back to the original scan, so you can check the source yourself. Anything the parser can\'t confidently read is left blank and logged rather than guessed at.',
+    a: "We aim for high accuracy. Most filings are parsed straight from the document's own text. A minority arrive as scans of hand-filled paper forms, and rather than trust a machine reading of those, every one of them has been checked against the scan by hand. Anything that still can't be read with confidence is left blank and logged rather than guessed at, and every trade links to the original document so you can check it yourself.",
   },
   {
     q: "How do I check a trade against the original filing?",
@@ -106,9 +106,8 @@ export default function AboutPage() {
             <p>
               Senate PTRs are filed with the Office of Public Records. Electronic filings are parsed straight from
               their HTML transaction table. A portion of both chambers&rsquo; filings, mostly hand-delivered paper
-              forms, arrive as scanned images with no extractable text; those are read with a purpose-built OCR
-              pipeline that locates each form&rsquo;s own gridlines from the scan and reads every cell and checkbox
-              mark individually, rather than a single pass over the whole page.
+              forms, arrive as scans with no text in them at all. Those are transcribed and then verified against
+              the scan by hand, line by line, before they join the rest.
             </p>
             <p>
               Member photos and party affiliation come from the public{" "}
@@ -148,8 +147,8 @@ export default function AboutPage() {
             <p>We&rsquo;d rather show you nothing than show you a guess. In practice that means:</p>
             <ul className="list-disc space-y-1.5 pl-5">
               <li>
-                A transaction recovered by OCR rather than read directly as text carries a visible{" "}
-                <strong className="text-ink">OCR</strong> badge, linking to the original scan, wherever it appears.
+                Every trade links to the document it came from, wherever it appears, so any figure here can be read
+                back against the filing itself.
               </li>
               <li>A line the parser can&rsquo;t confidently match to an asset, amount, or date is logged and left out rather than guessed at.</li>
               <li>Dates are stored exactly as filed, even on the rare filing with an internal typo; we don&rsquo;t silently correct the source document.</li>

@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/trades", label: "All Trades" },
   { href: "/politicians", label: "Politicians" },
   { href: "/issuers", label: "Issuers" },
+  { href: "/news", label: "News" },
   { href: "/about", label: "About" },
 ];
 

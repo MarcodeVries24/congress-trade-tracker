@@ -54,7 +54,7 @@ export function PolicyStrip() {
   return (
     <section className="rounded-lg border border-line bg-panel">
       <div className="flex items-baseline justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold text-ink">From the agencies</h2>
+        <h2 className="text-sm font-semibold text-ink">News from the agencies</h2>
         <p className="text-[11px] text-ink-faint">Official releases, unedited</p>
       </div>
 

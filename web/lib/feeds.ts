@@ -19,6 +19,15 @@ export type FeedItem = {
   source: string;
   /** ISO string, or null when the feed omits or mangles the date. */
   publishedAt: string | null;
+  /**
+   * The illustration the feed itself offers, where it offers one.
+   *
+   * Only MarketWatch does, of the feeds here. It is served from the
+   * publisher's own domain and shown beside a headline that links back to
+   * them, which is what a media:content element in a public feed is for. Not
+   * copied, not re-hosted.
+   */
+  image: string | null;
 };
 
 const TIMEOUT_MS = 6000;
@@ -26,18 +35,49 @@ const TIMEOUT_MS = 6000;
 /** SEC asks for a descriptive agent with a contact address; the rest don't mind. */
 const USER_AGENT = "CongTrade/1.0 (+https://www.congtrade.com; contact@congtrade.com)";
 
+/** The handful of named entities these feeds use; the rest arrive numeric. */
+const NAMED: Record<string, string> = {
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  rsquo: "\u2019",
+  lsquo: "\u2018",
+  ldquo: "\u201c",
+  rdquo: "\u201d",
+  mdash: "\u2014",
+  ndash: "\u2013",
+  hellip: "\u2026",
+};
+
 function decode(raw: string): string {
-  return raw
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#3[49];|&apos;|&rsquo;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    raw
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+      .replace(/<[^>]+>/g, "")
+      // Numeric first, and both bases: MarketWatch writes its curly quotes as
+      // &#x2019; and a headline rendered with the escape still in it looks
+      // like the parser gave up halfway.
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => safeChar(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec) => safeChar(parseInt(dec, 10)))
+      .replace(/&([a-z]+);/gi, (match, name: string) => NAMED[name.toLowerCase()] ?? match)
+      // Ampersand last, so a doubly-escaped entity resolves rather than
+      // turning into a stray & mid-word.
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
+/** An out-of-range code point means a malformed feed, not a reason to throw. */
+function safeChar(code: number): string {
+  if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) return "";
+  try {
+    return String.fromCodePoint(code);
+  } catch {
+    return "";
+  }
 }
 
 function tag(block: string, name: string): string | null {
@@ -49,6 +89,14 @@ function isoDate(raw: string | null): string | null {
   if (!raw) return null;
   const d = new Date(raw);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** media:content and media:thumbnail carry it; enclosure is the older form. */
+function image(block: string): string | null {
+  const media = block.match(/<media:(?:content|thumbnail)[^>]*url="([^"]+)"/i);
+  if (media) return media[1];
+  const enclosure = block.match(/<enclosure[^>]*url="([^"]+)"[^>]*type="image\//i);
+  return enclosure ? enclosure[1] : null;
 }
 
 /** RSS puts the link in a text node; Atom puts it in an attribute. */
@@ -75,6 +123,7 @@ export function parseFeed(xml: string, source: string): FeedItem[] {
       url,
       source,
       publishedAt: isoDate(tag(block, "pubDate") ?? tag(block, "published") ?? tag(block, "updated")),
+      image: image(block),
     });
   }
   return items;

@@ -18,6 +18,7 @@ import { AmericanFlag } from "@/components/AmericanFlag";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { SentimentRiver } from "@/components/SentimentRiver";
 import { PolicyStrip } from "@/components/PolicyStrip";
+import { GeneralNews } from "@/components/GeneralNews";
 import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
@@ -349,6 +350,8 @@ export default function Home() {
         <div className="mt-4 lg:mt-6">
           <PolicyStrip />
         </div>
+
+        <GeneralNews />
       </main>
       <Footer />
     </>

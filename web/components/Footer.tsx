@@ -13,6 +13,7 @@ const RESOURCE_LINKS = [
 ];
 
 const LEGAL_LINKS = [
+  { label: "Disclaimer", href: "/disclaimer" },
   { label: "Terms of Service", href: "/terms" },
   { label: "Privacy Policy", href: "/privacy" },
 ];
@@ -93,7 +94,11 @@ export function Footer() {
           and may contain errors, omissions, or delays. Always verify against the
           original filing before relying on it. Nothing on this site is investment, legal, or tax advice, and a
           member of Congress trading a security is not a recommendation or endorsement of it. Fact-checking and due
-          diligence remain the visitor's own responsibility.
+          diligence remain the visitor&rsquo;s own responsibility.{" "}
+          <Link href="/disclaimer" className="underline decoration-line-strong hover:text-ink-muted">
+            Read the full disclaimer
+          </Link>
+          .
         </p>
 
         <div className="mt-4 flex flex-col gap-1 text-[11px] text-ink-faint sm:flex-row sm:items-center sm:justify-between">

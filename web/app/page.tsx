@@ -57,6 +57,7 @@ export default function Home() {
   // Toggles between the two lists the API already computed server-side —
   // no refetch needed, just swaps which array the Latest Trades card reads.
   const [assetFilter, setAssetFilter] = useState<"stocks" | "all">("stocks");
+  const archiveStart = archiveStartLabel(stats?.earliestFiling);
 
   useEffect(() => {
     fetchDashboard()
@@ -81,7 +82,8 @@ export default function Home() {
           <div className="relative">
             <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Every disclosed Congress asset trade, at a glance</h1>
             <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
-              Built directly from Periodic Transaction Reports filed with the House Clerk and Senate eFD. Updated every 4 hours.
+              Built directly from Periodic Transaction Reports filed with the House Clerk and Senate eFD. Every filing
+              since {archiveStart}, updated every 4 hours.
             </p>
           </div>
         </div>
@@ -407,6 +409,22 @@ function CardSkeleton({ rows }: { rows: number }) {
       ))}
     </div>
   );
+}
+
+/**
+ * When the archive starts, as a month and year.
+ *
+ * Filings, not trades: the oldest trade in here is from 2015, disclosed years
+ * late by a filing from 2022, and claiming a decade of coverage on the back of
+ * two rows would be the kind of thing this site exists to catch other people
+ * doing. Falls back to the known start if the stat hasn't loaded, so the
+ * sentence never renders half-written.
+ */
+function archiveStartLabel(earliestFiling: string | null | undefined): string {
+  if (!earliestFiling) return "January 2022";
+  const date = new Date(`${earliestFiling}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "January 2022";
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function EmptyRow() {

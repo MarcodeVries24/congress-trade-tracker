@@ -9,7 +9,6 @@ import { useDebounced } from "@/lib/useDebounced";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Select } from "@/components/Select";
-import { AdSlot } from "@/components/AdSlot";
 import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
 
@@ -148,9 +147,6 @@ export default function Politicians() {
           </p>
         </div>
 
-        <div className="mb-4 sm:mb-6">
-          <AdSlot />
-        </div>
 
         <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-line bg-panel p-4">
           <input
@@ -322,9 +318,6 @@ export default function Politicians() {
           </div>
         )}
 
-        <div className="mt-6">
-          <AdSlot />
-        </div>
       </main>
       <Footer />
     </>

@@ -5,7 +5,6 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
-import { AdSlot } from "@/components/AdSlot";
 import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
@@ -112,9 +111,6 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
           <TradeFlowChart quarters={flow} subject={profile.display} />
         </div>
 
-        <div className="my-6">
-          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
-        </div>
 
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-ink">

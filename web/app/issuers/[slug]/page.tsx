@@ -7,7 +7,6 @@ import { InfoTip } from "@/components/InfoTip";
 import { IssuerNews } from "@/components/IssuerNews";
 import { getIssuerNews } from "@/lib/issuerNews";
 import { MemberPhoto } from "@/components/MemberPhoto";
-import { AdSlot } from "@/components/AdSlot";
 import {
   amountLabel,
   ASSET_TYPE_LABELS,
@@ -147,9 +146,6 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
           <TradeFlowChart quarters={flow} subject={`${name} (${issuer.ticker})`} />
         </div>
 
-        <div className="my-6">
-          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
-        </div>
 
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-ink">

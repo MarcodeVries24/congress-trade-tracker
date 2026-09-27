@@ -22,7 +22,6 @@ import { NewsRow } from "@/components/NewsRow";
 import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
-import { AdSlot } from "@/components/AdSlot";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
 
@@ -105,9 +104,6 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-6 sm:mb-8">
-          <AdSlot />
-        </div>
 
         {error && (
           <div className="mb-6 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">

@@ -38,7 +38,6 @@ import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
 import { GatedFilter } from "@/components/GatedFilter";
-import { AdSlot } from "@/components/AdSlot";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { AlertCta } from "@/components/AlertCta";
 import { MemberPhoto } from "@/components/MemberPhoto";
@@ -603,9 +602,6 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mb-4 sm:mb-6">
-          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID_TOP} />
-        </div>
 
         <div className="mb-6 rounded-lg border border-line bg-panel p-4">
           <div className="flex items-center justify-between gap-3 sm:hidden">
@@ -1103,9 +1099,6 @@ export default function Home() {
             </div>
           </div>
         )}
-        <div className="mt-6">
-          <AdSlot />
-        </div>
       </main>
       <Footer />
       <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} onSignIn={continueSignIn} />

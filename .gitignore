@@ -18,3 +18,10 @@ ingest/data/pdfs/*
 .env.local
 .DS_Store
 logs/
+
+# Local database exports, not history
+ingest/*.zip
+
+# Scratch probes left in the web workspace
+web/tmp-*.mjs
+web/tmp-*.ts

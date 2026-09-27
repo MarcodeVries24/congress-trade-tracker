@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PricingTable } from "@clerk/nextjs";
+import { PlanCards } from "@/components/PlanCards";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
@@ -47,6 +47,8 @@ export default async function UpgradePage({
   // has no further use for. A half-built alert goes back to itself; everyone
   // else lands on their account, where the alerts live.
   const draft = (await searchParams)[ALERT_DRAFT_PARAM];
+  // Where Stripe sends them after paying: back to the alert they were part of
+  // the way through, or to their account. Never back to the pricing page.
   const afterCheckout =
     typeof draft === "string" && draft
       ? `/account?${ALERT_DRAFT_PARAM}=${encodeURIComponent(draft)}`
@@ -54,10 +56,8 @@ export default async function UpgradePage({
 
   // Both are decoration on a page whose job is to take payment: a database
   // hiccup should cost the proof strip, never the pricing table.
-  const [proof, pricing] = await Promise.all([
-    getUpgradeProof().catch(() => null),
-    getProPricing().catch(() => null),
-  ]);
+  const proof = await getUpgradeProof().catch(() => null);
+  const pricing = getProPricing();
 
   return (
     <>
@@ -90,7 +90,7 @@ export default async function UpgradePage({
         <section className="mt-7">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-lg font-bold tracking-tight text-ink">Pricing</h2>
-            {pricing?.annualSavingPercent ? (
+            {pricing.annualSavingPercent ? (
               <p className="pr-4 text-xs font-medium text-accent">
                 Save {pricing.annualSavingPercent}% on annual billing: {pricing.currencySymbol}
                 {pricing.annualMonthly}/mo instead of {pricing.currencySymbol}
@@ -102,7 +102,12 @@ export default async function UpgradePage({
               hiding it on the free plan also hid the "Current plan" state it
               puts there for whoever is already on that plan. */}
           <div className="mt-4">
-            <PricingTable newSubscriptionRedirectUrl={afterCheckout} />
+            <PlanCards
+              monthly={pricing.monthly}
+              annualMonthly={pricing.annualMonthly}
+              savingPercent={pricing.annualSavingPercent}
+              returnTo={afterCheckout}
+            />
           </div>
           {/* Ticks rather than middots between the items: a separator only
               works while the row is one line, and at most widths this one

@@ -263,4 +263,40 @@ export const SCHEMA_STATEMENTS = [
     last_report_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT report_runs_singleton CHECK (id)
   )`,
+  // Who is paying, and for what.
+  //
+  // Stripe is the system of record for the money; this table is the system of
+  // record for *access*, which is a different question and one every part of
+  // this codebase has to answer cheaply. The alert sender asks it once per
+  // subscriber per run, and an HTTP call to a billing API for each of those
+  // was the previous design.
+  //
+  // Keyed by the Clerk user id, because that is the identity the rest of the
+  // app has in hand. One row per user: a second subscription for the same
+  // person replaces the first rather than sitting beside it.
+  `CREATE TABLE IF NOT EXISTS subscriptions (
+    clerk_user_id TEXT PRIMARY KEY,
+    stripe_customer_id TEXT NOT NULL,
+    stripe_subscription_id TEXT,
+    -- Stripe's own vocabulary, stored verbatim: 'active' | 'trialing' |
+    -- 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' |
+    -- 'unpaid' | 'paused'. Deciding which of those still grants access is a
+    -- product question and lives in code, not in this column.
+    status TEXT NOT NULL,
+    price_id TEXT,
+    -- When the paid-for period ends. Access survives to here even after a
+    -- cancellation, which is what "cancel any time" promises on the site.
+    current_period_end TIMESTAMPTZ,
+    cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(stripe_customer_id)`,
+  // Stripe redelivers webhooks, and out of order. Recording every event id we
+  // have already applied makes replays free rather than merely harmless.
+  `CREATE TABLE IF NOT EXISTS stripe_events (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];

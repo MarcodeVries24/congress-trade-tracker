@@ -1,6 +1,6 @@
 import { clerkClient } from "@clerk/nextjs/server";
 
-import { isProSubscription, type BillingItems } from "./proPlan";
+import { isSubscriber } from "./subscription";
 
 /**
  * The slice of Clerk's backend client this module touches.
@@ -12,7 +12,6 @@ import { isProSubscription, type BillingItems } from "./proPlan";
  */
 export type SessionLimitClient = {
   users: { getUser(userId: string): Promise<{ publicMetadata: unknown }> };
-  billing: { getUserBillingSubscription(userId: string): Promise<BillingItems> };
   sessions: {
     getSessionList(params: {
       userId: string;
@@ -39,17 +38,23 @@ export type SessionLimitClient = {
 export const MAX_CONCURRENT_SESSIONS = 3;
 
 /**
- * Whether this account is a paying one, asked of Clerk directly.
+ * Whether this account is a paying one.
  *
- * lib/access.ts answers the same question from a request context; a webhook
- * has none, so it goes through the Backend API the way the alert sender does.
+ * Reads the subscriptions table, the same source lib/access.ts uses for the
+ * request-time checks, so a webhook and a page agree by construction. It also
+ * removes the call this used to make to a billing API on every sign-in, which
+ * was the fragile part: a beta endpoint, a 404 that meant "free" rather than
+ * "broken", and a retry policy built around both.
  *
- * Throws if Clerk can't answer, rather than guessing. The caller turns that
- * into a 500 so Clerk retries — nothing is revoked in the meantime, because
- * the cost of guessing wrong is signing a real customer out of their own
- * laptop.
+ * Throws only if the database is unreachable. The caller turns that into a
+ * 500 so Clerk retries, and nothing is revoked in the meantime — the cost of
+ * guessing wrong is signing a real customer out of their own laptop.
  */
-async function isPayingAccount(client: SessionLimitClient, userId: string): Promise<boolean> {
+async function isPayingAccount(
+  client: SessionLimitClient,
+  userId: string,
+  hasSubscription: (userId: string) => Promise<boolean>
+): Promise<boolean> {
   // A comped operator account ({"admin": true} in public metadata) is exempt
   // rather than capped: it's the owner's own account, not a shared login.
   try {
@@ -62,14 +67,7 @@ async function isPayingAccount(client: SessionLimitClient, userId: string): Prom
     throw err;
   }
 
-  try {
-    return isProSubscription(await client.billing.getUserBillingSubscription(userId));
-  } catch (err) {
-    // An account with no subscription record at all is a 404, which means
-    // free, not broken. Anything else is a real failure and worth a retry.
-    if ((err as { status?: number }).status === 404) return false;
-    throw err;
-  }
+  return hasSubscription(userId);
 }
 
 /**
@@ -87,17 +85,24 @@ async function isPayingAccount(client: SessionLimitClient, userId: string): Prom
  * person, and a weaker signal for a shared password, where it's the idle
  * logins that are the giveaway.
  */
-export async function enforceSessionLimit(
-  userId: string,
-  injected?: SessionLimitClient
-): Promise<string[]> {
-  const client: SessionLimitClient = injected ?? (await clerkClient());
+export type SessionLimitDeps = {
+  client?: SessionLimitClient;
+  /**
+   * The table read, and only the table read. The comp-account check and the
+   * deleted-user handling stay in isPayingAccount below, where they are the
+   * behaviour under test rather than something a fake re-implements.
+   */
+  hasSubscription?: (userId: string) => Promise<boolean>;
+};
+
+export async function enforceSessionLimit(userId: string, deps: SessionLimitDeps = {}): Promise<string[]> {
+  const client: SessionLimitClient = deps.client ?? (await clerkClient());
 
   // The cap exists to stop one paid login being shared, so it only applies to
   // paid logins. A free account signing in on six browsers costs nothing and
   // gains nothing by being cut off; capping it would just be a worse free
   // tier for no reason.
-  if (!(await isPayingAccount(client, userId))) return [];
+  if (!(await isPayingAccount(client, userId, deps.hasSubscription ?? isSubscriber))) return [];
 
   const { data: sessions } = await client.sessions.getSessionList({
     userId,

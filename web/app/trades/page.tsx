@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
+import { useProMirror } from "@/lib/useProMirror";
 import {
   amountLabel,
   AMOUNT_RANGES,
@@ -119,20 +120,18 @@ export default function Home() {
   // unfiltered list. Read once on mount; the search box itself just drives
   // local state after that, same as before this param existed.
   const searchParams = useSearchParams();
-  const { isLoaded: authLoaded, isSignedIn, has } = useAuth();
-  const { user } = useUser();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { openSignUp, openSignIn } = useClerk();
-  // Comp access via public metadata ({"admin": true}, set in the Clerk
-  // dashboard or Backend API) — lets a specific account use paid features
-  // without an actual subscription. Mirrors the server-side check in
-  // lib/access.ts; this one's UI-only, not the security boundary.
-  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
+  // Reads the plan mirrored onto the Clerk user by the Stripe webhook, and
+  // the same {"admin": true} comp flag as before. UI only: the enforcement
+  // is server-side in /api/trades, which never trusts the client's view.
+  const { isPro } = useProMirror();
   // Defaults to "unlocked" while Clerk is still loading (usually well under
   // a second) rather than flashing every visitor's filters as locked first —
   // this is a UX nicety only, not the security boundary. The actual
   // enforcement is server-side in /api/trades, which never trusts the
   // client's plan state.
-  const filtersLocked = authLoaded && !has({ feature: "filters" }) && !isAdmin;
+  const filtersLocked = authLoaded && !isPro;
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   // Which wall they hit. A locked *filter* should just take them to pricing;
   // only the alert offer carries the half-built alert through checkout, so
@@ -830,7 +829,7 @@ export default function Home() {
           // paid plan actually grants, and the API gate accepts either (see
           // PRO_FEATURES in lib/access.ts). Checking only `filters` here would
           // show a paying subscriber the upsell instead of the link.
-          locked={!isSignedIn || (authLoaded && !has({ feature: "notifications" }) && !has({ feature: "filters" }) && !isAdmin)}
+          locked={!isSignedIn || (authLoaded && !isPro)}
           signedIn={!!isSignedIn}
           onLockedClick={promptUpgradeForAlert}
         />

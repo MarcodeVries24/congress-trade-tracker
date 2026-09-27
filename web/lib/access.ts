@@ -1,37 +1,41 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { isSubscriber } from "@/lib/subscription";
 
 // Comp access, independent of a paid plan — granted by setting
 // `{"admin": true}` in a user's *public* metadata (Clerk dashboard: Users ->
-// pick user -> Metadata; or via the Backend API), not by assigning them the
-// paid plan. Lets an operator (or anyone comped) use paid features without a
-// real subscription/Stripe checkout. Checked server-side here since this is
-// the actual enforcement boundary — see the matching client-side check in
-// app/page.tsx, which is UI-only.
-export async function hasFeatureServer(feature: string): Promise<boolean> {
-  const { has } = await auth();
-  if (has({ feature })) return true;
+// pick user -> Metadata; or via the Backend API), not by a subscription. Lets
+// an operator (or anyone comped) use paid features without paying. Unchanged
+// by the move off Clerk Billing: this was always Clerk *user* data rather
+// than billing data.
+async function isComped(): Promise<boolean> {
   const user = await currentUser();
   return (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
 }
 
-// Every feature slug that means "this account has CongTrade Pro".
-//
-// These are the real slugs on the `pro_congtrade` plan in Clerk Billing,
-// which grants `notifications`, `filters` and `no_ads` together. Both are
-// listed rather than just one so that a future plan split (an alerts-only
-// tier, say) doesn't silently lock anyone out — holding either grants Pro.
-//
-// Must stay in step with PRO_FEATURE_SLUGS in ingest/src/alerts/entitlements.ts,
-// which asks Clerk the same question from outside a request context.
-const PRO_FEATURES = ["notifications", "filters"];
-
 /**
- * Whether the caller may use paid features. Same comp-access escape hatch as
- * hasFeatureServer (public metadata {"admin": true}).
+ * Whether the caller may use paid features.
+ *
+ * Reads our own subscriptions table, which a Stripe webhook keeps current.
+ * Both exported helpers keep the signatures they had under Clerk Billing, so
+ * every call site — five API routes and the account page — is untouched by
+ * the change of provider. What varies between them is only which feature is
+ * being asked about, and today every paid feature comes in one plan.
+ *
+ * This is the enforcement boundary. The client-side checks in the trades page
+ * are UI only, and read a mirror of this on the Clerk user (see the Stripe
+ * webhook, which writes both).
  */
 export async function hasProServer(): Promise<boolean> {
-  const { has } = await auth();
-  if (PRO_FEATURES.some((feature) => has({ feature }))) return true;
-  const user = await currentUser();
-  return (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
+  const { userId } = await auth();
+  if (await isSubscriber(userId)) return true;
+  return isComped();
+}
+
+/**
+ * Per-feature check, kept as its own function because the call sites read
+ * better for it ("can this caller use filters?") and because a tiered plan
+ * later would want exactly this shape back.
+ */
+export async function hasFeatureServer(_feature: string): Promise<boolean> {
+  return hasProServer();
 }

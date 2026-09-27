@@ -1,53 +1,11 @@
 import { sql } from "../db/index.js";
-
-/**
- * Does this account still hold CongTrade Pro?
- *
- * The alert sender runs in GitHub Actions, outside any request, so it can't
- * use Clerk's `has({ feature })` — that reads session claims. It asks Clerk's
- * Backend API directly instead, over plain fetch (no SDK), the same way every
- * other external API in this project is called.
- *
- * ## Why the obvious check doesn't work
- *
- * Clerk Billing puts *everyone* on a subscription, including free users: the
- * default `free_user` plan. Asking "is their subscription active?" returns
- * true for every visitor who ever signed up, forever — verified against the
- * live instance, where a free account's subscription reads
- * `status: "active"`. Entitlement lives one level down, in the features the
- * subscribed *plan* grants, which is exactly what `has({ feature })` reads on
- * the web side.
- *
- * ## Failing open, on purpose
- *
- * Every uncertain outcome grants access: no API key configured, a network
- * error, an unexpected response shape, Clerk being down. The two failure modes
- * are not symmetric — one lapsed subscriber getting an extra email is a
- * rounding error, while silently cutting off paying subscribers because our
- * own call failed is the kind of bug people cancel over. Errors are recorded
- * so they surface in the daily report rather than passing unnoticed.
- */
+import { grantsAccess, type SubscriptionRow } from "../../../web/lib/subscriptionAccess";
 
 const CLERK_API = "https://api.clerk.com/v1";
+/** Only used to see whether an account is comped; the plan itself is local. */
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
 
-/**
- * Feature slugs on the paid plan. Must stay in step with PRO_FEATURES in
- * web/lib/access.ts, which answers the same question from inside a request.
- * (As configured today, `pro_congtrade` grants notifications + filters +
- * no_ads, and `free_user` grants nothing.)
- */
-const PRO_FEATURE_SLUGS = new Set(["notifications", "filters"]);
-
-/**
- * A subscription item in these states still counts as paid-up. `past_due`
- * is deliberately included: a declined renewal is usually one retry from
- * succeeding, and cutting someone's alerts the moment a card expires punishes
- * a customer who hasn't gone anywhere.
- */
-const ENTITLED_ITEM_STATUSES = new Set(["active", "past_due"]);
-
-/** How long a successful answer is trusted before Clerk is asked again. */
+/** How long a successful answer is trusted before it is looked up again. */
 const CACHE_TTL_HOURS = 12;
 
 export type EntitlementVerdict =
@@ -58,34 +16,12 @@ export type EntitlementVerdict =
   /** Couldn't find out. Send anyway — see "Failing open" above. */
   | { status: "unknown"; reason: string };
 
-interface ClerkPlan {
-  slug?: string;
-  features?: { slug?: string }[];
-}
-interface ClerkSubscriptionItem {
-  status?: string;
-  plan?: ClerkPlan | null;
-}
-interface ClerkSubscription {
-  subscription_items?: ClerkSubscriptionItem[];
-}
-
 async function clerkGet<T>(path: string): Promise<{ ok: true; data: T } | { ok: false; status: number; body: string }> {
   const res = await fetch(`${CLERK_API}${path}`, {
     headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
   });
   if (!res.ok) return { ok: false, status: res.status, body: (await res.text().catch(() => "")).slice(0, 300) };
   return { ok: true, data: (await res.json()) as T };
-}
-
-/** The paid plan whose features this account currently holds, if any. */
-function entitlingPlan(subscription: ClerkSubscription): ClerkPlan | null {
-  for (const item of subscription.subscription_items ?? []) {
-    if (!ENTITLED_ITEM_STATUSES.has(item.status ?? "")) continue;
-    const granted = item.plan?.features ?? [];
-    if (granted.some((f) => f.slug && PRO_FEATURE_SLUGS.has(f.slug))) return item.plan ?? null;
-  }
-  return null;
 }
 
 /**
@@ -100,10 +36,27 @@ type Probe =
   | { kind: "missing" }
   | { kind: "error"; reason: string };
 
+/** Whether our own subscriptions table grants this user access. */
+async function readSubscription(userId: string): Promise<SubscriptionRow | null> {
+  const rows = (await sql.query(
+    `SELECT clerk_user_id, stripe_customer_id, stripe_subscription_id, status, price_id,
+            current_period_end, cancel_at_period_end
+     FROM subscriptions WHERE clerk_user_id = $1`,
+    [userId]
+  )) as SubscriptionRow[];
+  return rows[0] ?? null;
+}
+
 async function probeClerk(userId: string): Promise<Probe> {
-  // Comp access first: an account comped with {"admin": true} in public
-  // metadata has no paid subscription at all, and mirroring web/lib/access.ts
-  // here is what stops the operator's own alerts being switched off.
+  // The local table first, because it answers for every paying subscriber
+  // without leaving the process. Stripe's webhook keeps it current; the same
+  // rule decides access here and in the browser (web/lib/subscriptionAccess).
+  const row = await readSubscription(userId);
+  if (grantsAccess(row)) return { kind: "entitled", planSlug: row?.price_id ?? null, source: "stripe" };
+
+  // Only accounts with nothing paid reach Clerk, and only to see whether they
+  // are comped with {"admin": true} — the operator's own alerts must not be
+  // switched off for never having paid.
   const user = await clerkGet<{ public_metadata?: { admin?: boolean } }>(`/users/${encodeURIComponent(userId)}`);
   if (!user.ok) {
     if (user.status === 404) return { kind: "missing" };
@@ -111,15 +64,7 @@ async function probeClerk(userId: string): Promise<Probe> {
   }
   if (user.data.public_metadata?.admin === true) return { kind: "entitled", planSlug: null, source: "admin" };
 
-  const subscription = await clerkGet<ClerkSubscription>(`/users/${encodeURIComponent(userId)}/billing/subscription`);
-  if (!subscription.ok) {
-    // The account exists, so no subscription record just means nothing paid.
-    if (subscription.status === 404) return { kind: "no-plan" };
-    return { kind: "error", reason: `GET /billing/subscription: ${subscription.status} ${subscription.body}` };
-  }
-
-  const plan = entitlingPlan(subscription.data);
-  return plan ? { kind: "entitled", planSlug: plan.slug ?? null, source: "billing" } : { kind: "no-plan" };
+  return { kind: "no-plan" };
 }
 
 async function readCache(userIds: string[]) {

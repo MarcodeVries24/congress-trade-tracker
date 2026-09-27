@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useProMirror } from "@/lib/useProMirror";
 import { AlertFilters, describeAlert } from "@/lib/alertFilters";
 import { alertDraftHref, readAlertDraft } from "@/lib/alertsClient";
 
@@ -22,16 +22,15 @@ import { alertDraftHref, readAlertDraft } from "@/lib/alertsClient";
  */
 export function UpgradeDraftHandoff() {
   const router = useRouter();
-  const { isLoaded, has } = useAuth();
-  const { user } = useUser();
+
   const [draft, setDraft] = useState<AlertFilters | null>(null);
 
   useEffect(() => {
     setDraft(readAlertDraft(window.location.search) ?? null);
   }, []);
 
-  const isAdmin = (user?.publicMetadata as { admin?: boolean } | undefined)?.admin === true;
-  const isPro = isLoaded && (has({ feature: "notifications" }) || has({ feature: "filters" }) || isAdmin);
+  const { loaded, isPro: pro } = useProMirror();
+  const isPro = loaded && pro;
 
   useEffect(() => {
     if (draft && isPro) router.replace(alertDraftHref(draft));

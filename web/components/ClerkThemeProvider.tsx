@@ -5,12 +5,11 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 
 // Hand-mapping every Clerk color token to our CSS variables (colorBackground,
-// colorText, etc.) worked for the sign-in modal but left <PricingTable />
-// cards unreadable — its cards don't consistently pick up all of those
-// tokens, so forced light text landed on a background that stayed light too.
-// Using Clerk's own maintained light/dark presets (@clerk/themes) is more
-// robust across every Clerk component, including Billing — we only nudge
-// colorPrimary to match the site's own accent color on top of that.
+// colorText, etc.) worked for the sign-in modal but not for Clerk's larger
+// components, which don't consistently pick up all of those tokens: forced
+// light text landed on a background that stayed light too. Clerk's own
+// maintained light/dark presets (@clerk/themes) are robust across all of
+// them, and we only nudge colorPrimary to the site's accent on top.
 const LIGHT_ACCENT = "#0284c7";
 const DARK_ACCENT = "#38bdf8";
 
@@ -34,12 +33,6 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
         baseTheme: isDark ? dark : undefined,
         variables: { colorPrimary: isDark ? DARK_ACCENT : LIGHT_ACCENT, borderRadius: "0.375rem" },
       }}
-      // The pricing table badges the plan you're on as "Active", which reads
-      // as a status light rather than as an answer to "which one am I on?".
-      // The key is Clerk's own (badge__activePlan), so this is a relabel, not
-      // a behaviour change: it still appears only for a signed-in subscriber,
-      // on the plan they actually hold.
-      localization={{ badge__activePlan: "Current plan" }}
     >
       {children}
     </ClerkProvider>

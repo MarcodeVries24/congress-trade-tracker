@@ -15,16 +15,22 @@ import {
   type SessionLimitClient,
 } from "../lib/sessionLimit";
 
-const PRO = { subscriptionItems: [{ status: "active", plan: { features: [{ slug: "filters" }] } }] };
-const FREE = { subscriptionItems: [{ status: "active", plan: { features: [] } }] };
+/**
+ * The entitlement now comes from the subscriptions table rather than from the
+ * Clerk client, so the fake supplies it directly as a boolean. Which
+ * subscription *states* count as paying is decided in lib/subscription.ts and
+ * tested in subscription.test.ts; this suite only cares that a paying account
+ * is capped and a free one is left alone.
+ */
 
 type Session = { id: string; lastActiveAt: number; createdAt: number };
 
 type Opts = {
   metadata?: unknown;
-  subscription?: unknown;
+  /** Whether the subscriptions table grants this user access. */
+  paying?: boolean;
   userError?: { status?: number };
-  billingError?: { status?: number };
+  payingError?: { status?: number };
   sessions?: Session[];
   failRevoke?: string[];
 };
@@ -37,13 +43,6 @@ function fakeClerk(opts: Opts) {
         calls.getUser++;
         if (opts.userError) throw Object.assign(new Error("user lookup failed"), opts.userError);
         return { publicMetadata: opts.metadata ?? {} };
-      },
-    },
-    billing: {
-      async getUserBillingSubscription() {
-        calls.billing++;
-        if (opts.billingError) throw Object.assign(new Error("billing failed"), opts.billingError);
-        return (opts.subscription ?? FREE) as never;
       },
     },
     sessions: {
@@ -61,7 +60,13 @@ function fakeClerk(opts: Opts) {
       },
     },
   };
-  return { client, calls };
+  const hasSubscription = async (_id: string) => {
+    calls.billing++;
+    if (opts.payingError) throw Object.assign(new Error("subscription lookup failed"), opts.payingError);
+    return opts.paying === true;
+  };
+
+  return { client, calls, deps: { client, hasSubscription } };
 }
 
 // Six browsers whose sign-in order is the exact reverse of their last-used
@@ -91,36 +96,36 @@ async function main() {
 
   // --- who the cap applies to ---
   {
-    const { client, calls } = fakeClerk({ subscription: FREE, sessions: six });
-    check("free account, 6 browsers: revokes nothing", await enforceSessionLimit("u", client), []);
+    const { calls, deps } = fakeClerk({ sessions: six });
+    check("free account, 6 browsers: revokes nothing", await enforceSessionLimit("u", deps), []);
     check("free account: never even lists sessions", calls.list, 0);
   }
   {
-    const { client, calls } = fakeClerk({
+    const { calls, deps } = fakeClerk({
       metadata: { admin: true },
-      subscription: PRO,
+      paying: true,
       sessions: six,
     });
-    check("comped admin, 6 browsers: revokes nothing", await enforceSessionLimit("u", client), []);
+    check("comped admin, 6 browsers: revokes nothing", await enforceSessionLimit("u", deps), []);
     check("comped admin: never asks billing", calls.billing, 0);
   }
 
   // --- the cap itself ---
   {
-    const { client } = fakeClerk({ subscription: PRO, sessions: six.slice(0, 3) });
-    check("pro, 3 browsers: revokes nothing", await enforceSessionLimit("u", client), []);
+    const { deps } = fakeClerk({ paying: true, sessions: six.slice(0, 3) });
+    check("pro, 3 browsers: revokes nothing", await enforceSessionLimit("u", deps), []);
   }
   {
-    const { client } = fakeClerk({ subscription: PRO, sessions: six.slice(0, 4) });
+    const { deps } = fakeClerk({ paying: true, sessions: six.slice(0, 4) });
     check(
       "pro, 4 browsers: revokes the one idle longest",
-      await enforceSessionLimit("u", client),
+      await enforceSessionLimit("u", deps),
       ["s_idle_longest"]
     );
   }
   {
-    const { client, calls } = fakeClerk({ subscription: PRO, sessions: six });
-    const revoked = await enforceSessionLimit("u", client);
+    const { calls, deps } = fakeClerk({ paying: true, sessions: six });
+    const revoked = await enforceSessionLimit("u", deps);
     check("pro, 6 browsers: revokes the 3 idlest, least idle first", revoked, [
       "s_idle_1",
       "s_idle_2",
@@ -150,25 +155,18 @@ async function main() {
       { id: "s_c", lastActiveAt: 500, createdAt: 70 },
       { id: "s_oldest_signin", lastActiveAt: 500, createdAt: 60 },
     ];
-    const { client } = fakeClerk({ subscription: PRO, sessions: tied });
+    const { deps } = fakeClerk({ paying: true, sessions: tied });
     check(
       "equally active browsers: sign-in date breaks the tie",
-      await enforceSessionLimit("u", client),
+      await enforceSessionLimit("u", deps),
       ["s_oldest_signin"]
     );
-  }
-  {
-    const pastDue = {
-      subscriptionItems: [{ status: "past_due", plan: { features: [{ slug: "notifications" }] } }],
-    };
-    const { client } = fakeClerk({ subscription: pastDue, sessions: six });
-    check("past_due pro: still capped", (await enforceSessionLimit("u", client)).length, 3);
   }
 
   // --- resilience ---
   {
-    const { client } = fakeClerk({ subscription: PRO, sessions: six, failRevoke: ["s_idle_2"] });
-    check("one revoke fails: the other two still go", await enforceSessionLimit("u", client), [
+    const { deps } = fakeClerk({ paying: true, sessions: six, failRevoke: ["s_idle_2"] });
+    check("one revoke fails: the other two still go", await enforceSessionLimit("u", deps), [
       "s_idle_1",
       "s_idle_longest",
     ]);
@@ -176,22 +174,18 @@ async function main() {
 
   // --- fail directions ---
   {
-    const { client, calls } = fakeClerk({ userError: { status: 404 }, sessions: six });
-    check("deleted user: nothing to do, no retry", await enforceSessionLimit("u", client), []);
+    const { calls, deps } = fakeClerk({ userError: { status: 404 }, sessions: six });
+    check("deleted user: nothing to do, no retry", await enforceSessionLimit("u", deps), []);
     check("deleted user: never lists sessions", calls.list, 0);
   }
-  {
-    const { client } = fakeClerk({ billingError: { status: 404 }, sessions: six });
-    check("no subscription record: treated as free", await enforceSessionLimit("u", client), []);
-  }
   for (const [name, opts] of [
-    ["user lookup 503", { userError: { status: 503 }, sessions: six }],
-    ["billing 503", { billingError: { status: 503 }, sessions: six }],
+    ["user lookup 503", { userError: { status: 503 }, paying: true, sessions: six }],
+    ["subscription lookup fails", { payingError: { status: 503 }, sessions: six }],
   ] as [string, Opts][]) {
-    const { client, calls } = fakeClerk(opts);
+    const { calls, deps } = fakeClerk(opts);
     let threw = false;
     try {
-      await enforceSessionLimit("u", client);
+      await enforceSessionLimit("u", deps);
     } catch {
       threw = true;
     }

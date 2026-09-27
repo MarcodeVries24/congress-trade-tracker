@@ -2,6 +2,10 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "baseUrl": "..",
-    "paths": { "@/*": ["./*"], "@clerk/nextjs/server": ["./test/clerkStub.ts"] }
+    "paths": {
+      "@/lib/db": ["./test/dbStub.ts"],
+      "@/*": ["./*"],
+      "@clerk/nextjs/server": ["./test/clerkStub.ts"]
+    }
   }
 }

@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AlertsManager } from "@/components/AlertsManager";
+import { ManagePlanButton } from "@/components/ManagePlanButton";
 import { hasProServer } from "@/lib/access";
 
 export const metadata: Metadata = {
@@ -55,16 +56,18 @@ export default async function AccountPage() {
                   <p className="mt-1 text-xs text-ink-faint">Signed in as {user.primaryEmailAddress.emailAddress}</p>
                 )}
               </div>
-              <Link
-                href="/upgrade"
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  isPro
-                    ? "border border-line text-ink-muted hover:border-line-strong hover:text-ink"
-                    : "bg-accent text-white hover:opacity-90"
-                }`}
-              >
-                {isPro ? "Manage plan" : "Upgrade to Pro"}
-              </Link>
+              {/* A subscriber goes to Stripe's portal; everyone else to the
+                  pricing page. */}
+              {isPro ? (
+                <ManagePlanButton className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink" />
+              ) : (
+                <Link
+                  href="/upgrade"
+                  className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                >
+                  Upgrade to Pro
+                </Link>
+              )}
             </div>
           </section>
 

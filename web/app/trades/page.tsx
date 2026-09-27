@@ -31,7 +31,7 @@ import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters, ALERT_PARTIES, MIN_AMOUNT_OPTIONS, US_STATES } from "@/lib/alertFilters";
 import { alertDraftHref, alertUpgradeHref } from "@/lib/alertsClient";
-import { AmericanFlag } from "@/components/AmericanFlag";
+import { BannerFlag } from "@/components/BannerFlag";
 import { MultiSelect } from "@/components/MultiSelect";
 import { SearchableMultiSelect } from "@/components/SearchableMultiSelect";
 import { Select } from "@/components/Select";
@@ -548,7 +548,7 @@ export default function Home() {
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="relative mb-4 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
-          <AmericanFlag
+          <BannerFlag
             className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 opacity-[0.14] sm:w-1/2"
             style={{ maskImage: "linear-gradient(to right, transparent, black 45%)", WebkitMaskImage: "linear-gradient(to right, transparent, black 45%)" }}
           />

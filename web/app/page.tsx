@@ -18,8 +18,7 @@ import { AmericanFlag } from "@/components/AmericanFlag";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { SentimentRiver } from "@/components/SentimentRiver";
 import { PolicyStrip } from "@/components/PolicyStrip";
-import { GeneralNews } from "@/components/GeneralNews";
-import { MarketsStrip } from "@/components/MarketsStrip";
+import { NewsRow } from "@/components/NewsRow";
 import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
@@ -244,7 +243,9 @@ export default function Home() {
           </div>
         </div>
 
-        <MarketsStrip />
+        {/* Markets sits between the trading panels and the breakdown
+            cards: it is the market those trades were made into. */}
+        <NewsRow sectionKey="cnbc-markets" title="Markets" showAllLink />
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}
@@ -354,7 +355,7 @@ export default function Home() {
           <PolicyStrip />
         </div>
 
-        <GeneralNews />
+        <NewsRow sectionKey="cnbc" title="Economy" />
       </main>
       <Footer />
     </>

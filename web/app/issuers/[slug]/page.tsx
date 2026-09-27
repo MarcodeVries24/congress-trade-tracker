@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { InfoTip } from "@/components/InfoTip";
+import { IssuerNews } from "@/components/IssuerNews";
+import { getIssuerNews } from "@/lib/issuerNews";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { AdSlot } from "@/components/AdSlot";
 import {
@@ -68,6 +70,11 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
   const { issuer, traders, trades } = found;
   const flow = await getIssuerTradeFlow(issuer.ticker);
   const name = issuer.company_name ?? issuer.ticker;
+  // Fetched after the page's own data rather than alongside it: the trades
+  // are the page, and a slow news feed must not hold them up. getIssuerNews
+  // resolves to an empty list on any failure, and the section then renders
+  // nothing at all.
+  const news = await getIssuerNews(issuer.ticker, issuer.company_name);
   const tradesHref = `/trades?tickers=${encodeURIComponent(issuer.ticker)}`;
   const cap = formatMarketCap(issuer.market_cap);
 
@@ -256,6 +263,8 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
             );
           })}
         </div>
+
+        <IssuerNews items={news} name={name} />
 
         <p className="mt-4 text-xs leading-relaxed text-ink-faint">
           Figures come from members&rsquo; own Periodic Transaction Reports, which disclose a value <em>bracket</em> rather

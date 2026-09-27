@@ -17,6 +17,7 @@ import { memberDisplayName } from "@/lib/memberDisplay";
 import { AmericanFlag } from "@/components/AmericanFlag";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { SentimentRiver } from "@/components/SentimentRiver";
+import { PolicyStrip } from "@/components/PolicyStrip";
 import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
@@ -341,6 +342,12 @@ export default function Home() {
           <div className="lg:col-span-2">
             <SentimentRiver />
           </div>
+        </div>
+
+        {/* Last, deliberately: it is context for the data above, not a reason
+            anyone came. */}
+        <div className="mt-4 lg:mt-6">
+          <PolicyStrip />
         </div>
       </main>
       <Footer />

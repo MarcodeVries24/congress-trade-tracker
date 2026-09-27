@@ -2,17 +2,17 @@ import { fetchFeed, type FeedItem } from "./feeds";
 import { articleImage } from "./articleImage";
 
 /**
- * The two commercial feeds, kept apart from the agency releases on purpose.
+ * The commercial feeds, kept apart from the agency releases on purpose.
  *
  * The agency strip is public-domain primary sources and says so; these are
  * other people's journalism, shown as headline, credit and link, each one
  * leaving for the publisher. Mixing the two into one list would blur the
  * distinction the rest of the site is built on.
  *
- * CNBC's Economy desk covers what moves the disclosures on this site — the
- * Fed, Treasury yields, the data prints. MarketWatch's top stories run wider
- * and towards personal finance, and are the only feed anywhere in this
- * project that ships pictures.
+ * Both desks are CNBC's: Economy for the Fed, Treasury yields and the data
+ * prints, Markets for what the tape did about them. MarketWatch's top stories
+ * were here too and were dropped, being personal-finance features that read
+ * as somebody else's newsletter pasted in beside congressional trades.
  */
 export type NewsSection = {
   key: string;
@@ -39,13 +39,6 @@ const SOURCES = [
     blurb: "Markets and investing",
     url: "https://www.cnbc.com/id/15839069/device/rss/rss.html",
   },
-  {
-    key: "marketwatch",
-    publisher: "MarketWatch",
-    homepage: "https://www.marketwatch.com/",
-    blurb: "Top stories",
-    url: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
-  },
 ];
 
 export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
@@ -71,10 +64,10 @@ export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
 /**
  * Fills in the pictures a feed didn't carry, from each article's own og:image.
  *
- * MarketWatch ships one per item and skips this entirely. CNBC ships none, so
- * every card there would otherwise fall back to type, which reads as a feed
- * that half-loaded. Fetched in parallel and individually optional: an article
- * that won't answer in four seconds simply keeps the typographic card.
+ * CNBC publishes none in any of its feeds, so every card would otherwise fall
+ * back to type, which reads as a page that half-loaded. Anything already
+ * carrying one is skipped. Fetched in parallel and individually optional: an
+ * article that won't answer in four seconds keeps the typographic card.
  */
 async function illustrate(items: FeedItem[]): Promise<void> {
   const missing = items.filter((item) => !item.image);

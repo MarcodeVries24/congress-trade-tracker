@@ -6,11 +6,12 @@ import type { NewsSection } from "@/lib/newsFeed";
 import { NewsCard } from "./NewsCard";
 
 /**
- * Other people's journalism, under their own name, kept clearly apart from
- * the agency releases above it.
+ * CNBC's economy desk, under its own name, kept clearly apart from the agency
+ * releases above it.
  *
- * Four per publisher on the home page, the rest on /news. Each block leaves
- * for the publisher; nothing is summarised or re-hosted here.
+ * The markets desk is deliberately absent: it has its own band between the
+ * trading panels further up. Each block leaves for the publisher; nothing is
+ * summarised or re-hosted here.
  */
 export function GeneralNews() {
   const [sections, setSections] = useState<NewsSection[] | null>(null);
@@ -20,7 +21,9 @@ export function GeneralNews() {
     fetch("/api/news")
       .then((r) => (r.ok ? r.json() : { sections: [] }))
       .then((d: { sections: NewsSection[] }) => {
-        if (!cancelled) setSections(d.sections ?? []);
+        // Markets has its own band higher up the page (MarketsStrip), and
+        // the same four headlines twice on one screen reads as a bug.
+        if (!cancelled) setSections((d.sections ?? []).filter((s) => s.key !== "cnbc-markets"));
       })
       .catch(() => {
         if (!cancelled) setSections([]);

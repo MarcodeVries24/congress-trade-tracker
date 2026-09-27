@@ -19,6 +19,7 @@ import { AboutCongTrade } from "@/components/AboutCongTrade";
 import { SentimentRiver } from "@/components/SentimentRiver";
 import { PolicyStrip } from "@/components/PolicyStrip";
 import { GeneralNews } from "@/components/GeneralNews";
+import { MarketsStrip } from "@/components/MarketsStrip";
 import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
@@ -242,6 +243,8 @@ export default function Home() {
             </Card>
           </div>
         </div>
+
+        <MarketsStrip />
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}

@@ -22,10 +22,10 @@ export type FeedItem = {
   /**
    * The illustration the feed itself offers, where it offers one.
    *
-   * Only MarketWatch does, of the feeds here. It is served from the
-   * publisher's own domain and shown beside a headline that links back to
-   * them, which is what a media:content element in a public feed is for. Not
-   * copied, not re-hosted.
+   * None of the feeds currently read carry one, so in practice this is filled
+   * in from the article's own og:image (see lib/articleImage.ts). Either way
+   * the picture is served from the publisher's own domain and shown beside a
+   * headline that links back to them. Not copied, not re-hosted.
    */
   image: string | null;
 };
@@ -56,8 +56,8 @@ function decode(raw: string): string {
     raw
       .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
       .replace(/<[^>]+>/g, "")
-      // Numeric first, and both bases: MarketWatch writes its curly quotes as
-      // &#x2019; and a headline rendered with the escape still in it looks
+      // Numeric first, and both bases: feeds write curly quotes as &#x2019;
+      // or &#8217;, and a headline rendered with the escape still in it looks
       // like the parser gave up halfway.
       .replace(/&#x([0-9a-f]+);/gi, (_, hex) => safeChar(parseInt(hex, 16)))
       .replace(/&#(\d+);/g, (_, dec) => safeChar(parseInt(dec, 10)))

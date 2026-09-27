@@ -8,7 +8,7 @@ import { getPolicyFeed } from "@/lib/policyFeed";
 export const metadata: Metadata = {
   title: "News | CongTrade",
   description:
-    "Federal agency releases, plus economy and markets coverage from CNBC and MarketWatch, beside the congressional trading data they move.",
+    "Federal agency releases, plus economy and markets coverage from CNBC, beside the congressional trading data they move.",
 };
 
 /**

@@ -6,6 +6,7 @@ import { ALERT_FREQUENCIES, describeAlert } from "@/lib/alertFilters";
 import { AlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { AlertsResponse, SavedAlert, alertUpgradeHref, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
+import { ALERT_FROM_ADDRESS } from "@/lib/site";
 import { AlertDraft, AlertEditor } from "./AlertEditor";
 
 function frequencyLabel(value: string): string {
@@ -131,6 +132,24 @@ export function AlertsManager() {
           </button>
         )}
       </div>
+
+      {state.isPro && (
+        <div className="mt-4 rounded-lg border border-line bg-panel-muted px-4 py-3">
+          <p className="text-sm text-ink">
+            Alerts are sent from{" "}
+            <span className="font-medium">
+              <a href={`mailto:${ALERT_FROM_ADDRESS}`} className="underline decoration-line-strong hover:decoration-ink-muted">
+                {ALERT_FROM_ADDRESS}
+              </a>
+            </span>
+            . Add it to your contacts so it isn&apos;t filtered.
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+            Check your spam or junk folder for the first one, and mark it &ldquo;not spam&rdquo; if it landed there.
+            Mail from a new sender often does, once, and that one click is what stops it happening again.
+          </p>
+        </div>
+      )}
 
       {!state.isPro && (
         <div className="mt-4 rounded-lg border border-line bg-panel p-5">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TrustpilotWidget } from "./TrustpilotWidget";
 
 const YEAR = new Date().getFullYear();
 
@@ -100,6 +101,12 @@ export function Footer() {
           </Link>
           .
         </p>
+
+        {/* Above the copyright line rather than in the Legal column: it is a
+            mark, not a document. */}
+        <div className="mt-4 max-w-[220px]">
+          <TrustpilotWidget template="microStar" />
+        </div>
 
         <div className="mt-4 flex flex-col gap-1 text-[11px] text-ink-faint sm:flex-row sm:items-center sm:justify-between">
           <span>© {YEAR} CongTrade. All data sourced from public government filings.</span>

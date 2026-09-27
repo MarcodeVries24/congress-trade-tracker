@@ -7,6 +7,7 @@ import { AlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { AlertsResponse, SavedAlert, alertUpgradeHref, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
 import { ALERT_FROM_ADDRESS } from "@/lib/site";
+import { TrustpilotWidget } from "./TrustpilotWidget";
 import { AlertDraft, AlertEditor } from "./AlertEditor";
 
 function frequencyLabel(value: string): string {
@@ -148,6 +149,16 @@ export function AlertsManager() {
             Check your spam or junk folder for the first one, and mark it &ldquo;not spam&rdquo; if it landed there.
             Mail from a new sender often does, once, and that one click is what stops it happening again.
           </p>
+        </div>
+      )}
+
+      {/* Asked of subscribers, who are the only people with anything to say. */}
+      {state.isPro && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line px-4 py-3">
+          <p className="text-sm text-ink-muted">Getting something out of CongTrade? A review helps other people find it.</p>
+          <div className="w-[220px] shrink-0">
+            <TrustpilotWidget template="reviewCollector" label="Review CongTrade on Trustpilot" />
+          </div>
         </div>
       )}
 

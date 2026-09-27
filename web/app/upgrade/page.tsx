@@ -6,7 +6,6 @@ import { UpgradeDraftHandoff } from "@/components/UpgradeDraftHandoff";
 import { AlertEmailPreview } from "@/components/AlertEmailPreview";
 import { UpgradeFaq } from "@/components/UpgradeFaq";
 import { MemberFaces } from "@/components/MemberFaces";
-import { TrustpilotWidget } from "@/components/TrustpilotWidget";
 import { PersonalNote } from "@/components/PersonalNote";
 import { getUpgradeProof } from "@/lib/upgradeProof";
 import { getProPricing } from "@/lib/plans";
@@ -115,12 +114,7 @@ export default async function UpgradePage({
               above ends where the card's content ends. Without it the row sat
               three pixels adrift of the cards, which reads as a mistake
               rather than as a separate element. */}
-          {/* Beside the buttons, in the card's own column. */}
-          <div className="mt-4 max-w-[240px] px-4">
-            <TrustpilotWidget template="microTrustScore" />
-          </div>
-
-          <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 px-4 text-xs text-ink-muted">
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 px-4 text-xs text-ink-muted">
             {[
               <>
                 <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro

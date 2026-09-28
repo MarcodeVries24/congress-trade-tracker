@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignedIn } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
+import { useProMirror } from "@/lib/useProMirror";
 
 const LINKS = [
   { href: "/trades", label: "All Trades" },
@@ -29,6 +30,7 @@ const LINKS = [
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { isPro } = useProMirror();
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -144,6 +146,25 @@ export function MobileNav() {
               );
             })}
           </ul>
+          {/* Unlike the account link below, this one shows signed-out too:
+              /upgrade is the pricing page, not a page that only tells you to
+              sign in, and someone who has not signed up yet is exactly who it
+              is for. Hidden once they are paying. */}
+          {!isPro && (
+            <div className="border-t border-line px-4 pb-2">
+              <Link
+                href="/upgrade"
+                tabIndex={open ? undefined : -1}
+                aria-current={pathname === "/upgrade" ? "page" : undefined}
+                className={`mt-2 flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${
+                  pathname === "/upgrade" ? "bg-panel-muted text-accent" : "text-accent hover:bg-panel-muted"
+                }`}
+              >
+                Upgrade to Pro
+                {pathname === "/upgrade" && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
+              </Link>
+            </div>
+          )}
           {/* Signed-in only, and outside LINKS above, so a signed-out
               visitor is never offered a page that just tells them to sign
               in. The same destination is in the avatar menu on wider

@@ -61,6 +61,19 @@ export function Header() {
           >
             News
           </Link>
+          {/* Signed-out only. A signed-in free account reaches the same page
+              from the avatar menu, and someone already paying does not need
+              the row spent on it. Without this a signed-out visitor on a
+              desktop had no route to pricing at all: there is no avatar menu
+              yet and the phone menu is hidden at this width. */}
+          <SignedOut>
+            <Link
+              href="/upgrade"
+              className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
+            >
+              Pricing
+            </Link>
+          </SignedOut>
         </nav>
 
         {/* `ml-auto` pins these right; `shrink-0` + `whitespace-nowrap` stop

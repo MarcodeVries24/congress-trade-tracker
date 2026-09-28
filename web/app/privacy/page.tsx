@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "How CongTrade handles data.",
 };
 
-const LAST_UPDATED = "September 22, 2026";
+const LAST_UPDATED = "September 28, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -30,8 +30,10 @@ export default function PrivacyPage() {
         <LegalSection title="2. Accounts">
           <p>
             Creating an account is optional and only needed for paid features (filters, alerts, an ad-free view).
-            Accounts are handled by our authentication provider, Clerk. You can sign up with an email address or a
-            Google account. Clerk stores your email address, authentication method, and account metadata, and sets
+            Accounts are handled by our authentication provider, Clerk. You can sign up with an email address, a
+            Google account, or an Apple account. If you sign in with Apple and choose to hide your email address,
+            we receive Apple&rsquo;s relay address instead of your real one, and alerts are delivered through it.
+            Clerk stores your email address, authentication method, and account metadata, and sets
             cookies needed to keep you signed in. See{" "}
             <a href="https://clerk.com/privacy" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
               Clerk&rsquo;s privacy policy
@@ -59,9 +61,11 @@ export default function PrivacyPage() {
 
         <LegalSection title="4. Payments">
           <p>
-            Subscription payments are processed by Stripe through Clerk&rsquo;s billing integration. We never see or
-            store your full card details; Stripe handles that directly. We do retain a record that your account has
-            an active (or past) subscription, needed to grant access to paid features.
+            Subscription payments are processed by Stripe. We never see or store your card details; Stripe handles
+            those directly. In our own database we keep a record of your subscription, namely your Clerk account ID,
+            the Stripe customer and subscription identifiers, its status, the plan, and when the paid period ends.
+            That record is what grants access to paid features, and we are required to keep billing and tax records
+            for seven years.
           </p>
         </LegalSection>
 
@@ -111,27 +115,55 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="9. Children's privacy">
-          <p>The Site is not directed at children under 13, and we don&rsquo;t knowingly collect information from them.</p>
-        </LegalSection>
-
-        <LegalSection title="10. Your rights">
+        <LegalSection title="9. Children&rsquo;s privacy">
           <p>
-            You can access or update your account details (email, sign-in method) directly through your account
-            settings, and cancel a subscription at any time. To request deletion of your account and associated
-            data, contact us using the details below. Visitors who never create an account have no account data with
-            us to access or delete in the first place.
+            The Site is not directed at children, and an account requires you to be at least 16. We don&rsquo;t
+            knowingly collect information from anyone younger; if you believe we have, tell us and we will delete it.
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Changes to this policy">
+        <LegalSection title="10. Why we are allowed to use this data">
+          <p>
+            Under the GDPR we need a legal ground for each use. Ours are: performing our agreement with you, which
+            covers your account, your subscription and your alerts; our legitimate interest in keeping the Site
+            secure, preventing abuse and keeping it working, which covers technical logs; a legal obligation, which
+            covers billing and tax records; and your consent, which we ask for separately and which covers
+            non-essential advertising cookies. Accepting our Terms of Service is not itself consent, and we never
+            treat it as though it were.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="11. Your rights">
+          <p>
+            You can access or update your account details (email, sign-in method) directly through your account
+            settings, and cancel a subscription at any time. You can also ask us for a copy of your data, to correct
+            it, to delete it, to restrict or object to how we use it, or to transfer it to another provider, and you
+            can withdraw any consent you have given without that affecting what we did before you withdrew it.
+            Contact us using the details below. Visitors who never create an account have no account data with us to
+            access or delete in the first place.
+          </p>
+          <p>
+            Deleting an alert deletes its criteria and its sending history. Closing your account removes your
+            account data, apart from the billing records we are required to keep.
+          </p>
+          <p>
+            If you think we have handled your data wrongly, please tell us first so we can put it right. You also
+            have the right to complain to the Dutch data protection authority, the{" "}
+            <a href="https://autoriteitpersoonsgegevens.nl" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+              Autoriteit Persoonsgegevens
+            </a>
+            , or to the supervisory authority in the country where you live.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="12. Changes to this policy">
           <p>
             We may update this policy from time to time; the &ldquo;last updated&rdquo; date at the top reflects the
             most recent revision.
           </p>
         </LegalSection>
 
-        <LegalSection title="12. Contact">
+        <LegalSection title="13. Contact">
           <p>
             Questions about this policy, or a request to access or delete your data, can be sent to{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

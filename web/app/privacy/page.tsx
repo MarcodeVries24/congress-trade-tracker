@@ -17,9 +17,9 @@ export default function PrivacyPage() {
       <LegalDocument title="Privacy Policy" lastUpdated={LAST_UPDATED}>
         <LegalSection title="1. Who is responsible for your data">
           <p>
-            CongTrade is a service of MV Digital, established in the Netherlands and registered with the Dutch
-            Chamber of Commerce under number 42025400. MV Digital is the controller of the personal data described
-            below, and can be reached at{" "}
+            CongTrade is a service of MV Digital, established in the Netherlands, registered with the Dutch Chamber
+            of Commerce under number 42025400, VAT identification number NL005440118B52. MV Digital is the controller
+            of the personal data described below, and can be reached at{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
               contact@congtrade.com
             </a>

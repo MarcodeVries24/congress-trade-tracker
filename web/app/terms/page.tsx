@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "September 28, 2026";
 
-// TODO(marco): section 2 still needs two statutory trader details that Dutch
-// and EU e-commerce law require a seller to publish: the geographical business
-// address, and the VAT (BTW) number. They are left out rather than guessed at.
-// Everything else on this page is accurate as written.
+// TODO(marco): section 2 still needs the one statutory trader detail Dutch and
+// EU e-commerce law require that we do not have: the geographical business
+// address. It is left out rather than guessed at. Everything else on this page
+// is accurate as written.
 
 export default function TermsPage() {
   return (
@@ -36,8 +36,8 @@ export default function TermsPage() {
 
         <LegalSection title="2. Who you are contracting with">
           <p>
-            CongTrade is a service of MV Digital, established in the Netherlands and registered with the Dutch
-            Chamber of Commerce (Kamer van Koophandel) under number 42025400.
+            CongTrade is a service of MV Digital, established in the Netherlands, registered with the Dutch Chamber
+            of Commerce (Kamer van Koophandel) under number 42025400, VAT identification number NL005440118B52.
           </p>
           <p>
             You can reach us at{" "}

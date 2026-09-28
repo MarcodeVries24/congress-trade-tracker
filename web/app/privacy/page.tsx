@@ -15,7 +15,19 @@ export default function PrivacyPage() {
     <>
       <Header />
       <LegalDocument title="Privacy Policy" lastUpdated={LAST_UPDATED}>
-        <LegalSection title="1. The short version">
+        <LegalSection title="1. Who is responsible for your data">
+          <p>
+            CongTrade is a service of MV Digital, established in the Netherlands and registered with the Dutch
+            Chamber of Commerce under number 42025400. MV Digital is the controller of the personal data described
+            below, and can be reached at{" "}
+            <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+              contact@congtrade.com
+            </a>
+            .
+          </p>
+        </LegalSection>
+
+        <LegalSection title="2. The short version">
           <p>
             All of the trading data shown on the Site is public government filing data, not personal data about
             visitors. Browsing and searching the Site doesn&rsquo;t require an account. If you create an account to
@@ -27,7 +39,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="2. Accounts">
+        <LegalSection title="3. Accounts">
           <p>
             Creating an account is optional and only needed for paid features (filters, alerts, an ad-free view).
             Accounts are handled by our authentication provider, Clerk. You can sign up with an email address, a
@@ -42,7 +54,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="3. Email alerts">
+        <LegalSection title="4. Email alerts">
           <p>
             CongTrade Pro subscribers can save alerts, each one a set of filter criteria, and be emailed
             when a new public filing matches. To send those emails we store, in our own database: the criteria you
@@ -59,7 +71,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="4. Payments">
+        <LegalSection title="5. Payments">
           <p>
             Subscription payments are processed by Stripe. We never see or store your card details; Stripe handles
             those directly. In our own database we keep a record of your subscription, namely your Clerk account ID,
@@ -69,7 +81,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="5. Cookies and local storage">
+        <LegalSection title="6. Cookies and local storage">
           <p>Depending on how you use the Site, it can set:</p>
           <ul>
             <li>An authentication session cookie (Clerk), if you create an account. It keeps you signed in.</li>
@@ -78,7 +90,7 @@ export default function PrivacyPage() {
           </ul>
         </LegalSection>
 
-        <LegalSection title="6. Advertising">
+        <LegalSection title="7. Advertising">
           <p>
             The free tier of the Site may show ads served by Google AdSense. Google and its advertising partners may
             use cookies or device identifiers to serve ads, including personalized ones based on your activity
@@ -96,7 +108,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="7. Hosting and technical logs">
+        <LegalSection title="8. Hosting and technical logs">
           <p>
             The Site is hosted on Vercel, with its data stored in a Neon Postgres database. Like virtually every
             website, our hosting provider automatically logs standard technical information for security and
@@ -106,7 +118,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="8. Third-party services and sites">
+        <LegalSection title="9. Third-party services and sites">
           <p>
             The Site links out to third-party sites, such as the House Clerk&rsquo;s disclosure portal, the Senate
             eFD system, and individual source filings, to let you verify data at the source. It also relies on Clerk,
@@ -115,14 +127,14 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="9. Children&rsquo;s privacy">
+        <LegalSection title="10. Children&rsquo;s privacy">
           <p>
             The Site is not directed at children, and an account requires you to be at least 16. We don&rsquo;t
             knowingly collect information from anyone younger; if you believe we have, tell us and we will delete it.
           </p>
         </LegalSection>
 
-        <LegalSection title="10. Why we are allowed to use this data">
+        <LegalSection title="11. Why we are allowed to use this data">
           <p>
             Under the GDPR we need a legal ground for each use. Ours are: performing our agreement with you, which
             covers your account, your subscription and your alerts; our legitimate interest in keeping the Site
@@ -133,7 +145,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Your rights">
+        <LegalSection title="12. Your rights">
           <p>
             You can access or update your account details (email, sign-in method) directly through your account
             settings, and cancel a subscription at any time. You can also ask us for a copy of your data, to correct
@@ -156,14 +168,14 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="12. Changes to this policy">
+        <LegalSection title="13. Changes to this policy">
           <p>
             We may update this policy from time to time; the &ldquo;last updated&rdquo; date at the top reflects the
             most recent revision.
           </p>
         </LegalSection>
 
-        <LegalSection title="13. Contact">
+        <LegalSection title="14. Contact">
           <p>
             Questions about this policy, or a request to access or delete your data, can be sent to{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

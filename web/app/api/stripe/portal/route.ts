@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { stripe, billingConfigured } from "@/lib/stripe";
+import { stripe } from "@/lib/stripe";
+import { billingConfigured } from "@/lib/stripePrices";
 import { getSubscription } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
 

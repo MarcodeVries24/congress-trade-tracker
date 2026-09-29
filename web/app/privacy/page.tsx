@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LegalDocument, LegalSection } from "@/components/LegalDocument";
@@ -156,7 +157,11 @@ export default function PrivacyPage() {
           </p>
           <p>
             Deleting an alert deletes its criteria and its sending history. Closing your account removes your
-            account data, apart from the billing records we are required to keep.
+            account data, apart from the billing records we are required to keep. The steps are on the{" "}
+            <Link href="/delete-account" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
+              account deletion page
+            </Link>
+            .
           </p>
           <p>
             If you think we have handled your data wrongly, please tell us first so we can put it right. You also

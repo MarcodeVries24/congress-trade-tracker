@@ -1,0 +1,3 @@
+# One-off repair backups written by backfill scripts. Operational output,
+# not source: they hold a snapshot of rows, and the fix lives in the script.
+asset-name-backfill-*.json

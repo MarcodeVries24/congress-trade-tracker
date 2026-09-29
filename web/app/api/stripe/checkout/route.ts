@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
-import { priceIdFor, billingConfigured, type BillingPeriod } from "@/lib/stripePrices";
+import { priceIdFor, billingConfigured, BILLING_PERIODS, type BillingPeriod } from "@/lib/stripePrices";
 import { currencyForRequest } from "@/lib/currency";
 import { getSubscription } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as { period?: BillingPeriod; returnTo?: string };
-  const period: BillingPeriod = body.period === "annual" ? "annual" : "monthly";
+  // Validated against the list rather than coerced with a ternary, which
+  // silently turned every unknown period into monthly and would have charged a
+  // weekly buyer a month.
+  const period: BillingPeriod =
+    body.period && BILLING_PERIODS.includes(body.period) ? body.period : "monthly";
 
   // Everything from here on is inside the catch. The first version wrapped
   // only the Stripe call, and the failure that actually broke checkout was the

@@ -22,16 +22,21 @@ import type { Currency } from "@/lib/currency";
  */
 export const PRICES = {
   eur: {
+    weekly: process.env.STRIPE_PRICE_WEEKLY,
     monthly: process.env.STRIPE_PRICE_MONTHLY,
     annual: process.env.STRIPE_PRICE_ANNUAL,
   },
   usd: {
+    weekly: process.env.STRIPE_PRICE_WEEKLY_USD,
     monthly: process.env.STRIPE_PRICE_MONTHLY_USD,
     annual: process.env.STRIPE_PRICE_ANNUAL_USD,
   },
 } as const;
 
-export type BillingPeriod = "monthly" | "annual";
+export type BillingPeriod = "weekly" | "monthly" | "annual";
+
+/** The periods a buyer can be offered, longest commitment last. */
+export const BILLING_PERIODS: readonly BillingPeriod[] = ["weekly", "monthly", "annual"];
 
 /** Euros are the fallback: it is what the account settles in. */
 export function priceIdFor(period: BillingPeriod, currency: Currency): string {
@@ -40,9 +45,20 @@ export function priceIdFor(period: BillingPeriod, currency: Currency): string {
   return id;
 }
 
-/** Whether a currency has both of its prices set, for falling back cleanly. */
+/**
+ * Whether a currency can be quoted at all.
+ *
+ * Monthly and annual only: weekly exists for the mobile app's hard paywall and
+ * is optional everywhere else, so a missing weekly price should hide that one
+ * option rather than push the whole currency back to euros.
+ */
 export function currencyConfigured(currency: Currency): boolean {
   return Boolean(PRICES[currency]?.monthly && PRICES[currency]?.annual);
+}
+
+/** Whether one specific period can be charged in this currency. */
+export function periodConfigured(period: BillingPeriod, currency: Currency): boolean {
+  return Boolean(PRICES[currency]?.[period]);
 }
 
 /** Whether checkout can run at all, for refusing rather than half-working. */

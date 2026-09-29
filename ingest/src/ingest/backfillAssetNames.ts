@@ -1,5 +1,5 @@
 import "../loadEnv.js";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { sql } from "../db/index.js";
 import { stripAssetDetail } from "./senate/parseReport.js";
 
@@ -17,12 +17,52 @@ import { stripAssetDetail } from "./senate/parseReport.js";
  * Dry run by default. Pass --apply to write, which first saves every original
  * value to a JSON file so the change can be undone.
  *
- * Usage: npm run backfill:asset-names [-- --apply]
+ * Once a run has happened the detail block is no longer in the database, so a
+ * later change to stripAssetDetail cannot be applied from the rows themselves.
+ * --from-backup replays the current rule over the originals in one of those
+ * saved files instead, which is what makes the rule safe to refine.
+ *
+ * Usage: npm run backfill:asset-names [-- --apply] [-- --from-backup <file>]
  */
 const MATCH = `asset_name LIKE '% Company: %' OR asset_name LIKE '% Description: %'`;
 
+type Change = { id: number; doc_id: string; before: string; after: string };
+
+/** Re-derives names from a previous run's saved originals. */
+async function fromBackup(path: string, apply: boolean) {
+  const saved = JSON.parse(readFileSync(path, "utf8")) as Change[];
+  const current = (await sql.query(`SELECT id, asset_name FROM transactions WHERE id = ANY($1)`, [
+    saved.map((s) => s.id),
+  ])) as { id: number; asset_name: string }[];
+  const byId = new Map(current.map((r) => [r.id, r.asset_name]));
+
+  const changes = saved
+    .map((s) => ({ id: s.id, doc_id: s.doc_id, before: byId.get(s.id) ?? "", after: stripAssetDetail(s.before) }))
+    .filter((c) => c.before && c.after && c.after !== c.before);
+
+  console.log(`${saved.length} row(s) in ${path}, ${changes.length} differ from what is stored`);
+  for (const c of changes) {
+    console.log(`  ${c.id}\n    stored ${JSON.stringify(c.before)}\n    rule   ${JSON.stringify(c.after)}`);
+  }
+  if (!apply) {
+    console.log("\nDry run, nothing written. Add --apply to write.");
+    return;
+  }
+  for (const c of changes) {
+    await sql.query(`UPDATE transactions SET asset_name = $1 WHERE id = $2`, [c.after, c.id]);
+  }
+  console.log(`\nUpdated ${changes.length} row(s).`);
+}
+
 async function main() {
   const apply = process.argv.includes("--apply");
+
+  const backupFlag = process.argv.indexOf("--from-backup");
+  if (backupFlag !== -1) {
+    const path = process.argv[backupFlag + 1];
+    if (!path) throw new Error("--from-backup needs a file path");
+    return fromBackup(path, apply);
+  }
 
   const rows = (await sql.query(
     `SELECT t.id, t.doc_id, t.asset_name, f.parse_status

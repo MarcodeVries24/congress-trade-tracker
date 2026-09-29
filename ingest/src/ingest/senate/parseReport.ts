@@ -84,10 +84,51 @@ export function normalizeTickerCell(cell: string | undefined): string | null {
  * If a cell somehow leads with the block, the original text is kept rather
  * than returning nothing.
  */
+/**
+ * Names that describe what was traded without saying whose it was. A filer is
+ * free to put one of these in the Asset Name field, and five rows did, which
+ * leaves the entity's identity only in the Company part of the detail block.
+ *
+ * Deliberately a closed list of shapes rather than a length or word-count
+ * heuristic: "More" is a whole company name and "Business Entity" is not, and
+ * nothing about the strings themselves separates those two. Anything that does
+ * not match keeps the filer's own wording, so the cost of this list being
+ * incomplete is the old behaviour, not a wrong name.
+ */
+const PLACEHOLDER_ASSET_NAME =
+  /^(?:business entity|(?:shares? of )?stock|common stock|(?:series [\w-]+ )?preferred stock|(?:membership|partnership|llc) interests?)$/i;
+
+/** The last parenthesised group, which in the Company part is its location. */
+function dropTrailingParenthetical(text: string): string {
+  if (!text.endsWith(")")) return text;
+  let depth = 0;
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === ")") depth++;
+    else if (text[i] === "(") {
+      depth--;
+      if (depth === 0) return text.slice(0, i).trimEnd() || text;
+    }
+  }
+  return text;
+}
+
+/** The company named in the detail block, without its city and state. */
+function companyFromDetail(text: string): string | null {
+  const match = text.match(/\sCompany:\s(.+)$/);
+  if (!match) return null;
+  const company = dropTrailingParenthetical(match[1].split(/\sDescription:\s/)[0].trim());
+  return company || null;
+}
+
 export function stripAssetDetail(cell: string | undefined): string {
   const text = (cell ?? "").trim();
   const name = text.split(/\s(?:Company|Description):\s/)[0].trim();
-  return name || text;
+  if (!name) return text;
+  // "Business Entity" names nothing. Where the filer left a placeholder, the
+  // company in the detail block is the only identity the row has, so it
+  // becomes the name rather than being dropped with the rest of the block.
+  if (PLACEHOLDER_ASSET_NAME.test(name)) return companyFromDetail(text) ?? name;
+  return name;
 }
 
 export async function parseSenateReportPage(page: Page): Promise<SenateTransaction[] | null> {

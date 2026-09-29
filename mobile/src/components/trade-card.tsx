@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View, useColorScheme } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
@@ -25,9 +26,15 @@ export function TradeCard({ trade }: { trade: Trade }) {
   const colors = Colors[scheme];
   const tone = transactionTone(trade.transaction_type);
   const toneColor = TONE_COLORS[tone][scheme];
+  const router = useRouter();
 
+  // router.push rather than <Link asChild>: asChild renders an anchor around
+  // the card, and on web that anchor's inline layout collapsed the card's
+  // background and its party bar.
   return (
-    <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+    <Pressable
+      onPress={() => router.push({ pathname: '/trade/[id]', params: { id: String(trade.id) } })}
+      style={({ pressed }) => [styles.card, { backgroundColor: colors.backgroundElement, opacity: pressed ? 0.7 : 1 }]}>
       <View style={[styles.partyBar, { backgroundColor: partyColor(trade.party) }]} />
 
       <View style={styles.body}>
@@ -64,7 +71,7 @@ export function TradeCard({ trade }: { trade: Trade }) {
           </ThemedText>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

@@ -16,6 +16,7 @@ import { ThemedView } from '@/components/themed-view';
 import { TradeCard } from '@/components/trade-card';
 import { Colors } from '@/constants/theme';
 import { fetchTrades, type Trade } from '@/lib/api';
+import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
 
 const PAGE_SIZE = 25;
@@ -57,6 +58,7 @@ export default function TradesScreen() {
       try {
         const selected = CHAMBERS.find((c) => c.key === chamber)!.value;
         const res = await fetchTrades({ page: nextPage, limit: PAGE_SIZE, chamber: [...selected] }, await authed());
+        rememberTrades(res.data);
         setTrades((prev) => (replace ? res.data : [...prev, ...res.data]));
         setPage(res.page);
         setTotalPages(res.totalPages);

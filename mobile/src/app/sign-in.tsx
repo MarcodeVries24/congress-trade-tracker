@@ -1,8 +1,18 @@
 import { useOAuth, useAuth, useUser } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useColorScheme,
+} from 'react-native';
 
+import { EmailSignIn } from '@/components/email-sign-in';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -75,36 +85,61 @@ export default function SignInScreen() {
     );
   }
 
+  // Scrollable and keyboard-aware now that there are text fields: on a small
+  // phone the keyboard would otherwise cover the email form it just opened for.
   return (
-    <ThemedView style={styles.screen}>
-      <ThemedText style={styles.title}>Your CongTrade account</ThemedText>
-      <ThemedText style={[styles.body, { color: colors.textSecondary }]}>
-        The same account as the website. Your plan and your saved alerts come with you.
-      </ThemedText>
+    <ThemedView style={styles.fill}>
+      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+          <ThemedText style={styles.title}>Your CongTrade account</ThemedText>
+          <ThemedText style={[styles.body, { color: colors.textSecondary }]}>
+            The same account as the website. Your plan and your saved alerts come with you.
+          </ThemedText>
 
-      <View style={styles.buttons}>
-        {PROVIDERS.map((p) => (
-          <Pressable
-            key={p.strategy}
-            disabled={busy !== null}
-            onPress={() => start(p.strategy)}
-            style={[styles.button, { backgroundColor: colors.backgroundElement, opacity: busy ? 0.6 : 1 }]}>
-            {busy === p.strategy ? <ActivityIndicator /> : <ThemedText style={styles.buttonLabel}>{p.label}</ThemedText>}
-          </Pressable>
-        ))}
-      </View>
+          <View style={styles.buttons}>
+            {PROVIDERS.map((p) => (
+              <Pressable
+                key={p.strategy}
+                disabled={busy !== null}
+                onPress={() => start(p.strategy)}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: colors.backgroundElement,
+                    opacity: busy ? 0.6 : 1,
+                  },
+                ]}>
+                {busy === p.strategy ? (
+                  <ActivityIndicator />
+                ) : (
+                  <ThemedText style={styles.buttonLabel}>{p.label}</ThemedText>
+                )}
+              </Pressable>
+            ))}
+          </View>
 
-      {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+          {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+
+          <EmailSignIn />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', gap: 10, padding: 28 },
+  fill: { flex: 1 },
+  screen: { flexGrow: 1, justifyContent: 'center', gap: 10, padding: 28 },
   title: { fontSize: 22, fontWeight: '700' },
   body: { fontSize: 14, lineHeight: 20 },
   buttons: { marginTop: 16, gap: 10 },
-  button: { alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 12, paddingHorizontal: 18 },
+  button: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+  },
   buttonLabel: { fontSize: 15, fontWeight: '600' },
   error: { marginTop: 12, fontSize: 13, color: '#d6455d' },
 });

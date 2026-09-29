@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { appleApiConfigured, subscriptionStatusFor } from "@/lib/appleStore";
+import { accountTokenFor } from "@/lib/storeAccountToken";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
 /**
@@ -44,11 +45,12 @@ export async function POST(req: NextRequest) {
 
   const { status, transaction } = result;
 
-  // The transaction has to belong to this account. appAccountToken is set by
-  // the app at purchase time, and a mismatch means someone is presenting
-  // somebody else's transaction id: answer honestly about it granting them
-  // nothing rather than attaching it to whoever happens to be signed in.
-  if (transaction.appAccountToken && transaction.appAccountToken !== userId) {
+  // The transaction has to belong to this account. The token is the UUID we
+  // issued for this user, not the Clerk id, because that is all StoreKit will
+  // carry. A mismatch means someone is presenting somebody else's transaction:
+  // say it grants them nothing rather than attaching it to whoever is signed in.
+  const expectedToken = await accountTokenFor(userId);
+  if (transaction.appAccountToken && transaction.appAccountToken !== expectedToken) {
     console.error("[apple] transaction belongs to another account", { userId, originalTransactionId });
     return NextResponse.json({ entitled: false, reason: "other-account" }, { status: 409 });
   }

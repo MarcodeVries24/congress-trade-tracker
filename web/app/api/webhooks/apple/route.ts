@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appleNotificationsConfigured, statusForNotification, verifyNotification, verifyTransaction } from "@/lib/appleStore";
+import { userForAccountToken } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -61,14 +62,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid transaction" }, { status: 400 });
   }
 
-  // appAccountToken is the Clerk user id, set by the app when it starts the
-  // purchase. It is the only thing tying a receipt to an account, which is why
-  // the app must always send it and why a purchase without one is recorded
-  // nowhere rather than guessed at.
-  const clerkUserId = transaction.appAccountToken;
+  // appAccountToken is a UUID we issued, not the Clerk id itself: StoreKit
+  // only carries UUIDs and drops anything else silently. Resolving it is the
+  // only thing tying a receipt to an account, so a purchase we cannot resolve
+  // is recorded nowhere rather than attached to a guess.
+  const accountToken = transaction.appAccountToken;
+  const clerkUserId = accountToken ? await userForAccountToken(accountToken) : null;
   if (!clerkUserId) {
-    console.error("[apple] transaction carries no appAccountToken", {
+    console.error("[apple] could not resolve the purchase to an account", {
       notificationUUID,
+      hadToken: Boolean(accountToken),
       originalTransactionId: transaction.originalTransactionId,
     });
     return NextResponse.json({ received: true, unlinked: true });

@@ -1,14 +1,14 @@
 import { getProPricing } from '@congtrade/shared/plans';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-
-type Period = 'weekly' | 'monthly' | 'annual';
+import type { BillingPeriod } from '@/lib/products';
+import { usePurchases } from '@/lib/use-purchases';
 
 /**
  * The paywall.
@@ -17,13 +17,13 @@ type Period = 'weekly' | 'monthly' | 'annual';
  * will commit to, and the longer plans carry the saving so they argue for
  * themselves rather than being buried.
  *
- * Nothing here charges anything yet. StoreKit and Play Billing are the next
- * step, and until they land the button says so instead of pretending: an app
- * that takes a tap and does nothing is worse than one that admits it.
+ * Prices come from the store, not from us. Apple's matrix turns 4.99 euro into
+ * $4.99 in the US and A$7.99 in Australia, and the paywall has to show what
+ * will be charged. @congtrade/shared is the fallback for the web preview, which
+ * has no store to ask, and stays the figure typed into the two consoles.
  *
- * Prices come from @congtrade/shared so the app, the website and Stripe cannot
- * disagree about what Pro costs. The store products must be created with the
- * same figures, which is the one place this can still drift.
+ * The purchase itself is reported to the server, which asks Apple what it was.
+ * Nothing on this screen decides whether anyone is entitled to anything.
  */
 export default function PaywallScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -31,31 +31,36 @@ export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Euros until the store tells us the buyer's storefront. The shared module
-  // decides by country on the website; on a phone the store is the authority,
-  // and asking it is part of wiring up the purchase.
+  // Only a fallback now: the store answers with the real localised figure.
   const pricing = getProPricing('eur');
-  const [period, setPeriod] = useState<Period>('weekly');
+  const [period, setPeriod] = useState<BillingPeriod>('weekly');
+  const purchases = usePurchases(useCallback(() => router.replace('/(tabs)'), [router]));
 
-  const plans: { key: Period; title: string; price: string; note: string; badge?: string }[] = [
+  // The store's price whenever there is one. Apple's matrix turns 4.99 euro
+  // into $4.99 in the US and A$7.99 in Australia, and the paywall must show
+  // what will actually be charged. Ours is the fallback for the web preview,
+  // where there is no store to ask.
+  const storePrice = (p: BillingPeriod) => purchases.products.find((x) => x.period === p)?.displayPrice;
+
+  const plans: { key: BillingPeriod; title: string; price: string; note: string; badge?: string }[] = [
     {
       key: 'weekly',
       title: 'Weekly',
-      price: `${pricing.currencySymbol}${pricing.weekly}`,
+      price: storePrice('weekly') ?? `${pricing.currencySymbol}${pricing.weekly}`,
       note: 'per week, cancel any time',
     },
     {
       key: 'monthly',
       title: 'Monthly',
-      price: `${pricing.currencySymbol}${pricing.monthly}`,
+      price: storePrice('monthly') ?? `${pricing.currencySymbol}${pricing.monthly}`,
       note: 'per month',
       badge: pricing.monthlySavingVsWeeklyPercent ? `Save ${pricing.monthlySavingVsWeeklyPercent}%` : undefined,
     },
     {
       key: 'annual',
       title: 'Yearly',
-      price: `${pricing.currencySymbol}${pricing.annualMonthly}`,
-      note: `per month, billed as ${pricing.currencySymbol}${pricing.annualTotal}`,
+      price: storePrice('annual') ?? `${pricing.currencySymbol}${pricing.annualTotal}`,
+      note: 'per year',
       badge: pricing.annualSavingPercent ? `Save ${pricing.annualSavingPercent}%` : undefined,
     },
   ];
@@ -108,9 +113,34 @@ export default function PaywallScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable disabled style={[styles.cta, { backgroundColor: '#3b7ddd', opacity: 0.45 }]}>
-          <ThemedText style={styles.ctaLabel}>In-app purchase not wired up yet</ThemedText>
+        {purchases.error ? <ThemedText style={styles.error}>{purchases.error}</ThemedText> : null}
+        <Pressable
+          disabled={!purchases.available || purchases.busy !== null}
+          onPress={() => purchases.buy(period)}
+          style={[
+            styles.cta,
+            { backgroundColor: '#3b7ddd', opacity: purchases.available && !purchases.busy ? 1 : 0.45 },
+          ]}>
+          {purchases.busy ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <ThemedText style={styles.ctaLabel}>
+              {purchases.available ? 'Subscribe' : 'Not available on the web preview'}
+            </ThemedText>
+          )}
         </Pressable>
+
+        {/* Apple requires a visible way to restore a purchase; an app without
+            one is rejected, and rightly, because someone who has paid and
+            reinstalled has no other route back in. */}
+        {purchases.available ? (
+          <Pressable onPress={() => purchases.restore()} style={styles.secondary}>
+            <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
+              Restore purchases
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
         <Pressable onPress={() => router.replace('/(tabs)')} style={styles.secondary}>
           <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
             Skip for now, look around
@@ -149,4 +179,5 @@ const styles = StyleSheet.create({
   ctaLabel: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
   secondary: { alignItems: 'center', paddingVertical: 12 },
   secondaryLabel: { fontSize: 14 },
+  error: { fontSize: 13, color: '#f87171', textAlign: 'center', marginBottom: 8 },
 });

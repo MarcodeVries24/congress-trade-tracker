@@ -349,6 +349,20 @@ export const SCHEMA_STATEMENTS = [
   // so both will arrive twice; the id is what makes a replay free rather than
   // merely harmless. Kept apart from stripe_events because the id spaces are
   // different and a collision between them would be silent.
+  // Apple's appAccountToken is a UUID, not a free string: StoreKit parses it
+  // with UUID(uuidString:) and silently drops anything else. A Clerk id is
+  // "user_2abc...", so passing one directly would have produced a purchase that
+  // verifies perfectly and belongs to nobody, which is the worst shape of bug
+  // here — the money arrives and the access does not.
+  //
+  // So each account gets a UUID of its own, once, and the stores carry that.
+  // Android's obfuscatedAccountId takes any string but uses the same one, so
+  // there is a single answer to "whose purchase is this".
+  `CREATE TABLE IF NOT EXISTS store_account_tokens (
+    token TEXT PRIMARY KEY,
+    clerk_user_id TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
   `CREATE TABLE IF NOT EXISTS store_events (
     provider TEXT NOT NULL,
     id TEXT NOT NULL,

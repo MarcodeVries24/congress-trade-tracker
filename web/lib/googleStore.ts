@@ -14,8 +14,20 @@ import { google, type androidpublisher_v3 } from "googleapis";
  */
 const PACKAGE_NAME = "com.congtrade.app";
 
-export function googleConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_PUBSUB_VERIFICATION_TOKEN);
+/** Whether we can ask Play about a subscription. */
+export function googleApiConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+}
+
+/**
+ * Whether the Pub/Sub endpoint can be trusted to answer.
+ *
+ * Needs the shared token as well as the API key, because a push carries no
+ * signature and the token is the only thing standing between the entitlement
+ * table and anyone who finds the URL.
+ */
+export function googleNotificationsConfigured(): boolean {
+  return googleApiConfigured() && Boolean(process.env.GOOGLE_PUBSUB_VERIFICATION_TOKEN);
 }
 
 let client: androidpublisher_v3.Androidpublisher | null = null;

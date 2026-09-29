@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { useIAP } from 'expo-iap';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { API_BASE } from '@/lib/api';
 import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct } from '@/lib/products';
@@ -41,15 +42,18 @@ export function usePurchases(onEntitled: () => void): Purchases {
    * that transaction is. A client that lies gets nothing back.
    */
   const report = useCallback(
-    async (originalTransactionId: string) => {
+    async (body: { originalTransactionId: string } | { purchaseToken: string }) => {
       const session = await getToken();
-      const res = await fetch(`${API_BASE}/api/store/apple`, {
+      // Each store answers about its own purchases, so the endpoint follows the
+      // platform rather than the shape of what came back.
+      const path = 'purchaseToken' in body ? '/api/store/google' : '/api/store/apple';
+      const res = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           ...(session ? { authorization: `Bearer ${session}` } : {}),
         },
-        body: JSON.stringify({ originalTransactionId }),
+        body: JSON.stringify(body),
       });
       const data = (await res.json().catch(() => ({}))) as { entitled?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? `Could not confirm the purchase (${res.status}).`);
@@ -60,18 +64,18 @@ export function usePurchases(onEntitled: () => void): Purchases {
 
   const iap = useIAP({
     onPurchaseSuccess: (purchase) => {
-      // iOS ties every renewal to the original transaction, which is the handle
-      // the server asks Apple about. Android has no equivalent, so the purchase
-      // token stands in until the Play half is wired.
-      // Purchase is a union: only the iOS arm carries the original transaction
-      // id, so it is narrowed rather than reached for.
-      const id =
+      // iOS ties every renewal to the original transaction; Play identifies a
+      // subscription by its purchase token. Purchase is a union, so each is
+      // narrowed rather than reached for.
+      const payload =
         'originalTransactionIdentifierIOS' in purchase
-          ? (purchase.originalTransactionIdentifierIOS ?? purchase.transactionId)
-          : purchase.transactionId;
+          ? { originalTransactionId: purchase.originalTransactionIdentifierIOS ?? purchase.transactionId }
+          : purchase.purchaseToken
+            ? { purchaseToken: purchase.purchaseToken }
+            : null;
       void (async () => {
         try {
-          if (id) await report(id);
+          if (payload) await report(payload);
           // Only after the server has accepted it. Finishing first would tell
           // the store we are done with a purchase we might have failed to
           // record, and the store would never mention it again.
@@ -151,11 +155,26 @@ export function usePurchases(onEntitled: () => void): Purchases {
       }
       setBusy(period);
       try {
+        // Play requires the offer token for the base plan being bought; a
+        // subscription purchase without one is rejected outright. Apple has no
+        // equivalent, which is why this is built per platform.
+        const found = subscriptions.find((s) => s.id === product.id);
+        const offers =
+          Platform.OS === 'android' && found && 'subscriptionOffers' in found
+            ? (found.subscriptionOffers ?? [])
+                .map((o) => o.offerTokenAndroid)
+                .filter((token): token is string => Boolean(token))
+                .map((offerToken) => ({ sku: product.id, offerToken }))
+            : [];
         await requestPurchase({
           type: 'subs',
           request: {
             apple: { sku: product.id, appAccountToken: accountToken.current },
-            google: { skus: [product.id], obfuscatedAccountId: accountToken.current },
+            google: {
+              skus: [product.id],
+              obfuscatedAccountId: accountToken.current,
+              ...(offers.length ? { subscriptionOffers: offers } : {}),
+            },
           },
         });
       } catch (err) {
@@ -163,7 +182,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
         setBusy(null);
       }
     },
-    [products, requestPurchase]
+    [products, requestPurchase, subscriptions]
   );
 
   /** Required by Apple: someone reinstalling must get back what they paid for. */

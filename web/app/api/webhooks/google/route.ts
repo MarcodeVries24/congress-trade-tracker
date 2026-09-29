@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchSubscriptionState, googleConfigured } from "@/lib/googleStore";
+import { fetchSubscriptionState, googleNotificationsConfigured } from "@/lib/googleStore";
+import { userForAccountToken } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -17,7 +18,7 @@ import { upsertSubscription } from "@/lib/subscriptionWrite";
  * credential rather than an address.
  */
 export async function POST(req: NextRequest) {
-  if (!googleConfigured()) {
+  if (!googleNotificationsConfigured()) {
     return NextResponse.json({ error: "Play notifications are not configured" }, { status: 503 });
   }
 
@@ -70,13 +71,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not read subscription state" }, { status: 503 });
   }
 
-  if (!state.clerkUserId) {
-    console.error("[google] purchase carries no obfuscatedExternalAccountId", { messageId });
+  // obfuscatedExternalAccountId carries the UUID we issued, not a Clerk id, so
+  // that one answer works for both stores. A purchase we cannot resolve is
+  // recorded nowhere rather than attached to a guess.
+  const clerkUserId = state.clerkUserId ? await userForAccountToken(state.clerkUserId) : null;
+  if (!clerkUserId) {
+    console.error("[google] could not resolve the purchase to an account", {
+      messageId,
+      hadToken: Boolean(state.clerkUserId),
+    });
     return NextResponse.json({ received: true, unlinked: true });
   }
 
   await upsertSubscription({
-    clerkUserId: state.clerkUserId,
+    clerkUserId,
     provider: "google",
     // The purchase token is the stable handle, except that an upgrade issues a
     // new one and points it at the old via linkedPurchaseToken.

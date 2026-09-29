@@ -67,6 +67,29 @@ export function normalizeTickerCell(cell: string | undefined): string | null {
   return parts.length ? parts[parts.length - 1] : null;
 }
 
+/**
+ * The Asset Name cell of an eFD report holds the name the filer typed and,
+ * for a non-public holding, a detail block rendered inside the same cell:
+ *
+ *   MH Built to Last LLC Company: MH Built to Last LLC (New York, NY) Description: Partnership
+ *
+ * textContent flattens the two into one string, so the company blurb ended up
+ * inside the asset name on 107 rows across 23 senators. The name is what the
+ * site puts in a table row, and "Business Entity Company: Arp & Hammond
+ * Hardware Company (Cheyenne, Wyoming) Description: Real Estate" is not a name
+ * anyone can read there, so the block is dropped.
+ *
+ * Split on the labels rather than on the detail's shape: they are literal,
+ * they are what the page renders, and no security is named "... Company: ...".
+ * If a cell somehow leads with the block, the original text is kept rather
+ * than returning nothing.
+ */
+export function stripAssetDetail(cell: string | undefined): string {
+  const text = (cell ?? "").trim();
+  const name = text.split(/\s(?:Company|Description):\s/)[0].trim();
+  return name || text;
+}
+
 export async function parseSenateReportPage(page: Page): Promise<SenateTransaction[] | null> {
   const hasTable = await page.locator("table thead th", { hasText: "Transaction Date" }).count();
   if (hasTable === 0) return null;
@@ -94,7 +117,7 @@ export async function parseSenateReportPage(page: Page): Promise<SenateTransacti
       transactionDate: toIsoDateSlash(dateCell),
       owner,
       ticker,
-      assetName: assetNameCell || "(unknown asset)",
+      assetName: stripAssetDetail(assetNameCell) || "(unknown asset)",
       assetTypeCode: assetTypeCell || null,
       transactionType,
       amountRange: amountCell,

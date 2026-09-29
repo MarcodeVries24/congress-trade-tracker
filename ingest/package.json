@@ -13,7 +13,8 @@
     "alerts:send": "tsx src/alerts/sendAlerts.ts",
     "review:queue": "tsx src/ingest/reviewQueue.ts",
     "review:approve": "tsx src/ingest/approveFiling.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "backfill:asset-names": "tsx src/ingest/backfillAssetNames.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

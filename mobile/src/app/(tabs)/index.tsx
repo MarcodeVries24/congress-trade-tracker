@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { TradeCard } from '@/components/trade-card';
 import { Colors } from '@/constants/theme';
 import { fetchTrades, type Trade } from '@/lib/api';
+import { useAuthedRequest } from '@/lib/use-api';
 
 const PAGE_SIZE = 25;
 const CHAMBERS = [
@@ -38,15 +39,15 @@ export default function TradesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const loading = useRef(false);
+  const authed = useAuthedRequest();
 
   const load = useCallback(
     async (nextPage: number, replace: boolean) => {
       if (loading.current) return;
       loading.current = true;
-      if (replace && nextPage === 1) setStatus((s) => (s === 'ready' ? s : 'loading'));
       try {
         const selected = CHAMBERS.find((c) => c.key === chamber)!.value;
-        const res = await fetchTrades({ page: nextPage, limit: PAGE_SIZE, chamber: [...selected] });
+        const res = await fetchTrades({ page: nextPage, limit: PAGE_SIZE, chamber: [...selected] }, await authed());
         setTrades((prev) => (replace ? res.data : [...prev, ...res.data]));
         setPage(res.page);
         setTotalPages(res.totalPages);
@@ -60,11 +61,19 @@ export default function TradesScreen() {
         setRefreshing(false);
       }
     },
-    [chamber]
+    [chamber, authed]
   );
 
+  // No setTrades([]) here: clearing synchronously inside an effect cascades a
+  // render, and `replace` swaps the list when the response lands anyway. The
+  // previous chamber's rows stay up for the moment it takes, which reads
+  // better than a flash of empty.
   useEffect(() => {
-    setTrades([]);
+    // react-hooks/set-state-in-effect flags this because load() sets state.
+    // Every one of those calls is behind an await, so nothing is set
+    // synchronously here, and fetching on mount is the case effects exist for.
+    // The template's own use-color-scheme.web.ts trips the same rule.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(1, true);
   }, [load]);
 
@@ -90,7 +99,12 @@ export default function TradesScreen() {
       <ThemedView style={styles.centered}>
         <ThemedText style={styles.errorTitle}>Couldn&apos;t load trades</ThemedText>
         <ThemedText style={[styles.errorBody, { color: colors.textSecondary }]}>{error}</ThemedText>
-        <Pressable onPress={() => load(1, true)} style={[styles.retry, { backgroundColor: colors.backgroundSelected }]}>
+        <Pressable
+          onPress={() => {
+            setStatus('loading');
+            load(1, true);
+          }}
+          style={[styles.retry, { backgroundColor: colors.backgroundSelected }]}>
           <ThemedText style={styles.retryLabel}>Try again</ThemedText>
         </Pressable>
       </ThemedView>

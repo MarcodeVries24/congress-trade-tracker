@@ -37,6 +37,9 @@ export function EmailSignIn() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeAvailable, setCodeAvailable] = useState(false);
+  // Whether the code being asked for is the sign-in itself or the check that
+  // follows a correct password, since Clerk verifies those through different calls.
+  const [codeIsSecondFactor, setCodeIsSecondFactor] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +64,7 @@ export function EmailSignIn() {
       strategy: 'email_code',
       emailAddressId: factor.emailAddressId,
     });
+    setCodeIsSecondFactor(false);
     setStep('code');
   };
 
@@ -92,6 +96,23 @@ export function EmailSignIn() {
         strategy: 'password',
         password,
       });
+      if (result.status === 'needs_second_factor') {
+        // Device Trust: the first password sign-in on a device is confirmed
+        // with a code sent to the account's email, so a leaked password alone
+        // is not enough. Every phone is a new device the first time.
+        const factor = result.supportedSecondFactors?.find((f) => f.strategy === 'email_code');
+        if (!factor) {
+          setError('This account needs a second step this app does not support yet.');
+          return;
+        }
+        await result.prepareSecondFactor({
+          strategy: 'email_code',
+          ...('emailAddressId' in factor ? { emailAddressId: factor.emailAddressId } : {}),
+        });
+        setCodeIsSecondFactor(true);
+        setStep('code');
+        return;
+      }
       await finish(result.status === 'complete' ? result.createdSessionId : null);
     } catch (err) {
       setError(messageFrom(err, 'That password did not work.'));
@@ -105,10 +126,10 @@ export function EmailSignIn() {
     setError(null);
     setBusy(true);
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: 'email_code',
-        code: code.trim(),
-      });
+      const attempt = { strategy: 'email_code', code: code.trim() } as const;
+      const result = codeIsSecondFactor
+        ? await signIn.attemptSecondFactor(attempt)
+        : await signIn.attemptFirstFactor(attempt);
       await finish(result.status === 'complete' ? result.createdSessionId : null);
     } catch (err) {
       setError(messageFrom(err, 'That code did not work.'));
@@ -133,6 +154,7 @@ export function EmailSignIn() {
     setStep('email');
     setPassword('');
     setCode('');
+    setCodeIsSecondFactor(false);
     setError(null);
   };
 
@@ -193,7 +215,9 @@ export function EmailSignIn() {
       {step === 'code' ? (
         <>
           <ThemedText style={[styles.hint, { color: colors.textSecondary }]}>
-            We sent a six-digit code to that address.
+            {codeIsSecondFactor
+              ? 'First sign-in on this device. We sent a six-digit code to that address to confirm it is you.'
+              : 'We sent a six-digit code to that address.'}
           </ThemedText>
           <TextInput
             value={code}

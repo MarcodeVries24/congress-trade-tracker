@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { billingConfigured } from "@/lib/stripePrices";
-import { getSubscription } from "@/lib/subscription";
+import { getSubscriptionFor } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
 
 /**
@@ -18,11 +18,18 @@ export async function POST() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
-  const subscription = await getSubscription(userId);
-  if (!subscription) return NextResponse.json({ error: "No subscription to manage" }, { status: 404 });
+  // The Stripe row specifically: a customer of the billing portal is a Stripe
+  // customer, and an App Store subscriber is managed in the App Store.
+  const subscription = await getSubscriptionFor(userId, "stripe");
+  // The column is nullable now, because a store subscription has no Stripe
+  // customer. A Stripe row without one should not exist, but the portal cannot
+  // be opened without it either way, so it is refused rather than asserted.
+  if (!subscription?.provider_account_id) {
+    return NextResponse.json({ error: "No subscription to manage" }, { status: 404 });
+  }
 
   const session = await stripe().billingPortal.sessions.create({
-    customer: subscription.stripe_customer_id,
+    customer: subscription.provider_account_id,
     return_url: `${SITE_URL}/account`,
   });
 

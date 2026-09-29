@@ -292,6 +292,51 @@ export const SCHEMA_STATEMENTS = [
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(stripe_customer_id)`,
+  // --- Provider-neutral columns, for the mobile app's in-app purchases. ---
+  //
+  // Apple and Google bill the app; Stripe bills the website. One person can
+  // hold a subscription from more than one of them, so the key is the pair and
+  // access is "any row grants it" (see grantsAccess in @congtrade/shared).
+  //
+  // Added alongside the stripe_* columns rather than renaming them, so that the
+  // deployed site keeps working while the new build rolls out. The old columns
+  // are dropped in a later pass, once nothing reads them.
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'`,
+  // What the provider calls the payer: a Stripe customer, or the original
+  // transaction the store ties every renewal of a subscription back to.
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS provider_account_id TEXT`,
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS provider_subscription_id TEXT`,
+  // Stripe calls it a price, the stores call it a product. Same job.
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS product_id TEXT`,
+  // A store subscription has no Stripe customer, so the old NOT NULL cannot
+  // stand. Guarded because a fresh database creates the column without it.
+  `DO $$ BEGIN
+     IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'subscriptions' AND column_name = 'stripe_customer_id'
+                  AND is_nullable = 'NO')
+     THEN ALTER TABLE subscriptions ALTER COLUMN stripe_customer_id DROP NOT NULL; END IF;
+   END $$`,
+  // Carry anything already stored under the Stripe names across.
+  `UPDATE subscriptions SET
+     provider_account_id = COALESCE(provider_account_id, stripe_customer_id),
+     provider_subscription_id = COALESCE(provider_subscription_id, stripe_subscription_id),
+     product_id = COALESCE(product_id, price_id)
+   WHERE provider_account_id IS NULL OR provider_subscription_id IS NULL OR product_id IS NULL`,
+  // The key becomes the pair. Done only when it is still the old single-column
+  // key, so re-running this is free.
+  `DO $$ BEGIN
+     IF EXISTS (SELECT 1 FROM pg_index i
+                JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'subscriptions_pkey' AND i.indnatts = 1)
+     THEN
+       ALTER TABLE subscriptions DROP CONSTRAINT subscriptions_pkey;
+       ALTER TABLE subscriptions ADD PRIMARY KEY (clerk_user_id, provider);
+     END IF;
+   END $$`,
+  // One account per provider, rather than one Stripe customer overall.
+  `DROP INDEX IF EXISTS idx_subscriptions_customer`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_provider_account
+     ON subscriptions(provider, provider_account_id) WHERE provider_account_id IS NOT NULL`,
   // Stripe redelivers webhooks, and out of order. Recording every event id we
   // have already applied makes replays free rather than merely harmless.
   `CREATE TABLE IF NOT EXISTS stripe_events (

@@ -3,7 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { priceIdFor, billingConfigured, BILLING_PERIODS, type BillingPeriod } from "@/lib/stripePrices";
 import { currencyForRequest } from "@/lib/currency";
-import { getSubscription } from "@/lib/subscription";
+import { getSubscriptionFor } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
 
 /**
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     // Reuse the customer if this person has ever paid, so Stripe keeps one
     // customer per human rather than one per checkout.
-    const existing = await getSubscription(userId);
+    const existing = await getSubscriptionFor(userId, "stripe");
     const user = await currentUser();
     const email = user?.primaryEmailAddress?.emailAddress;
 
@@ -58,7 +58,11 @@ export async function POST(req: NextRequest) {
     const session = await stripe().checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceIdFor(period, currency), quantity: 1 }],
-      ...(existing ? { customer: existing.stripe_customer_id } : email ? { customer_email: email } : {}),
+      ...(existing?.provider_account_id
+        ? { customer: existing.provider_account_id }
+        : email
+          ? { customer_email: email }
+          : {}),
       // The link back to the Clerk user. Stripe echoes this on every event for
       // the resulting subscription, which is what lets the webhook know whose
       // access to open without a lookup table of its own.

@@ -1,7 +1,8 @@
 import { sql } from "@/lib/db";
+import type { SubscriptionProvider } from "@/lib/subscriptionAccess";
 
 /**
- * The write half of the subscriptions table, used only by the Stripe webhook.
+ * The write half of the subscriptions table, used by each provider's webhook.
  *
  * Kept apart from the read helpers so that the one place allowed to change
  * who has access is easy to find, and so nothing on a page can import a
@@ -9,16 +10,18 @@ import { sql } from "@/lib/db";
  */
 export type SubscriptionUpsert = {
   clerkUserId: string;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string | null;
+  /** Defaults to Stripe, which is the only writer until the app ships. */
+  provider?: SubscriptionProvider;
+  providerAccountId: string | null;
+  providerSubscriptionId: string | null;
   status: string;
-  priceId: string | null;
+  productId: string | null;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
 };
 
 /**
- * One row per user, replaced wholesale.
+ * One row per user per provider, replaced wholesale.
  *
  * Stripe redelivers events and does not promise order, so this is written to
  * be safe to apply twice and harmless to apply late: the row simply ends up
@@ -27,23 +30,31 @@ export type SubscriptionUpsert = {
  */
 export async function upsertSubscription(input: SubscriptionUpsert): Promise<void> {
   await sql.query(
-    `INSERT INTO subscriptions (clerk_user_id, stripe_customer_id, stripe_subscription_id,
-                                status, price_id, current_period_end, cancel_at_period_end, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-     ON CONFLICT (clerk_user_id) DO UPDATE SET
-       stripe_customer_id = EXCLUDED.stripe_customer_id,
-       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+    // The conflict target is the pair, so a Stripe update cannot overwrite the
+    // same person's App Store row. stripe_customer_id is still written for now
+    // because the deployed build reads it until this one replaces it.
+    `INSERT INTO subscriptions (clerk_user_id, provider, provider_account_id, provider_subscription_id,
+                                status, product_id, current_period_end, cancel_at_period_end,
+                                stripe_customer_id, stripe_subscription_id, price_id, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $3, $4, $6, NOW())
+     ON CONFLICT (clerk_user_id, provider) DO UPDATE SET
+       provider_account_id = EXCLUDED.provider_account_id,
+       provider_subscription_id = EXCLUDED.provider_subscription_id,
        status = EXCLUDED.status,
-       price_id = EXCLUDED.price_id,
+       product_id = EXCLUDED.product_id,
        current_period_end = EXCLUDED.current_period_end,
        cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+       stripe_customer_id = EXCLUDED.stripe_customer_id,
+       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+       price_id = EXCLUDED.price_id,
        updated_at = NOW()`,
     [
       input.clerkUserId,
-      input.stripeCustomerId,
-      input.stripeSubscriptionId,
+      input.provider ?? "stripe",
+      input.providerAccountId,
+      input.providerSubscriptionId,
       input.status,
-      input.priceId,
+      input.productId,
       input.currentPeriodEnd ? input.currentPeriodEnd.toISOString() : null,
       input.cancelAtPeriodEnd,
     ]

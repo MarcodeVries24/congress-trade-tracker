@@ -1,5 +1,5 @@
 import { sql } from "../db/index.js";
-import { grantsAccess, type SubscriptionRow } from "../../../web/lib/subscriptionAccess";
+import { anyGrantsAccess, type SubscriptionRow } from "@congtrade/shared/subscriptionAccess";
 
 const CLERK_API = "https://api.clerk.com/v1";
 /** Only used to see whether an account is comped; the plan itself is local. */
@@ -36,23 +36,31 @@ type Probe =
   | { kind: "missing" }
   | { kind: "error"; reason: string };
 
-/** Whether our own subscriptions table grants this user access. */
-async function readSubscription(userId: string): Promise<SubscriptionRow | null> {
-  const rows = (await sql.query(
-    `SELECT clerk_user_id, stripe_customer_id, stripe_subscription_id, status, price_id,
-            current_period_end, cancel_at_period_end
+/**
+ * Every subscription this user holds, across providers.
+ *
+ * Plural for the same reason the website's version is: one person can be
+ * paying Stripe for the website and Apple for the app, and reading only the
+ * first row would let a cancelled one hide a live one.
+ */
+async function readSubscriptions(userId: string): Promise<SubscriptionRow[]> {
+  return (await sql.query(
+    `SELECT clerk_user_id, provider, provider_account_id, provider_subscription_id,
+            status, product_id, current_period_end, cancel_at_period_end
      FROM subscriptions WHERE clerk_user_id = $1`,
     [userId]
   )) as SubscriptionRow[];
-  return rows[0] ?? null;
 }
 
 async function probeClerk(userId: string): Promise<Probe> {
   // The local table first, because it answers for every paying subscriber
   // without leaving the process. Stripe's webhook keeps it current; the same
   // rule decides access here and in the browser (web/lib/subscriptionAccess).
-  const row = await readSubscription(userId);
-  if (grantsAccess(row)) return { kind: "entitled", planSlug: row?.price_id ?? null, source: "stripe" };
+  const rows = await readSubscriptions(userId);
+  if (anyGrantsAccess(rows)) {
+    const granting = rows.find((r) => r.status !== "canceled") ?? rows[0];
+    return { kind: "entitled", planSlug: granting?.product_id ?? null, source: granting?.provider ?? "stripe" };
+  }
 
   // Only accounts with nothing paid reach Clerk, and only to see whether they
   // are comped with {"admin": true} — the operator's own alerts must not be

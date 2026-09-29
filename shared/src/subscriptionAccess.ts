@@ -6,12 +6,23 @@
  * standalone script in another workspace. One rule, one place, no database
  * client dragged along behind it.
  */
+/**
+ * Who billed for it. Stripe bills the website, the two stores bill the app.
+ *
+ * Kept as a plain union rather than an enum so the database column and this
+ * type can be read side by side without a translation step.
+ */
+export type SubscriptionProvider = "stripe" | "apple" | "google";
+
 export type SubscriptionRow = {
   clerk_user_id: string;
-  stripe_customer_id: string;
-  stripe_subscription_id: string | null;
+  provider: SubscriptionProvider;
+  /** A Stripe customer, or the original store transaction renewals hang off. */
+  provider_account_id: string | null;
+  provider_subscription_id: string | null;
   status: string;
-  price_id: string | null;
+  /** Stripe calls it a price, the stores call it a product. */
+  product_id: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
 };
@@ -37,4 +48,24 @@ export function grantsAccess(row: SubscriptionRow | null): boolean {
     return new Date(row.current_period_end).getTime() > Date.now();
   }
   return false;
+}
+
+/**
+ * Whether any of a person's subscriptions grants access.
+ *
+ * One human can hold more than one: someone who subscribed on the website and
+ * later reinstalled the app through the App Store has a Stripe row and an Apple
+ * row, and cancelling either must not shut the other one off. So the question
+ * is "does any of these grant it", never "what does the first row say".
+ */
+export function anyGrantsAccess(rows: readonly SubscriptionRow[]): boolean {
+  return rows.some((row) => grantsAccess(row));
+}
+
+/** The row to act on for one provider, for the Stripe portal and the stores. */
+export function rowForProvider(
+  rows: readonly SubscriptionRow[],
+  provider: SubscriptionProvider
+): SubscriptionRow | null {
+  return rows.find((row) => row.provider === provider) ?? null;
 }

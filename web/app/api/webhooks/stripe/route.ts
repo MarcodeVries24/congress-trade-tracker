@@ -122,10 +122,11 @@ async function record(subscription: Stripe.Subscription, fallbackUserId: string 
 
   await upsertSubscription({
     clerkUserId,
-    stripeCustomerId: customerId,
-    stripeSubscriptionId: subscription.id,
+    provider: "stripe",
+    providerAccountId: customerId,
+    providerSubscriptionId: subscription.id,
     status: subscription.status,
-    priceId: item?.price?.id ?? null,
+    productId: item?.price?.id ?? null,
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
   });

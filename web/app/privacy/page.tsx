@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "How CongTrade handles data.",
 };
 
-const LAST_UPDATED = "September 28, 2026";
+const LAST_UPDATED = "September 30, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -28,26 +28,36 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="2. The short version">
+        <LegalSection title="2. What this policy covers">
           <p>
-            All of the trading data shown on the Site is public government filing data, not personal data about
-            visitors. Browsing and searching the Site doesn&rsquo;t require an account. If you create an account to
-            use paid features, we collect the minimum needed to run that account and subscription, mostly handled by
-            our providers (Clerk for accounts, Stripe for payment) rather than stored by us directly. The one
-            exception is email alerts, which need your address and your saved criteria in our own database in order
-            to send anything. The sections below cover what that involves, plus the ordinary technical data
-            inherent to running a website with ads.
+            This policy covers the CongTrade website at congtrade.com and the CongTrade apps for iPhone and Android.
+            They share one account system and one set of data, so everything below applies whichever you use, and
+            where the apps differ from the website, section 8 says so.
           </p>
         </LegalSection>
 
-        <LegalSection title="3. Accounts">
+        <LegalSection title="3. The short version">
+          <p>
+            All of the trading data shown in CongTrade is public government filing data, not personal data about
+            you. Browsing the website doesn&rsquo;t require an account. If you create an account, we collect the
+            minimum needed to run that account and subscription, mostly handled by our providers (Clerk for
+            accounts; Stripe, Apple or Google for payment) rather than stored by us directly. The one
+            exception is email alerts, which need your address and your saved criteria in our own database in order
+            to send anything. The apps collect nothing beyond that: no location, no contacts, no photos, no
+            analytics and no advertising identifiers.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="4. Accounts">
           <p>
             Creating an account is optional and only needed for paid features (filters, alerts, an ad-free view).
             Accounts are handled by our authentication provider, Clerk. You can sign up with an email address, a
             Google account, or an Apple account. If you sign in with Apple and choose to hide your email address,
             we receive Apple&rsquo;s relay address instead of your real one, and alerts are delivered through it.
-            Clerk stores your email address, authentication method, and account metadata, and sets
-            cookies needed to keep you signed in. See{" "}
+            If you sign in with Google or Apple, that provider also shares the name on your account, and Google
+            shares your profile picture; Clerk stores them with your account, and neither is used for anything else.
+            Clerk stores your email address, authentication method, and account metadata, and keeps you signed in
+            with a cookie on the website and a securely stored token in the apps. See{" "}
             <a href="https://clerk.com/privacy" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
               Clerk&rsquo;s privacy policy
             </a>{" "}
@@ -55,7 +65,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="4. Email alerts">
+        <LegalSection title="5. Email alerts">
           <p>
             CongTrade Pro subscribers can save alerts, each one a set of filter criteria, and be emailed
             when a new public filing matches. To send those emails we store, in our own database: the criteria you
@@ -72,7 +82,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="5. Payments">
+        <LegalSection title="6. Payments">
           <p>
             Subscription payments are processed by Stripe. We never see or store your card details; Stripe handles
             those directly. In our own database we keep a record of your subscription, namely your Clerk account ID,
@@ -80,9 +90,17 @@ export default function PrivacyPage() {
             That record is what grants access to paid features, and we are required to keep billing and tax records
             for seven years.
           </p>
+          <p>
+            In the apps, subscriptions are sold and charged by Apple through the App Store, or by Google through
+            Google Play, under their own terms and privacy policies. We never see your payment details there either.
+            What we receive from them is the same kind of record: the product, the transaction identifiers, the
+            status and the renewal date. To connect a store purchase to your CongTrade account, we give your account
+            a random identifier that the store carries with the purchase; it contains nothing about you and is used
+            for nothing else.
+          </p>
         </LegalSection>
 
-        <LegalSection title="6. Cookies and local storage">
+        <LegalSection title="7. Cookies and local storage">
           <p>Depending on how you use the Site, it can set:</p>
           <ul>
             <li>An authentication session cookie (Clerk), if you create an account. It keeps you signed in.</li>
@@ -91,9 +109,36 @@ export default function PrivacyPage() {
           </ul>
         </LegalSection>
 
-        <LegalSection title="7. Advertising">
+        <LegalSection title="8. In the iPhone and Android apps">
+          <p>The apps handle data the same way as the website, with these differences:</p>
+          <ul>
+            <li>
+              Instead of cookies, your sign-in token is kept in the device&rsquo;s secure storage (the iOS Keychain or
+              the Android Keystore).
+            </li>
+            <li>
+              The answers you give to the setup questions when you first open the app are stored on your device only.
+              They are never sent to us, and deleting the app removes them.
+            </li>
+            <li>
+              The apps request no device permissions. They do not access your location, contacts, photos, camera,
+              microphone or files.
+            </li>
+            <li>
+              The apps contain no analytics, crash reporting or advertising software, do not read your device&rsquo;s
+              advertising identifier, and do not track you across other apps or websites.
+            </li>
+            <li>The apps show no advertising.</li>
+          </ul>
           <p>
-            The free tier of the Site may show ads served by Google AdSense. Google and its advertising partners may
+            Like any app that loads data, they talk to our servers, which log the technical details described in
+            section 10.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="9. Advertising">
+          <p>
+            The free tier of the website may show ads served by Google AdSense. The apps show none. Google and its advertising partners may
             use cookies or device identifiers to serve ads, including personalized ones based on your activity
             across sites. We don&rsquo;t control this data or receive it ourselves. You can review or opt out of
             personalized advertising via{" "}
@@ -109,33 +154,34 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="8. Hosting and technical logs">
+        <LegalSection title="10. Hosting and technical logs">
           <p>
-            The Site is hosted on Vercel, with its data stored in a Neon Postgres database. Like virtually every
-            website, our hosting provider automatically logs standard technical information for security and
-            reliability purposes: things like IP address, browser type, and request timestamps. We don&rsquo;t
+            CongTrade is hosted on Vercel, with its data stored in a Neon Postgres database. The website and the apps
+            use the same servers, and like virtually every online service, our hosting provider automatically logs standard technical information for security and
+            reliability purposes: things like IP address, browser or app version, and request timestamps. We don&rsquo;t
             personally review this data; it&rsquo;s processed under our infrastructure providers&rsquo; own privacy
             and security practices.
           </p>
         </LegalSection>
 
-        <LegalSection title="9. Third-party services and sites">
+        <LegalSection title="11. Third-party services and sites">
           <p>
             The Site links out to third-party sites, such as the House Clerk&rsquo;s disclosure portal, the Senate
             eFD system, and individual source filings, to let you verify data at the source. It also relies on Clerk,
-            Stripe, Resend (which delivers alert emails), and Google AdSense to operate, as described above. None of
+            Stripe, Apple (the App Store), Google (Google Play and AdSense), Resend (which delivers alert emails),
+            Vercel and Neon to operate, as described above. None of
             these are under our control, and each has its own privacy practices.
           </p>
         </LegalSection>
 
-        <LegalSection title="10. Children&rsquo;s privacy">
+        <LegalSection title="12. Children&rsquo;s privacy">
           <p>
-            The Site is not directed at children, and an account requires you to be at least 16. We don&rsquo;t
+            CongTrade is not directed at children, and an account requires you to be at least 16. We don&rsquo;t
             knowingly collect information from anyone younger; if you believe we have, tell us and we will delete it.
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Why we are allowed to use this data">
+        <LegalSection title="13. Why we are allowed to use this data">
           <p>
             Under the GDPR we need a legal ground for each use. Ours are: performing our agreement with you, which
             covers your account, your subscription and your alerts; our legitimate interest in keeping the Site
@@ -146,7 +192,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="12. Your rights">
+        <LegalSection title="14. Your rights">
           <p>
             You can access or update your account details (email, sign-in method) directly through your account
             settings, and cancel a subscription at any time. You can also ask us for a copy of your data, to correct
@@ -173,14 +219,14 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="13. Changes to this policy">
+        <LegalSection title="15. Changes to this policy">
           <p>
             We may update this policy from time to time; the &ldquo;last updated&rdquo; date at the top reflects the
             most recent revision.
           </p>
         </LegalSection>
 
-        <LegalSection title="14. Contact">
+        <LegalSection title="16. Contact">
           <p>
             Questions about this policy, or a request to access or delete your data, can be sent to{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

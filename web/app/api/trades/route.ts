@@ -122,6 +122,9 @@ export async function GET(req: NextRequest) {
   // ALERT_FROM_SQL is by definition the set of joins buildAlertConditions
   // expects, including the asset_name_tickers hop that lets an OCR row with
   // no ticker of its own still match a market cap.
+  // `t.id` breaks ties. Thousands of trades share a filing date, and without a
+  // unique last key Postgres may order tied rows differently on each request,
+  // so paging by offset showed some trades twice and skipped others entirely.
   const [dataRows, countRows] = await Promise.all([
     sql.query(
       `SELECT t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
@@ -132,7 +135,7 @@ export async function GET(req: NextRequest) {
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
        ${ALERT_FROM_SQL}
        ${where}
-       ORDER BY ${sortExpr} ${order} NULLS LAST
+       ORDER BY ${sortExpr} ${order} NULLS LAST, t.id ${order}
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
       dataParams
     ),

@@ -27,7 +27,7 @@ function devCors(req: NextRequest): Headers | null {
   // a wildcard cannot be combined with credentialed requests.
   headers.set("access-control-allow-origin", origin);
   headers.set("vary", "Origin");
-  headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+  headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
   headers.set("access-control-allow-headers", "authorization, content-type");
   headers.set("access-control-max-age", "600");
   return headers;

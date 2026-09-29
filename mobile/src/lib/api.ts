@@ -136,7 +136,10 @@ export async function fetchMemberOptions(options: RequestOptions = {}): Promise<
   const groups = new Map<string, MemberOption>();
   const byName = new Map<string, MemberOption>();
 
-  const add = (group: MemberOption, r: { member_name: string; bioguide_id: string | null; trade_count: number | string }) => {
+  const add = (
+    group: MemberOption,
+    r: { member_name: string; bioguide_id: string | null; trade_count: number | string }
+  ) => {
     if (!group.names.includes(r.member_name)) group.names.push(r.member_name);
     group.bioguide_id = group.bioguide_id ?? r.bioguide_id;
     group.trade_count += Number(r.trade_count) || 0;
@@ -204,7 +207,10 @@ function listParams(query: ListQuery): URLSearchParams {
 }
 
 /** One row per person, merged across filed spellings by the server. */
-export function fetchPoliticians(query: ListQuery = {}, options: RequestOptions = {}): Promise<Page<PoliticianSummary>> {
+export function fetchPoliticians(
+  query: ListQuery = {},
+  options: RequestOptions = {}
+): Promise<Page<PoliticianSummary>> {
   return get<Page<PoliticianSummary>>("/api/politicians", listParams(query), options);
 }
 
@@ -326,6 +332,112 @@ export async function fetchNews(options: RequestOptions = {}): Promise<NewsSecti
     ...section,
     items: section.items.map((item) => ({ ...item, image: item.image ? item.image.replace(/&amp;/g, "&") : null })),
   }));
+}
+
+/**
+ * A write: POST, PATCH or DELETE with a JSON body. The alert routes explain a
+ * refusal in words ("You can have up to 25 alerts"), so that message is what
+ * the error carries rather than a bare status.
+ */
+async function send<T>(
+  method: "POST" | "PATCH" | "DELETE",
+  path: string,
+  body: unknown,
+  options: RequestOptions = {}
+): Promise<T> {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (body !== undefined) headers["content-type"] = "application/json";
+  if (options.token) headers.authorization = `Bearer ${options.token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      signal: options.signal,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    throw new ApiError(0, "No connection. Check your network and try again.");
+  }
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
+  return data;
+}
+
+export type AlertFrequency = "instant" | "daily" | "weekly";
+
+/** The subset of the website's alert criteria the app edits. The server keeps any others untouched. */
+export interface AlertFilters {
+  q?: string;
+  chambers?: string[];
+  members?: string[];
+  parties?: string[];
+  states?: string[];
+  tickers?: string[];
+  assetTypes?: string[];
+  types?: string[];
+  owners?: string[];
+  minAmount?: number;
+  amountRanges?: string[];
+  marketCapTiers?: string[];
+  filedStatus?: "late" | "onTime";
+}
+
+export interface Alert {
+  id: string;
+  name: string;
+  email: string;
+  filters: AlertFilters;
+  frequency: AlertFrequency;
+  active: boolean;
+  created_at: string;
+  last_sent_at: string | null;
+  sent_count: number;
+  matched_count: number;
+  paused_reason: string | null;
+  /** The server's one-line description, the same one the email uses. */
+  summary: string;
+}
+
+export interface AlertList {
+  alerts: Alert[];
+  isPro: boolean;
+  /** Where the emails go. */
+  email: string | null;
+  maxAlerts: number;
+}
+
+export function fetchAlerts(options: RequestOptions = {}): Promise<AlertList> {
+  return get<AlertList>("/api/alerts", undefined, options);
+}
+
+export async function createAlert(
+  input: { name: string; frequency: AlertFrequency; filters: AlertFilters },
+  options: RequestOptions = {}
+): Promise<Alert> {
+  return (await send<{ alert: Alert }>("POST", "/api/alerts", input, options)).alert;
+}
+
+export async function updateAlert(
+  id: string,
+  patch: Partial<{ name: string; frequency: AlertFrequency; filters: AlertFilters; active: boolean }>,
+  options: RequestOptions = {}
+): Promise<Alert> {
+  return (await send<{ alert: Alert }>("PATCH", `/api/alerts/${id}`, patch, options)).alert;
+}
+
+export async function deleteAlert(id: string, options: RequestOptions = {}): Promise<void> {
+  await send<{ ok: boolean }>("DELETE", `/api/alerts/${id}`, undefined, options);
+}
+
+/** How many trades a draft would have matched: ever, and in the last 90 days. */
+export function previewAlert(
+  filters: AlertFilters,
+  options: RequestOptions = {}
+): Promise<{ total: number; recent: number }> {
+  return send<{ total: number; recent: number }>("POST", "/api/alerts/preview", { filters }, options);
 }
 
 export interface SiteStats {

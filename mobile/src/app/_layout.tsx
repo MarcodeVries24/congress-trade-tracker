@@ -42,6 +42,7 @@ function Navigation() {
         <Stack.Screen name="trade/[id]" options={{ headerShown: true }} />
         <Stack.Screen name="politician/[slug]" options={{ headerShown: true, title: '' }} />
         <Stack.Screen name="issuer/[slug]" options={{ headerShown: true, title: '' }} />
+        <Stack.Screen name="alert/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Alert' }} />
         <Stack.Screen name="sign-in" options={{ presentation: 'modal', headerShown: true, title: 'Sign in' }} />
       </Stack>
     </>

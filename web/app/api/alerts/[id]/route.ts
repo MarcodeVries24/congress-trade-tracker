@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
-import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters } from "@/lib/alertFilters";
+import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { deleteAlert, updateAlert } from "@/lib/alerts";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const alert = await updateAlert(userId, id, patch);
   if (!alert) return NextResponse.json({ error: "Unknown alert." }, { status: 404 });
-  return NextResponse.json({ alert });
+  return NextResponse.json({ alert: { ...alert, summary: summarizeAlert(alert.filters) } });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

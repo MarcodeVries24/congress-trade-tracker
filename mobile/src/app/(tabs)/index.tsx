@@ -61,7 +61,15 @@ export default function TradesScreen() {
         const selected = CHAMBERS.find((c) => c.key === chamber)!.value;
         const res = await fetchTrades({ page: nextPage, limit: PAGE_SIZE, chamber: [...selected] }, await authed());
         rememberTrades(res.data);
-        setTrades((prev) => (replace ? res.data : [...prev, ...res.data]));
+        // Pages are offsets over a sort with ties (many trades share a date), so
+        // a row can shift from one page into the next between requests and
+        // arrive twice. Kept once: a duplicate is a repeated card and a
+        // duplicate React key.
+        setTrades((prev) => {
+          if (replace) return res.data;
+          const seen = new Set(prev.map((t) => t.id));
+          return [...prev, ...res.data.filter((t) => !seen.has(t.id))];
+        });
         setPage(res.page);
         setTotalPages(res.totalPages);
         setStatus('ready');

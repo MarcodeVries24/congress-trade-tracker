@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
-import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters } from "@/lib/alertFilters";
+import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { countAlerts, createAlert, listAlerts, MAX_ALERTS_PER_USER, recordEntitlement, syncAlertEmails } from "@/lib/alerts";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
@@ -35,7 +35,14 @@ export async function GET() {
   // Cheap gift to the cron: it needs this same answer and has to pay a Clerk
   // round trip for it, whereas here it's already in the session.
   await recordEntitlement(userId, isPro);
-  return NextResponse.json({ alerts, isPro, email, maxAlerts: MAX_ALERTS_PER_USER });
+  // `summary` is the same sentence the account screen and the email show, sent
+  // along so the app can print it without keeping its own copy of the wording.
+  return NextResponse.json({
+    alerts: alerts.map((a) => ({ ...a, summary: summarizeAlert(a.filters) })),
+    isPro,
+    email,
+    maxAlerts: MAX_ALERTS_PER_USER,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -76,5 +83,5 @@ export async function POST(req: NextRequest) {
     frequency,
     filters: normalizeAlertFilters((body as { filters?: unknown }).filters),
   });
-  return NextResponse.json({ alert }, { status: 201 });
+  return NextResponse.json({ alert: { ...alert, summary: summarizeAlert(alert.filters) } }, { status: 201 });
 }

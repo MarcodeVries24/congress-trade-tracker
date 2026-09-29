@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { AccessProvider, useAccess } from '@/lib/access';
 import { OnboardingProvider, useOnboarding } from '@/lib/onboarding';
 import { tokenCache } from '@/lib/token-cache';
 
@@ -25,10 +26,15 @@ function Navigation() {
   // onboarding was incomplete sent every step back to the first one: the URL
   // advanced and the welcome screen kept rendering underneath it.
   const inFlow = segments[0] === 'onboarding' || segments[0] === 'paywall';
+  // The hard paywall. Sign-in stays reachable from it, because someone who
+  // already subscribed, and a store reviewer, get in by signing in.
+  const { locked } = useAccess();
+  const onSignIn = segments[0] === 'sign-in';
 
   return (
     <>
       {loaded && !done && !inFlow ? <Redirect href="/onboarding" /> : null}
+      {loaded && done && locked && !inFlow && !onSignIn ? <Redirect href="/paywall" /> : null}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
@@ -61,12 +67,14 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <OnboardingProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <AnimatedSplashOverlay />
-          <Navigation />
-        </ThemeProvider>
-      </OnboardingProvider>
+      <AccessProvider>
+        <OnboardingProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <AnimatedSplashOverlay />
+            <Navigation />
+          </ThemeProvider>
+        </OnboardingProvider>
+      </AccessProvider>
     </ClerkProvider>
   );
 }

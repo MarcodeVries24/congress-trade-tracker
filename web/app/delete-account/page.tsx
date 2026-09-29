@@ -35,6 +35,13 @@ export default function DeleteAccountPage() {
           <p>
             This applies to CongTrade on the web, on iPhone and on Android. It is one account wherever you signed up.
           </p>
+          <p>
+            <strong>In the app:</strong> tap <strong>Account</strong> at the top of the Trades screen, then{" "}
+            <strong>Delete account</strong>. The account is deleted straight away.
+          </p>
+          <p>
+            <strong>By email</strong>, if you don&rsquo;t have the app:
+          </p>
           <ol className="list-decimal space-y-1.5 pl-5">
             <li>
               Email{" "}

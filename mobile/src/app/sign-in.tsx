@@ -1,6 +1,7 @@
-import { useOAuth, useAuth, useUser } from '@clerk/clerk-expo';
+import { useOAuth, useAuth } from '@clerk/clerk-expo';
+import { Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,6 +13,7 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { AccountPanel } from '@/components/account-panel';
 import { EmailSignIn } from '@/components/email-sign-in';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -33,8 +35,16 @@ const PROVIDERS: Provider[] = [
 export default function SignInScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
-  const { isSignedIn, signOut } = useAuth();
-  const { user } = useUser();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+
+  // Closes itself once a sign-in started here succeeds, so whatever opened it
+  // (the paywall, usually) can carry on. Opened while already signed in, it is
+  // the account screen and stays put.
+  const openedSignedOut = useRef(!isSignedIn);
+  useEffect(() => {
+    if (isSignedIn && openedSignedOut.current && router.canGoBack()) router.back();
+  }, [isSignedIn, router]);
 
   const google = useOAuth({ strategy: 'oauth_google' });
   const apple = useOAuth({ strategy: 'oauth_apple' });
@@ -73,14 +83,11 @@ export default function SignInScreen() {
 
   if (isSignedIn) {
     return (
-      <ThemedView style={styles.screen}>
-        <ThemedText style={styles.title}>Signed in</ThemedText>
-        <ThemedText style={[styles.body, { color: colors.textSecondary }]}>
-          {user?.primaryEmailAddress?.emailAddress ?? 'Your account is connected.'}
-        </ThemedText>
-        <Pressable onPress={() => signOut()} style={[styles.button, { backgroundColor: colors.backgroundElement }]}>
-          <ThemedText style={styles.buttonLabel}>Sign out</ThemedText>
-        </Pressable>
+      <ThemedView style={styles.fill}>
+        <Stack.Screen options={{ title: 'Account' }} />
+        <ScrollView contentContainerStyle={styles.screen}>
+          <AccountPanel />
+        </ScrollView>
       </ThemedView>
     );
   }

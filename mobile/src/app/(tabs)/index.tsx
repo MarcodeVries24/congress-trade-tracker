@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -40,6 +41,7 @@ export default function TradesScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [chamber, setChamber] = useState<ChamberKey>('both');
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -72,7 +74,7 @@ export default function TradesScreen() {
         setRefreshing(false);
       }
     },
-    [chamber, authed]
+    [chamber, authed],
   );
 
   // No setTrades([]) here: clearing synchronously inside an effect cascades a
@@ -145,6 +147,13 @@ export default function TradesScreen() {
             </Pressable>
           );
         })}
+        {/* The way back to the account screen from inside the app: plan,
+            sign out, and the account deletion Apple requires in-app. */}
+        <Pressable
+          onPress={() => router.push('/sign-in')}
+          style={[styles.segment, styles.account, { backgroundColor: colors.backgroundElement }]}>
+          <ThemedText style={[styles.segmentLabel, { color: colors.textSecondary }]}>Account</ThemedText>
+        </Pressable>
       </View>
 
       <FlatList
@@ -183,6 +192,7 @@ const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
   segment: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   segmentLabel: { fontSize: 13, fontWeight: '600' },
+  account: { marginLeft: 'auto' },
   list: { paddingBottom: 24 },
   footer: { paddingVertical: 20, alignItems: 'center' },
   end: { fontSize: 12 },

@@ -1,5 +1,5 @@
 import { getProPricing } from '@congtrade/shared/plans';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { useAccess } from '@/lib/access';
 import type { BillingPeriod } from '@/lib/products';
 import { usePurchases } from '@/lib/use-purchases';
 
@@ -34,7 +35,21 @@ export default function PaywallScreen() {
   // Only a fallback now: the store answers with the real localised figure.
   const pricing = getProPricing('eur');
   const [period, setPeriod] = useState<BillingPeriod>('weekly');
-  const purchases = usePurchases(useCallback(() => router.replace('/(tabs)'), [router]));
+  const access = useAccess();
+  // A purchase is not taken as proof of anything here: it asks the server
+  // again, and the effect below lets the person in once the server says so.
+  const { refresh } = access;
+  const purchases = usePurchases(useCallback(() => void refresh(), [refresh]));
+
+  // Also how signing in gets someone past this screen: an account that
+  // already has Pro, from the website or an admin flag, flips this on its own.
+  // Only while this screen is on top, so it waits for the sign-in sheet to
+  // close rather than navigating out from underneath it.
+  useFocusEffect(
+    useCallback(() => {
+      if (access.status === 'pro') router.replace('/(tabs)');
+    }, [access.status, router]),
+  );
 
   // The store's price whenever there is one. Apple's matrix turns 4.99 euro
   // into $4.99 in the US and A$7.99 in Australia, and the paywall must show
@@ -134,10 +149,13 @@ export default function PaywallScreen() {
             one is rejected, and rightly, because someone who has paid and
             reinstalled has no other route back in. */}
         {purchases.available ? (
-          <Pressable onPress={() => purchases.restore()} style={styles.secondary}>
-            <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
-              Restore purchases
-            </ThemedText>
+          <Pressable
+            onPress={async () => {
+              await purchases.restore();
+              await refresh();
+            }}
+            style={styles.secondary}>
+            <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>Restore purchases</ThemedText>
           </Pressable>
         ) : null}
 
@@ -150,11 +168,18 @@ export default function PaywallScreen() {
           </ThemedText>
         </Pressable>
 
-        <Pressable onPress={() => router.replace('/(tabs)')} style={styles.secondary}>
-          <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
-            Skip for now, look around
-          </ThemedText>
-        </Pressable>
+        {access.skipForDevelopment ? (
+          <Pressable
+            onPress={() => {
+              access.skipForDevelopment?.();
+              router.replace('/(tabs)');
+            }}
+            style={styles.secondary}>
+            <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
+              Skip (development builds only)
+            </ThemedText>
+          </Pressable>
+        ) : null}
       </View>
     </ThemedView>
   );

@@ -37,6 +37,8 @@ export interface Trade {
   member_state: string | null;
   parse_status: string;
   market_cap: number | null;
+  /** From the market cap table, when the ticker is in it. */
+  company_name?: string | null;
 }
 
 export interface Page<T> {
@@ -438,6 +440,12 @@ export function previewAlert(
   options: RequestOptions = {}
 ): Promise<{ total: number; recent: number }> {
   return send<{ total: number; recent: number }>("POST", "/api/alerts/preview", { filters }, options);
+}
+
+/** Announcements from the SEC, the Federal Reserve and the statistics agencies. */
+export async function fetchPolicy(options: RequestOptions = {}): Promise<NewsItem[]> {
+  const raw = await get<{ items: NewsItem[] }>("/api/policy", undefined, options);
+  return raw.items;
 }
 
 export interface SiteStats {

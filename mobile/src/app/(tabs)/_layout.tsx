@@ -1,52 +1,63 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import { Tabs } from 'expo-router';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors } from '@/constants/theme';
+import { haptic } from '@/lib/haptics';
+import { useSeedFollowsFromOnboarding } from '@/lib/seed-follows';
+import { useTheme } from '@/theme';
+import { Icon, type IconName } from '@/ui/icon';
+
+const TABS: { name: string; title: string; icon: IconName; active: IconName }[] = [
+  { name: 'index', title: 'Discover', icon: 'flame-outline', active: 'flame' },
+  { name: 'portfolio', title: 'Portfolio', icon: 'trending-up-outline', active: 'trending-up' },
+  { name: 'alerts', title: 'Alerts', icon: 'notifications-outline', active: 'notifications' },
+  { name: 'more', title: 'More', icon: 'person-outline', active: 'person' },
+];
 
 /**
- * Five tabs, in the order someone actually moves through them.
+ * Four tabs, as in the design: Discover is where you find things, Portfolio is
+ * what you follow, Alerts is what they did, More is you.
  *
- * Trades is home because the feed is the product. Alerts gets a tab of its own
- * rather than living in a settings screen: on the website it is a paid feature
- * you go and find, on a phone it is the reason the app stays installed.
- *
- * SF Symbols on iOS, which is why no icon assets are shipped. Android needs
- * drawable resources for the same triggers and does not have them yet, so its
- * tab bar is labels only for now.
+ * A JavaScript tab bar rather than the native one, so the red active state,
+ * the filled icons and the spacing are identical on iOS and Android.
  */
 export default function TabLayout() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  useSeedFollowsFromOnboarding();
   return (
-    <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Trades</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="chart.line.uptrend.xyaxis" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="politicians">
-        <NativeTabs.Trigger.Label>Politicians</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="person.2" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="issuers">
-        <NativeTabs.Trigger.Label>Issuers</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="building.2" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="alerts">
-        <NativeTabs.Trigger.Label>Alerts</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="bell" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="news">
-        <NativeTabs.Trigger.Label>News</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="newspaper" />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Tabs
+      screenListeners={{ tabPress: () => haptic.select() }}
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: c.accent,
+        tabBarInactiveTintColor: c.textMuted,
+        tabBarLabelStyle: styles.label,
+        tabBarStyle: {
+          backgroundColor: c.tabBar,
+          borderTopColor: c.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: 58 + insets.bottom,
+          paddingTop: 6,
+        },
+        sceneStyle: { backgroundColor: c.background },
+      }}>
+      {TABS.map((t) => (
+        <Tabs.Screen
+          key={t.name}
+          name={t.name}
+          options={{
+            title: t.title,
+            tabBarIcon: ({ focused, color }) => (
+              <Icon name={focused ? t.active : t.icon} size={24} color={String(color)} />
+            ),
+          }}
+        />
+      ))}
+    </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  label: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+});

@@ -1,22 +1,16 @@
-import { memberDisplayName } from '@congtrade/shared/memberDisplay';
+import { memberDisplayName, memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
-  useColorScheme,
 } from 'react-native';
 
-import { Chips } from '@/components/chips';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
 import {
   createAlert,
   deleteAlert,
@@ -28,8 +22,16 @@ import {
   type MemberOption,
 } from '@/lib/api';
 import { recallAlert } from '@/lib/alert-cache';
+import { haptic } from '@/lib/haptics';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useDebounced } from '@/lib/use-paged';
+import { radius, useTheme } from '@/theme';
+import { Button } from '@/ui/button';
+import { ChipRow } from '@/ui/chip-row';
+import { EmptyState } from '@/ui/empty-state';
+import { Icon } from '@/ui/icon';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
 
 const CHAMBERS = [
   { key: 'any', label: 'Both chambers' },
@@ -62,33 +64,43 @@ const FREQUENCIES = [
 type ChamberKey = (typeof CHAMBERS)[number]['key'];
 type TypeKey = (typeof TYPES)[number]['key'];
 
-function Label({ children }: { children: string }) {
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
-  return <ThemedText style={[styles.label, { color: colors.textSecondary }]}>{children}</ThemedText>;
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.field}>
+      <Text variant="label" tone="faint" style={styles.fieldLabel}>
+        {label.toUpperCase()}
+      </Text>
+      {children}
+    </View>
+  );
 }
 
 /**
- * Making or changing one alert.
+ * Making or changing one email alert.
  *
- * The app edits the criteria people set on a phone: members, tickers,
- * chamber, buy or sell, and a minimum amount. An alert made on the website
- * can carry more (states, parties, owners, market cap), and those are kept as
- * they are rather than dropped, because the editor starts from the saved
- * filters and only overwrites the fields it shows.
+ * Opened empty from the alerts list, or pre-filled from a member, a company or
+ * a trade ("email me when NVDA is traded"). The app edits the criteria people
+ * set on a phone; an alert made on the website can carry more (states,
+ * parties, owners, market cap) and those are kept, because the editor starts
+ * from the saved filters and only overwrites the fields it shows.
  *
- * The count underneath is the server running the same query the sender will,
- * so a filter that would email twenty times a day is visible before saving.
+ * The count underneath is the server running the same query the sender will.
  */
 export default function AlertEditorScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const params = useLocalSearchParams<{ id: string; members?: string; tickers?: string; name?: string }>();
+  const { id } = params;
+  const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
   const existing = id === 'new' ? undefined : recallAlert(id);
 
-  const [name, setName] = useState(existing?.name ?? '');
-  const [members, setMembers] = useState<string[]>(existing?.filters.members ?? []);
-  const [tickers, setTickers] = useState((existing?.filters.tickers ?? []).join(', '));
+  const [name, setName] = useState(existing?.name ?? params.name ?? '');
+  const [members, setMembers] = useState<string[]>(
+    existing?.filters.members ?? (params.members ? params.members.split('|').filter(Boolean) : [])
+  );
+  const [tickers, setTickers] = useState(
+    (existing?.filters.tickers ?? (params.tickers ? [params.tickers] : [])).join(', ')
+  );
   const [chamber, setChamber] = useState<ChamberKey>(
     existing?.filters.chambers?.length === 1 ? (existing.filters.chambers[0] as ChamberKey) : 'any'
   );
@@ -110,6 +122,7 @@ export default function AlertEditorScreen() {
   const [memberQuery, setMemberQuery] = useState('');
   const [preview, setPreview] = useState<{ total: number; recent: number } | 'failed' | null>(null);
   const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -152,7 +165,18 @@ export default function AlertEditorScreen() {
     };
   }, [settled, authed]);
 
+  // A member pre-filled from their page may not be in the loaded options yet,
+  // or may be filed under a spelling the options group differently; the chip
+  // falls back to the filed name so nothing picked is ever invisible.
   const pickedOptions = options.filter((o) => o.names.some((n) => members.includes(n)));
+  const unmatchedGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const n of members.filter((m) => !pickedOptions.some((o) => o.names.includes(m)))) {
+      const display = memberDisplayNameFromFiledName(n);
+      groups.set(display, [...(groups.get(display) ?? []), n]);
+    }
+    return [...groups.entries()];
+  }, [members, pickedOptions]);
   const matches = useMemo(() => {
     const q = memberQuery.trim().toLowerCase();
     if (!q) return [];
@@ -162,13 +186,12 @@ export default function AlertEditorScreen() {
       .slice(0, 6);
   }, [options, memberQuery, members]);
 
-  // One option can stand for several filed spellings, and the alert matches the
-  // filed name exactly, so all of them go in together and come out together.
   const addMember = (o: MemberOption) => {
+    haptic.select();
     setMembers((prev) => [...prev, ...o.names.filter((n) => !prev.includes(n))]);
     setMemberQuery('');
   };
-  const removeMember = (o: MemberOption) => setMembers((prev) => prev.filter((n) => !o.names.includes(n)));
+  const removeNames = (names: string[]) => setMembers((prev) => prev.filter((n) => !names.includes(n)));
 
   const save = async () => {
     const trimmed = name.trim();
@@ -181,6 +204,7 @@ export default function AlertEditorScreen() {
     try {
       if (existing) await updateAlert(existing.id, { name: trimmed, frequency, filters }, await authed());
       else await createAlert({ name: trimmed, frequency, filters }, await authed());
+      haptic.success();
       router.back();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the alert.');
@@ -191,10 +215,16 @@ export default function AlertEditorScreen() {
 
   const remove = async () => {
     if (!existing) return;
+    if (!confirmDelete) {
+      haptic.select();
+      setConfirmDelete(true);
+      return;
+    }
     setError(null);
     setBusy('delete');
     try {
       await deleteAlert(existing.id, await authed());
+      haptic.commit();
       router.back();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the alert.');
@@ -203,165 +233,209 @@ export default function AlertEditorScreen() {
     }
   };
 
-  const inputStyle = [styles.input, { backgroundColor: colors.backgroundElement, color: colors.text }];
+  const input = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
 
   if (id !== 'new' && !existing) {
     return (
-      <ThemedView style={styles.missing}>
-        <Stack.Screen options={{ title: 'Alert' }} />
-        <ThemedText style={[styles.body, { color: colors.textSecondary }]}>
-          This alert is not loaded. Go back to the Alerts tab and open it from there.
-        </ThemedText>
-      </ThemedView>
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
+        <EmptyState icon="mail-outline" title="This alert isn't loaded" body="Open it from the email alerts list." />
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
       <Stack.Screen options={{ title: existing ? 'Edit alert' : 'New alert' }} />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Label>Name</Label>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. Pelosi's options"
-            placeholderTextColor={colors.textSecondary}
-            maxLength={80}
-            style={inputStyle}
-          />
+          <Field label="Name">
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g. Pelosi's options"
+              placeholderTextColor={c.textFaint}
+              maxLength={80}
+              style={input}
+            />
+          </Field>
 
-          <Label>Members</Label>
-          {pickedOptions.length ? (
-            <View style={styles.picked}>
-              {pickedOptions.map((o) => (
-                <Pressable
-                  key={o.bioguide_id ?? o.member_name}
-                  onPress={() => removeMember(o)}
-                  style={[styles.pill, { backgroundColor: colors.backgroundSelected }]}>
-                  <ThemedText style={styles.pillLabel}>{memberDisplayName(o)} ✕</ThemedText>
-                </Pressable>
-              ))}
+          <Field label="Members">
+            {pickedOptions.length || unmatchedGroups.length ? (
+              <View style={styles.picked}>
+                {pickedOptions.map((o) => (
+                  <Tap
+                    key={o.bioguide_id ?? o.member_name}
+                    onPress={() => removeNames(o.names)}
+                    scaleTo={0.94}
+                    style={[styles.token, { backgroundColor: c.primary }]}>
+                    <Text variant="callout" color={c.primaryText} style={styles.bold}>
+                      {memberDisplayName(o)}
+                    </Text>
+                    <Icon name="close" size={14} color={c.primaryText} />
+                  </Tap>
+                ))}
+                {unmatchedGroups.map(([display, names]) => (
+                  <Tap
+                    key={display}
+                    onPress={() => removeNames(names)}
+                    scaleTo={0.94}
+                    style={[styles.token, { backgroundColor: c.primary }]}>
+                    <Text variant="callout" color={c.primaryText} style={styles.bold}>
+                      {display}
+                    </Text>
+                    <Icon name="close" size={14} color={c.primaryText} />
+                  </Tap>
+                ))}
+              </View>
+            ) : null}
+            <TextInput
+              value={memberQuery}
+              onChangeText={setMemberQuery}
+              placeholder={pickedOptions.length ? 'Add another member' : 'Anyone, or search for a member'}
+              placeholderTextColor={c.textFaint}
+              autoCorrect={false}
+              style={input}
+            />
+            {matches.length ? (
+              <View style={[styles.matches, { backgroundColor: c.surface, borderColor: c.border }]}>
+                {matches.map((o, i) => (
+                  <Tap
+                    key={o.bioguide_id ?? o.member_name}
+                    onPress={() => addMember(o)}
+                    scaleTo={0.99}
+                    style={[
+                      styles.match,
+                      i < matches.length - 1 && {
+                        borderBottomColor: c.border,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                      },
+                    ]}>
+                    <Text variant="bodyStrong">{memberDisplayName(o)}</Text>
+                    <Text variant="caption" tone="muted">
+                      {o.trade_count.toLocaleString()} trades
+                    </Text>
+                  </Tap>
+                ))}
+              </View>
+            ) : null}
+          </Field>
+
+          <Field label="Tickers">
+            <TextInput
+              value={tickers}
+              onChangeText={setTickers}
+              placeholder="Any, or e.g. NVDA, TSLA"
+              placeholderTextColor={c.textFaint}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={input}
+            />
+          </Field>
+
+          <Field label="Chamber">
+            <ChipRow options={CHAMBERS} value={chamber} onChange={setChamber} inset={0} />
+          </Field>
+          <Field label="Type">
+            <ChipRow options={TYPES} value={type} onChange={setType} inset={0} />
+          </Field>
+          <Field label="Minimum amount">
+            <ChipRow options={minOptions} value={minAmount} onChange={setMinAmount} inset={0} />
+          </Field>
+          <Field label="Email me">
+            <ChipRow options={FREQUENCIES} value={frequency} onChange={setFrequency} inset={0} />
+          </Field>
+
+          <View style={[styles.preview, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.previewIcon, { backgroundColor: c.surfaceMuted }]}>
+              <Icon name="pulse" size={20} color={c.primary} />
             </View>
+            <View style={styles.flex}>
+              {preview === 'failed' ? (
+                <Text variant="callout" tone="muted">
+                  Couldn&apos;t count the matches right now. The alert still works.
+                </Text>
+              ) : preview ? (
+                <Text variant="callout">
+                  Would have matched{' '}
+                  <Text variant="callout" style={styles.strong}>
+                    {preview.recent.toLocaleString()}
+                  </Text>{' '}
+                  {preview.recent === 1 ? 'trade' : 'trades'} filed in the last 90 days, and{' '}
+                  {preview.total.toLocaleString()} in all.
+                </Text>
+              ) : (
+                <ActivityIndicator />
+              )}
+            </View>
+          </View>
+
+          {error ? (
+            <Text variant="caption" tone="loss">
+              {error}
+            </Text>
           ) : null}
-          <TextInput
-            value={memberQuery}
-            onChangeText={setMemberQuery}
-            placeholder={pickedOptions.length ? 'Add another member' : 'Anyone, or search for a member'}
-            placeholderTextColor={colors.textSecondary}
-            autoCorrect={false}
-            style={inputStyle}
+
+          <Button
+            label={existing ? 'Save changes' : 'Save alert'}
+            loading={busy === 'save'}
+            disabled={busy !== null}
+            onPress={save}
           />
-          {matches.map((o) => (
-            <Pressable
-              key={o.bioguide_id ?? o.member_name}
-              onPress={() => addMember(o)}
-              style={[styles.match, { borderBottomColor: colors.backgroundElement }]}>
-              <ThemedText style={styles.matchName}>{memberDisplayName(o)}</ThemedText>
-              <ThemedText style={[styles.meta, { color: colors.textSecondary }]}>
-                {o.trade_count.toLocaleString()} trades
-              </ThemedText>
-            </Pressable>
-          ))}
-
-          <Label>Tickers</Label>
-          <TextInput
-            value={tickers}
-            onChangeText={setTickers}
-            placeholder="Any, or e.g. NVDA, TSLA"
-            placeholderTextColor={colors.textSecondary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            style={inputStyle}
-          />
-
-          <Label>Chamber</Label>
-          <View style={styles.chips}>
-            <Chips options={CHAMBERS} value={chamber} onChange={setChamber} />
-          </View>
-          <Label>Type</Label>
-          <View style={styles.chips}>
-            <Chips options={TYPES} value={type} onChange={setType} />
-          </View>
-          <Label>Minimum amount</Label>
-          <View style={styles.chips}>
-            <Chips options={minOptions} value={minAmount} onChange={setMinAmount} />
-          </View>
-          <Label>Email me</Label>
-          <View style={styles.chips}>
-            <Chips options={FREQUENCIES} value={frequency} onChange={setFrequency} />
-          </View>
-
-          <View style={[styles.preview, { backgroundColor: colors.backgroundElement }]}>
-            {preview === 'failed' ? (
-              <ThemedText style={[styles.body, { color: colors.textSecondary }]}>
-                Couldn&apos;t count the matches right now. The alert still works.
-              </ThemedText>
-            ) : preview ? (
-              <ThemedText style={styles.body}>
-                Would have matched <ThemedText style={styles.strong}>{preview.recent.toLocaleString()}</ThemedText>{' '}
-                {preview.recent === 1 ? 'trade' : 'trades'} filed in the last 90 days, and{' '}
-                {preview.total.toLocaleString()} in all.
-              </ThemedText>
-            ) : (
-              <ActivityIndicator />
-            )}
-          </View>
-
-          {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
-
-          <Pressable disabled={busy !== null} onPress={save} style={[styles.primary, { opacity: busy ? 0.6 : 1 }]}>
-            {busy === 'save' ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <ThemedText style={styles.primaryLabel}>{existing ? 'Save changes' : 'Save alert'}</ThemedText>
-            )}
-          </Pressable>
           {existing ? (
-            <Pressable disabled={busy !== null} onPress={remove} style={styles.delete}>
-              <ThemedText style={styles.deleteLabel}>{busy === 'delete' ? 'Deleting…' : 'Delete alert'}</ThemedText>
-            </Pressable>
+            <Button
+              label={confirmDelete ? 'Tap again to delete' : 'Delete alert'}
+              kind="danger"
+              loading={busy === 'delete'}
+              disabled={busy !== null}
+              onPress={remove}
+            />
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  missing: { flex: 1, padding: 24, justifyContent: 'center' },
-  content: { padding: 16, gap: 8, paddingBottom: 48 },
-  label: { marginTop: 10, fontSize: 13, fontWeight: '600' },
-  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  content: { padding: 16, gap: 20, paddingBottom: 56 },
+  flex: { flex: 1 },
+  field: { gap: 10 },
+  fieldLabel: { paddingHorizontal: 2 },
+  input: {
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
   picked: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  pillLabel: { fontSize: 13, fontWeight: '600' },
+  token: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+  },
+  bold: { fontWeight: '700' },
+  matches: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   match: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 11,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  matchName: { fontSize: 15 },
-  meta: { fontSize: 12 },
-  // The chip rows carry their own 16pt side padding, made for full-width
-  // screens; cancelled here because this form is already inset.
-  chips: { marginHorizontal: -16 },
-  preview: { marginTop: 14, padding: 14, borderRadius: 12, minHeight: 52, justifyContent: 'center' },
-  body: { fontSize: 14, lineHeight: 20 },
-  strong: { fontWeight: '800' },
-  error: { fontSize: 13, color: '#d6455d' },
-  primary: {
-    marginTop: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: '#3b7ddd',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
-  primaryLabel: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
-  delete: { alignItems: 'center', paddingVertical: 14 },
-  deleteLabel: { fontSize: 14, fontWeight: '600', color: '#d6455d' },
+  preview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 64,
+  },
+  previewIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  strong: { fontWeight: '800' },
 });

@@ -1,9 +1,11 @@
 import { useSignIn } from '@clerk/clerk-expo';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, useColorScheme } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { radius, useTheme } from '@/theme';
+import { Button } from '@/ui/button';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
 
 type Step = 'email' | 'password' | 'code';
 
@@ -29,8 +31,7 @@ function messageFrom(err: unknown, fallback: string): string {
  */
 export function EmailSignIn() {
   const { isLoaded, signIn, setActive } = useSignIn();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const { c } = useTheme();
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ export function EmailSignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inputStyle = [styles.input, { backgroundColor: colors.backgroundElement, color: colors.text }];
+  const inputStyle = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
 
   const finish = async (sessionId: string | null) => {
     if (!sessionId || !setActive) {
@@ -175,14 +176,12 @@ export function EmailSignIn() {
 
   return (
     <View style={styles.wrap}>
-      <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Or use your email</ThemedText>
-
       {step === 'email' ? (
         <TextInput
           value={email}
           onChangeText={setEmail}
-          placeholder="you@example.com"
-          placeholderTextColor={colors.textSecondary}
+          placeholder="Email address"
+          placeholderTextColor={c.textFaint}
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
@@ -192,9 +191,14 @@ export function EmailSignIn() {
           style={inputStyle}
         />
       ) : (
-        <Pressable onPress={back}>
-          <ThemedText style={[styles.email, { color: colors.textSecondary }]}>{email.trim()} · Change</ThemedText>
-        </Pressable>
+        <Tap onPress={back} style={[styles.chosen, { backgroundColor: c.surfaceMuted }]}>
+          <Text variant="callout" numberOfLines={1} style={styles.flex}>
+            {email.trim()}
+          </Text>
+          <Text variant="callout" style={styles.bold}>
+            Change
+          </Text>
+        </Tap>
       )}
 
       {step === 'password' ? (
@@ -202,7 +206,7 @@ export function EmailSignIn() {
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={c.textFaint}
           secureTextEntry
           autoComplete="current-password"
           textContentType="password"
@@ -214,74 +218,66 @@ export function EmailSignIn() {
 
       {step === 'code' ? (
         <>
-          <ThemedText style={[styles.hint, { color: colors.textSecondary }]}>
+          <Text variant="caption" tone="muted">
             {codeIsSecondFactor
               ? 'First sign-in on this device. We sent a six-digit code to that address to confirm it is you.'
               : 'We sent a six-digit code to that address.'}
-          </ThemedText>
+          </Text>
           <TextInput
             value={code}
             onChangeText={setCode}
-            placeholder="123456"
-            placeholderTextColor={colors.textSecondary}
+            placeholder="6-digit code"
+            placeholderTextColor={c.textFaint}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
             maxLength={6}
             returnKeyType="go"
             onSubmitEditing={() => !action.disabled && action.onPress()}
-            style={inputStyle}
+            style={[inputStyle, styles.code]}
           />
         </>
       ) : null}
 
-      <Pressable
-        disabled={busy || action.disabled}
-        onPress={action.onPress}
-        style={[
-          styles.button,
-          {
-            backgroundColor: '#3b7ddd',
-            opacity: busy || action.disabled ? 0.5 : 1,
-          },
-        ]}>
-        {busy ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <ThemedText style={styles.buttonLabel}>{action.label}</ThemedText>
-        )}
-      </Pressable>
+      <Button label={action.label} onPress={action.onPress} loading={busy} disabled={action.disabled} />
 
       {step === 'password' && codeAvailable ? (
-        <Pressable onPress={switchToCode} disabled={busy} style={styles.link}>
-          <ThemedText style={[styles.linkLabel, { color: colors.textSecondary }]}>Email me a code instead</ThemedText>
-        </Pressable>
+        <Tap onPress={switchToCode} disabled={busy} style={styles.link}>
+          <Text variant="callout" tone="muted" style={styles.underline}>
+            Email me a code instead
+          </Text>
+        </Tap>
       ) : null}
 
-      {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+      {error ? (
+        <Text variant="caption" tone="loss">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 24, gap: 10 },
-  label: { fontSize: 13, fontWeight: '600' },
+  wrap: { gap: 12 },
+  flex: { flex: 1 },
+  bold: { fontWeight: '700' },
   input: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 15,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    fontSize: 16,
   },
-  email: { fontSize: 14 },
-  hint: { fontSize: 13 },
-  button: {
+  code: { fontSize: 22, letterSpacing: 6, textAlign: 'center', fontWeight: '700' },
+  chosen: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    borderRadius: 12,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: radius.lg,
   },
-  buttonLabel: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
   link: { alignItems: 'center', paddingVertical: 6 },
-  linkLabel: { fontSize: 14 },
-  error: { fontSize: 13, color: '#d6455d' },
+  underline: { textDecorationLine: 'underline' },
 });

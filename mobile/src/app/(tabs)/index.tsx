@@ -1,71 +1,147 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { useUser } from '@clerk/clerk-expo';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { TradeCard } from '@/components/trade-card';
-import { Colors } from '@/constants/theme';
 import { fetchTrades, type Trade } from '@/lib/api';
+import { useFollows } from '@/lib/follows';
+import { memberName } from '@/lib/format';
+import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
+import { radius, shadow, useTheme } from '@/theme';
+import { Avatar } from '@/ui/avatar';
+import { Button } from '@/ui/button';
+import { Card } from '@/ui/card';
+import { ChipRow } from '@/ui/chip-row';
+import { EmptyState } from '@/ui/empty-state';
+import { FollowStar } from '@/ui/follow-button';
+import { Icon, type IconName } from '@/ui/icon';
+import { SearchBar } from '@/ui/search-bar';
+import { SectionHeader } from '@/ui/section';
+import { SentimentBar } from '@/ui/sentiment-bar';
+import { RowSkeleton, Skeleton } from '@/ui/skeleton';
+import { TabHeader } from '@/ui/tab-header';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
+import { TickerLogo } from '@/ui/ticker-logo';
+import { TradeRow } from '@/ui/trade-row';
 
-const PAGE_SIZE = 25;
 const CHAMBERS = [
-  { key: 'both', label: 'All', value: ['house', 'senate'] as const },
-  { key: 'house', label: 'House', value: ['house'] as const },
-  { key: 'senate', label: 'Senate', value: ['senate'] as const },
+  { key: 'both', label: 'All trades' },
+  { key: 'house', label: 'House' },
+  { key: 'senate', label: 'Senate' },
 ] as const;
-
 type ChamberKey = (typeof CHAMBERS)[number]['key'];
 
-/**
- * The feed.
- *
- * Paging is by page number rather than a cursor because that is what
- * /api/trades takes. The in-flight request is tracked with a ref rather than
- * state so that a scroll to the bottom cannot fire two identical requests
- * before the first setState lands.
- */
-export default function TradesScreen() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
+const PAGE = 30;
 
-  const [chamber, setChamber] = useState<ChamberKey>('both');
-  const [trades, setTrades] = useState<Trade[]>([]);
+type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
+type Trending = { ticker: string; company: string | null; count: number; buys: number; sells: number; members: number };
+
+/**
+ * The latest trades read two more ways: who has just filed (the stories row)
+ * and which stocks keep coming up (trending). Worked out here from one request
+ * rather than asked of the server, because "recent" is exactly what the feed
+ * already is.
+ */
+function digest(trades: Trade[]): { stories: Story[]; trending: Trending[] } {
+  const stories = new Map<string, Story>();
+  const tickers = new Map<string, Trending & { who: Set<string> }>();
+  for (const t of trades) {
+    const key = t.member_slug ?? t.member_name;
+    const story = stories.get(key);
+    if (story) story.count += 1;
+    else if (t.member_slug) {
+      stories.set(key, { slug: t.member_slug, name: memberName(t), photo: t.photo_url, party: t.party, count: 1 });
+    }
+    if (!t.ticker) continue;
+    const entry = tickers.get(t.ticker) ?? {
+      ticker: t.ticker,
+      company: t.company_name ?? null,
+      count: 0,
+      buys: 0,
+      sells: 0,
+      members: 0,
+      who: new Set<string>(),
+    };
+    entry.count += 1;
+    if (t.transaction_type.startsWith('P')) entry.buys += 1;
+    if (t.transaction_type.startsWith('S')) entry.sells += 1;
+    entry.who.add(key);
+    entry.members = entry.who.size;
+    tickers.set(t.ticker, entry);
+  }
+  return {
+    stories: [...stories.values()].slice(0, 16),
+    trending: [...tickers.values()]
+      .filter((t) => t.count >= 2)
+      .sort((a, b) => b.members - a.members || b.count - a.count)
+      .slice(0, 10),
+  };
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Up late';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/**
+ * Discover: the home tab.
+ *
+ * Built like the apps people open without thinking: a search pill at the top,
+ * a row of faces who just did something, a swipeable way to find more, cards
+ * to scroll sideways, and then the feed itself, endless, one trade per row.
+ */
+export default function DiscoverScreen() {
+  const { c, scheme } = useTheme();
+  const router = useRouter();
+  const authed = useAuthedRequest();
+  const { user } = useUser();
+  const { answers } = useOnboarding();
+  const follows = useFollows();
+
+  const [chamber, setChamber] = useState<ChamberKey>(answers.chamber === 'both' ? 'both' : answers.chamber);
+  const [recent, setRecent] = useState<Trade[] | null>(null);
+  const [feed, setFeed] = useState<Trade[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const loading = useRef(false);
-  const authed = useAuthedRequest();
+  const loadingMore = useRef(false);
+  const generation = useRef(0);
 
-  const load = useCallback(
+  const loadRecent = useCallback(async () => {
+    try {
+      const res = await fetchTrades({ page: 1, limit: 200 }, await authed());
+      rememberTrades(res.data);
+      setRecent(res.data);
+    } catch {
+      setRecent((prev) => prev ?? []);
+    }
+  }, [authed]);
+
+  const loadFeed = useCallback(
     async (nextPage: number, replace: boolean) => {
-      if (loading.current) return;
-      loading.current = true;
+      const mine = replace ? ++generation.current : generation.current;
+      if (!replace) {
+        if (loadingMore.current) return;
+        loadingMore.current = true;
+      }
       try {
-        const selected = CHAMBERS.find((c) => c.key === chamber)!.value;
-        const res = await fetchTrades({ page: nextPage, limit: PAGE_SIZE, chamber: [...selected] }, await authed());
+        const res = await fetchTrades(
+          { page: nextPage, limit: PAGE, chamber: chamber === 'both' ? undefined : [chamber] },
+          await authed()
+        );
+        if (mine !== generation.current) return;
         rememberTrades(res.data);
-        // Pages are offsets over a sort with ties (many trades share a date), so
-        // a row can shift from one page into the next between requests and
-        // arrive twice. Kept once: a duplicate is a repeated card and a
-        // duplicate React key.
-        setTrades((prev) => {
+        // Offset pages over a sort with ties can hand back a row twice.
+        setFeed((prev) => {
           if (replace) return res.data;
           const seen = new Set(prev.map((t) => t.id));
           return [...prev, ...res.data.filter((t) => !seen.has(t.id))];
@@ -75,133 +151,293 @@ export default function TradesScreen() {
         setStatus('ready');
         setError(null);
       } catch (err) {
+        if (mine !== generation.current) return;
         setError(err instanceof Error ? err.message : 'Something went wrong.');
         if (replace) setStatus('error');
       } finally {
-        loading.current = false;
+        if (!replace) loadingMore.current = false;
         setRefreshing(false);
       }
     },
-    [chamber, authed],
+    [chamber, authed]
   );
 
-  // No setTrades([]) here: clearing synchronously inside an effect cascades a
-  // render, and `replace` swaps the list when the response lands anyway. The
-  // previous chamber's rows stay up for the moment it takes, which reads
-  // better than a flash of empty.
   useEffect(() => {
-    // react-hooks/set-state-in-effect flags this because load() sets state.
-    // Every one of those calls is behind an await, so nothing is set
-    // synchronously here, and fetching on mount is the case effects exist for.
-    // The template's own use-color-scheme.web.ts trips the same rule.
+    // Every state update in these is behind an await; the rule cannot see that.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(1, true);
-  }, [load]);
+    void loadRecent();
+  }, [loadRecent]);
 
-  const onRefresh = useCallback(() => {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadFeed(1, true);
+  }, [loadFeed]);
+
+  const { stories, trending } = useMemo(() => digest(recent ?? []), [recent]);
+
+  const onRefresh = () => {
     setRefreshing(true);
-    load(1, true);
-  }, [load]);
+    void loadRecent();
+    void loadFeed(1, true);
+  };
 
-  const onEndReached = useCallback(() => {
-    if (status === 'ready' && page < totalPages) load(page + 1, false);
-  }, [status, page, totalPages, load]);
+  const firstName = user?.firstName;
 
-  if (status === 'loading' && trades.length === 0) {
-    return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
-      </ThemedView>
-    );
-  }
+  const browse: { icon: IconName; label: string; href: '/politicians' | '/issuers' | '/news' }[] = [
+    { icon: 'people-outline', label: 'Politicians', href: '/politicians' },
+    { icon: 'business-outline', label: 'Companies', href: '/issuers' },
+    { icon: 'newspaper-outline', label: 'News', href: '/news' },
+  ];
 
-  if (status === 'error' && trades.length === 0) {
-    return (
-      <ThemedView style={styles.centered}>
-        <ThemedText style={styles.errorTitle}>Couldn&apos;t load trades</ThemedText>
-        <ThemedText style={[styles.errorBody, { color: colors.textSecondary }]}>{error}</ThemedText>
-        <Pressable
-          onPress={() => {
-            setStatus('loading');
-            load(1, true);
-          }}
-          style={[styles.retry, { backgroundColor: colors.backgroundSelected }]}>
-          <ThemedText style={styles.retryLabel}>Try again</ThemedText>
-        </Pressable>
-      </ThemedView>
-    );
-  }
+  const header = (
+    <View>
+      <TabHeader
+        right={
+          <Tap onPress={() => router.push('/sign-in')} scaleTo={0.9} accessibilityLabel="Account" hitSlop={8}>
+            <Avatar
+              uri={user?.imageUrl}
+              name={user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'You'}
+              size={34}
+            />
+          </Tap>
+        }
+      />
 
-  return (
-    <ThemedView style={styles.screen}>
-      {/* On iOS and Android the tab bar is along the bottom, so the only thing
-          to clear up here is the notch. Expo Router's web fallback puts the
-          tab bar across the top instead and floats it over the content, which
-          left this row clipped behind it. */}
-      <View style={[styles.segmented, { paddingTop: Platform.OS === 'web' ? 60 : insets.top + 8 }]}>
-        {CHAMBERS.map((c) => {
-          const selected = c.key === chamber;
-          return (
-            <Pressable
-              key={c.key}
-              onPress={() => setChamber(c.key)}
-              style={[
-                styles.segment,
-                { backgroundColor: selected ? colors.backgroundSelected : colors.backgroundElement },
-              ]}>
-              <ThemedText style={[styles.segmentLabel, { color: selected ? colors.text : colors.textSecondary }]}>
-                {c.label}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-        {/* The way back to the account screen from inside the app: plan,
-            sign out, and the account deletion Apple requires in-app. */}
-        <Pressable
-          onPress={() => router.push('/sign-in')}
-          style={[styles.segment, styles.account, { backgroundColor: colors.backgroundElement }]}>
-          <ThemedText style={[styles.segmentLabel, { color: colors.textSecondary }]}>Account</ThemedText>
-        </Pressable>
+      <View style={styles.hello}>
+        <Text variant="callout" tone="muted">
+          {greeting()}
+          {firstName ? `, ${firstName}` : ''}
+        </Text>
+        <Text variant="title">What is Congress trading?</Text>
       </View>
 
+      <View style={styles.search}>
+        <SearchBar onPress={() => router.push('/search')} />
+      </View>
+
+      <View style={styles.block}>
+        <SectionHeader title="Just filed" subtitle="Members with new disclosures" />
+        {recent === null ? (
+          <View style={styles.storiesRow}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <View key={i} style={styles.story}>
+                <Skeleton width={70} height={70} round={35} />
+                <Skeleton width={56} height={10} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
+            {stories.map((s) => (
+              <Tap
+                key={s.slug}
+                scaleTo={0.93}
+                feedback="tap"
+                onPress={() => router.push({ pathname: '/politician/[slug]', params: { slug: s.slug } })}
+                style={styles.story}>
+                <Avatar uri={s.photo} name={s.name} party={s.party} size={64} ring />
+                <Text variant="footnote" numberOfLines={1} style={styles.storyName}>
+                  {s.name.split(' ').slice(-1)[0]}
+                </Text>
+                <Text variant="footnote" tone="faint" style={styles.storyCount}>
+                  {s.count} {s.count === 1 ? 'trade' : 'trades'}
+                </Text>
+              </Tap>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      <View style={styles.inset}>
+        <Tap onPress={() => router.push('/swipe')} feedback="commit" scaleTo={0.98}>
+          <LinearGradient
+            colors={['#0B2A4A', '#173E6B', '#8E2B35']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.swipeCard, scheme === 'light' ? shadow.raised : null]}>
+            <View style={styles.swipeText}>
+              <Text variant="label" color="rgba(255,255,255,0.7)">
+                FIND WHO TO FOLLOW
+              </Text>
+              <Text variant="headline" color="#FFFFFF">
+                Swipe through Congress
+              </Text>
+              <Text variant="callout" color="rgba(255,255,255,0.8)">
+                Right to follow, left to pass. Your picks land in Portfolio.
+              </Text>
+            </View>
+            <View style={styles.swipeIcon}>
+              <Icon name="albums" size={30} color="#FFFFFF" />
+            </View>
+          </LinearGradient>
+        </Tap>
+      </View>
+
+      <View style={styles.block}>
+        <SectionHeader
+          title="Trending in Congress"
+          subtitle="Most traded in the latest filings"
+          action="All"
+          onAction={() => router.push('/issuers')}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendRow}>
+          {recent === null
+            ? Array.from({ length: 3 }, (_, i) => (
+                <View key={i} style={[styles.trendCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+                  <Skeleton width={52} height={52} round={16} />
+                  <Skeleton width="60%" height={14} />
+                  <Skeleton width="90%" height={10} />
+                </View>
+              ))
+            : trending.map((t) => (
+                <Card
+                  key={t.ticker}
+                  onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: t.ticker.toLowerCase() } })}
+                  style={styles.trendCard}>
+                  <View style={styles.trendTop}>
+                    <TickerLogo ticker={t.ticker} size={52} />
+                    <FollowStar
+                      following={follows.isFollowingStock(t.ticker)}
+                      onPress={() =>
+                        follows.toggleStock({ ticker: t.ticker, slug: t.ticker.toLowerCase(), company_name: t.company })
+                      }
+                    />
+                  </View>
+                  <View style={styles.trendText}>
+                    <Text variant="subhead">{t.ticker}</Text>
+                    <Text variant="caption" tone="muted" numberOfLines={1}>
+                      {t.company ?? 'Listed company'}
+                    </Text>
+                  </View>
+                  <Text variant="footnote" tone="muted">
+                    {t.count} trades · {t.members} {t.members === 1 ? 'member' : 'members'}
+                  </Text>
+                  <SentimentBar buys={t.buys} sells={t.sells} showLabels={false} />
+                </Card>
+              ))}
+        </ScrollView>
+      </View>
+
+      <View style={[styles.browse, styles.inset]}>
+        {browse.map((b) => (
+          <Tap
+            key={b.label}
+            feedback="tap"
+            onPress={() => router.push(b.href)}
+            style={[styles.browseTile, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <Icon name={b.icon} size={24} color={c.primary} />
+            <Text variant="callout" style={styles.browseLabel}>
+              {b.label}
+            </Text>
+          </Tap>
+        ))}
+      </View>
+
+      <View style={styles.feedHead}>
+        <SectionHeader title="Latest trades" subtitle="Newest disclosures first" />
+        <ChipRow options={CHAMBERS} value={chamber} onChange={setChamber} />
+      </View>
+      {status === 'loading' && feed.length === 0 ? <RowSkeleton count={6} /> : null}
+      {status === 'error' && feed.length === 0 ? (
+        <EmptyState
+          icon="cloud-offline-outline"
+          title="Couldn't load trades"
+          body={error}
+          action="Try again"
+          onAction={() => void loadFeed(1, true)}
+          compact
+        />
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
       <FlatList
-        data={trades}
+        data={status === 'ready' || feed.length ? feed : []}
         keyExtractor={(t) => String(t.id)}
-        renderItem={({ item }) => <TradeCard trade={item} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.6}
-        contentContainerStyle={styles.list}
+        renderItem={({ item }) => <TradeRow trade={item} />}
+        ListHeaderComponent={header}
         ListFooterComponent={
-          page < totalPages ? (
+          page < totalPages && feed.length ? (
             <View style={styles.footer}>
               <ActivityIndicator />
             </View>
-          ) : (
+          ) : feed.length ? (
             <View style={styles.footer}>
-              <ThemedText style={[styles.end, { color: colors.textSecondary }]}>
-                {trades.length.toLocaleString()} trades loaded
-              </ThemedText>
+              <Text variant="caption" tone="faint">
+                That is every trade on file.
+              </Text>
             </View>
-          )
+          ) : null
         }
+        onEndReached={() => {
+          if (status === 'ready' && page < totalPages) void loadFeed(page + 1, false);
+        }}
+        onEndReachedThreshold={0.8}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textMuted} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.list}
       />
-    </ThemedView>
+      {error && feed.length ? (
+        <View style={[styles.toast, { backgroundColor: c.primary }]}>
+          <Text variant="caption" color={c.primaryText}>
+            {error}
+          </Text>
+          <Button label="Retry" size="md" kind="secondary" onPress={() => void loadFeed(page + 1, false)} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24 },
-  errorTitle: { fontSize: 16, fontWeight: '600' },
-  errorBody: { fontSize: 13, textAlign: 'center' },
-  retry: { marginTop: 8, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
-  retryLabel: { fontSize: 14, fontWeight: '600' },
-  segmented: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
-  segment: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-  segmentLabel: { fontSize: 13, fontWeight: '600' },
-  account: { marginLeft: 'auto' },
-  list: { paddingBottom: 24 },
-  footer: { paddingVertical: 20, alignItems: 'center' },
-  end: { fontSize: 12 },
+  list: { paddingBottom: 32 },
+  hello: { paddingHorizontal: 20, paddingTop: 6, gap: 2 },
+  search: { paddingHorizontal: 20, paddingTop: 16 },
+  block: { paddingTop: 26, gap: 14 },
+  inset: { paddingHorizontal: 20, paddingTop: 26 },
+  storiesRow: { paddingHorizontal: 16, gap: 10 },
+  story: { width: 78, alignItems: 'center', gap: 6 },
+  storyName: { fontWeight: '600', maxWidth: 76 },
+  storyCount: { marginTop: -4 },
+  swipeCard: { borderRadius: radius.xxl, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  swipeText: { flex: 1, gap: 4 },
+  swipeIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trendRow: { paddingHorizontal: 20, gap: 12, paddingBottom: 8 },
+  trendCard: { width: 176, gap: 12, borderRadius: radius.xl, padding: 16, borderWidth: StyleSheet.hairlineWidth },
+  trendTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  trendText: { gap: 1 },
+  browse: { flexDirection: 'row', gap: 10 },
+  browseTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  browseLabel: { fontWeight: '600' },
+  feedHead: { paddingTop: 30, gap: 14, paddingBottom: 6 },
+  footer: { paddingVertical: 28, alignItems: 'center' },
+  toast: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 12,
+    borderRadius: radius.lg,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
 });

@@ -1,10 +1,10 @@
 import { memberDisplayName } from '@congtrade/shared/memberDisplay';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Choice, OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { SearchBar } from '@/ui/search-bar';
+import { Text } from '@/ui/text';
 import { fetchMemberOptions, type MemberOption } from '@/lib/api';
 import { useOnboarding } from '@/lib/onboarding';
 
@@ -22,8 +22,6 @@ const SHOWN = 40;
 export default function MembersScreen() {
   const { answers, set } = useOnboarding();
   const nav = useOnboardingNav();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
 
   const [options, setOptions] = useState<MemberOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,9 +38,7 @@ export default function MembersScreen() {
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matches = q
-      ? options.filter((o) => memberDisplayName(o).toLowerCase().includes(q))
-      : options;
+    const matches = q ? options.filter((o) => memberDisplayName(o).toLowerCase().includes(q)) : options;
     return matches.slice(0, SHOWN);
   }, [options, query]);
 
@@ -70,23 +66,16 @@ export default function MembersScreen() {
         set({ members: [] });
         nav.go('/onboarding/notify');
       }}>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search members"
-        placeholderTextColor={colors.textSecondary}
-        autoCorrect={false}
-        style={[styles.search, { backgroundColor: colors.backgroundElement, color: colors.text }]}
-      />
+      <SearchBar value={query} onChangeText={setQuery} placeholder="Search members" />
 
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator />
         </View>
       ) : shown.length === 0 ? (
-        <ThemedText style={[styles.empty, { color: colors.textSecondary }]}>
+        <Text variant="callout" tone="muted" style={styles.empty}>
           No member matches “{query.trim()}”.
-        </ThemedText>
+        </Text>
       ) : (
         shown.map((o) => (
           <Choice
@@ -103,7 +92,6 @@ export default function MembersScreen() {
 }
 
 const styles = StyleSheet.create({
-  search: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 4 },
   loading: { paddingVertical: 32, alignItems: 'center' },
-  empty: { paddingVertical: 24, fontSize: 14, textAlign: 'center' },
+  empty: { paddingVertical: 24, textAlign: 'center' },
 });

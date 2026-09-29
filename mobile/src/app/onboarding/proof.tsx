@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, useColorScheme } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { radius, useTheme } from '@/theme';
+import { Icon, type IconName } from '@/ui/icon';
+import { Text } from '@/ui/text';
 import { fetchStats, type SiteStats } from '@/lib/api';
 import { useOnboarding } from '@/lib/onboarding';
 
@@ -16,20 +17,25 @@ import { useOnboarding } from '@/lib/onboarding';
 export default function ProofScreen() {
   const nav = useOnboardingNav();
   const { finish } = useOnboarding();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const { c } = useTheme();
   const [stats, setStats] = useState<SiteStats | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchStats({ signal: controller.signal }).then(setStats).catch(() => {});
+    fetchStats({ signal: controller.signal })
+      .then(setStats)
+      .catch(() => {});
     return () => controller.abort();
   }, []);
 
-  const figures = [
-    { value: stats ? stats.totalTransactions.toLocaleString() : '—', label: 'disclosed trades' },
-    { value: stats ? stats.totalMembers.toLocaleString() : '—', label: 'members who file' },
-    { value: stats ? stats.totalFilings.toLocaleString() : '—', label: 'filings read' },
+  const figures: { value: string; label: string; icon: IconName }[] = [
+    {
+      value: stats ? stats.totalTransactions.toLocaleString() : '—',
+      label: 'disclosed trades',
+      icon: 'swap-horizontal',
+    },
+    { value: stats ? stats.totalMembers.toLocaleString() : '—', label: 'members who file', icon: 'people' },
+    { value: stats ? stats.totalFilings.toLocaleString() : '—', label: 'filings read', icon: 'document-text' },
   ];
 
   return (
@@ -44,9 +50,16 @@ export default function ProofScreen() {
       }}>
       <View style={styles.grid}>
         {figures.map((f) => (
-          <View key={f.label} style={[styles.stat, { backgroundColor: colors.backgroundElement }]}>
-            <ThemedText style={styles.value}>{f.value}</ThemedText>
-            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>{f.label}</ThemedText>
+          <View key={f.label} style={[styles.stat, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.icon, { backgroundColor: c.surfaceMuted }]}>
+              <Icon name={f.icon} size={22} color={c.primary} />
+            </View>
+            <View>
+              <Text variant="title">{f.value}</Text>
+              <Text variant="caption" tone="muted">
+                {f.label}
+              </Text>
+            </View>
           </View>
         ))}
       </View>
@@ -56,7 +69,14 @@ export default function ProofScreen() {
 
 const styles = StyleSheet.create({
   grid: { gap: 10 },
-  stat: { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 16, gap: 2 },
-  value: { fontSize: 24, fontWeight: '700' },
-  label: { fontSize: 13 },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  icon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

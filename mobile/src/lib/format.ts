@@ -1,4 +1,4 @@
-import { memberDisplayName, memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
+import { memberDisplayName, memberDisplayNameFromFiledName } from "@congtrade/shared/memberDisplay";
 
 /**
  * Display helpers the app needs and the website does not.
@@ -92,4 +92,69 @@ export function timeAgo(iso: string | null): string {
   const hours = Math.round(minutes / 60);
   if (hours < 48) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
+}
+
+/** "Bought" / "Sold" / "Sold part of" / "Exchanged", for sentences like "Bought Apple (AAPL)". */
+export function tradeVerb(code: string): string {
+  if (code.startsWith("P")) return "Bought";
+  if (/^S.*partial/i.test(code)) return "Sold part of";
+  if (code.startsWith("S")) return "Sold";
+  if (code.startsWith("E")) return "Exchanged";
+  return code;
+}
+
+/**
+ * The asset as a person would say it. Filings carry "Apple Inc. - Common Stock
+ * (AAPL) [ST]"; a sentence wants "Apple". The company name from the market cap
+ * table is preferred when there is one, and the filed text is trimmed of its
+ * share class, ticker and type code otherwise.
+ */
+export function assetLabel(row: { asset_name: string; ticker?: string | null; company_name?: string | null }): string {
+  const base =
+    row.company_name ??
+    row.asset_name
+      .replace(/\s*\[[A-Z]{2,4}\]\s*$/, "")
+      .replace(/\s*\([A-Z.]{1,6}\)\s*/g, " ")
+      .replace(/\s+-\s+(Class [A-Z] )?(Common|Ordinary|Preferred)( Stock| Shares)?.*$/i, "")
+      .replace(/\s+(Common Stock|Ordinary Shares)$/i, "")
+      .trim();
+  const cleaned = base.replace(/,?\s+(Inc\.?|Corp\.?|Corporation|Co\.?|Ltd\.?|plc|N\.V\.|S\.A\.)$/i, "").trim();
+  return cleaned || row.asset_name;
+}
+
+/** A filing date as "Today", "Yesterday", "3d ago", "2w ago", or a date past a couple of months. */
+export function filedAgo(iso: string | null): string {
+  if (!iso) return "";
+  const then = new Date(`${iso.slice(0, 10)}T00:00:00Z`).getTime();
+  if (Number.isNaN(then)) return "";
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((today - then) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.round(days / 7)}w ago`;
+  return shortDate(iso.slice(0, 10));
+}
+
+/** "$1,001 - $15,000" -> "$1,001 – $15,000", with the en dash a range deserves. */
+export function amountLabel(range: string | null): string {
+  if (!range) return "Amount undisclosed";
+  return range.replace(/\s*-\s*/g, " – ");
+}
+
+/** The pill tone for a trade: green for a purchase, red for a sale. */
+export function tradeTone(code: string): "gain" | "loss" | "warn" {
+  if (code.startsWith("P")) return "gain";
+  if (code.startsWith("S")) return "loss";
+  return "warn";
+}
+
+/** "Bought" / "Sold" / "Partial" / "Exchange" as a short pill label. */
+export function tradePill(code: string): string {
+  if (code.startsWith("P")) return "Bought";
+  if (/^S.*partial/i.test(code)) return "Sold part";
+  if (code.startsWith("S")) return "Sold";
+  if (code.startsWith("E")) return "Exchange";
+  return code;
 }

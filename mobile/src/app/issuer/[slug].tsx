@@ -1,185 +1,295 @@
-import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
+import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 
-import { CompactTradeRow } from '@/components/compact-trade-row';
-import { ListState } from '@/components/list-state';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
-import { fetchIssuer, type IssuerDetail } from '@/lib/api';
+import type { IssuerDetail } from '@/lib/api';
+import { getIssuer } from '@/lib/detail-cache';
 import { tradesFromIssuer } from '@/lib/detail-trades';
-import { compactUSD, partyColor, shortDate } from '@/lib/format';
+import { useFollows } from '@/lib/follows';
+import { compactUSD, memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
+import { byMonth } from '@/lib/group';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
+import { radius, useTheme } from '@/theme';
+import { Avatar } from '@/ui/avatar';
+import { Button } from '@/ui/button';
+import { EmptyState } from '@/ui/empty-state';
+import { FollowButton } from '@/ui/follow-button';
+import { SentimentBar } from '@/ui/sentiment-bar';
+import { RowSkeleton, Skeleton } from '@/ui/skeleton';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
+import { TickerLogo } from '@/ui/ticker-logo';
+import { TradeRow } from '@/ui/trade-row';
 
-function Stat({ label, value }: { label: string; value: string }) {
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
-  return (
-    <View style={[styles.stat, { backgroundColor: colors.backgroundElement }]}>
-      <ThemedText style={styles.statValue}>{value}</ThemedText>
-      <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</ThemedText>
-    </View>
-  );
-}
+const RECENT_DAYS = 90;
 
 /**
- * One company: how much Congress has traded it, who, and the latest trades.
+ * One company: how much Congress has traded it, which way it is leaning, who
+ * traded it, and the latest trades by month.
  *
- * The same function the website's issuer page renders from. The traders row
- * is the way across to a member, which is how people actually explore this:
- * from a stock to who holds it, and from them to what else they hold.
+ * The traders row is the way across to a member, which is how people actually
+ * explore this: from a stock to who holds it, and from them to what else.
  */
 export default function IssuerScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
-
+  const follows = useFollows();
   const [detail, setDetail] = useState<IssuerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setDetail(await fetchIssuer(slug, await authed()));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setRefreshing(false);
-    }
-  }, [slug, authed]);
+  const load = useCallback(
+    async (fresh = false) => {
+      try {
+        setDetail(await getIssuer(slug, await authed(), fresh));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Something went wrong.');
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [slug, authed]
+  );
 
   useEffect(() => {
-    // Every state update in load is behind an await, as in the trades screen.
+    // Every state update in load is behind an await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
   const trades = useMemo(() => (detail ? tradesFromIssuer(detail) : []), [detail]);
-  // So a tap on one opens the trade screen straight from memory.
   useEffect(() => rememberTrades(trades), [trades]);
+  const sections = useMemo(() => byMonth(trades), [trades]);
+
+  // Read once per visit: the clock is not something to consult during render.
+  const [now] = useState(() => Date.now());
+  const recent = useMemo(() => {
+    const cutoff = now - RECENT_DAYS * 86_400_000;
+    const rows = trades.filter((t) => t.filing_date && new Date(t.filing_date).getTime() >= cutoff);
+    return {
+      buys: rows.filter((t) => t.transaction_type.startsWith('P')).length,
+      sells: rows.filter((t) => t.transaction_type.startsWith('S')).length,
+    };
+  }, [trades, now]);
 
   if (!detail) {
     return (
-      <ThemedView style={styles.screen}>
-        <Stack.Screen options={{ title: slug?.toUpperCase() ?? '' }} />
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
         {error ? (
-          <ListState
-            kind="error"
+          <EmptyState
+            icon="cloud-offline-outline"
             title="Couldn't load this company"
             body={error}
-            onRetry={() => {
-              setError(null);
-              void load();
-            }}
+            action="Try again"
+            onAction={() => void load(true)}
           />
         ) : (
-          <ListState kind="loading" />
+          <View style={styles.loading}>
+            <Skeleton width={96} height={96} round={28} />
+            <Skeleton width={120} height={24} />
+            <Skeleton width={180} height={14} />
+            <RowSkeleton count={5} />
+          </View>
         )}
-      </ThemedView>
+      </View>
     );
   }
 
   const i = detail.issuer;
+  const following = follows.isFollowingStock(i.ticker);
 
   const header = (
-    <View style={styles.header}>
-      <View>
-        <ThemedText style={styles.ticker}>{i.ticker}</ThemedText>
-        {i.company_name ? (
-          <ThemedText style={[styles.company, { color: colors.textSecondary }]}>{i.company_name}</ThemedText>
-        ) : null}
+    <View>
+      <View style={styles.hero}>
+        <TickerLogo ticker={i.ticker} size={96} />
+        <Text variant="title" style={styles.center}>
+          {i.ticker}
+        </Text>
+        <Text variant="callout" tone="muted" style={styles.center}>
+          {i.company_name ?? 'Listed company'}
+          {i.market_cap ? ` · ${compactUSD(i.market_cap)} market cap` : ''}
+        </Text>
+        <View style={styles.actions}>
+          <View style={styles.flex}>
+            <FollowButton
+              following={following}
+              onPress={() => follows.toggleStock({ ticker: i.ticker, slug: i.slug, company_name: i.company_name })}
+            />
+          </View>
+          <View style={styles.flex}>
+            <Button
+              label="Email alert"
+              icon="notifications-outline"
+              kind="secondary"
+              size="md"
+              onPress={() =>
+                router.push({
+                  pathname: '/alert/[id]',
+                  params: { id: 'new', tickers: i.ticker, name: `Congress trading ${i.ticker}` },
+                })
+              }
+              style={styles.alertButton}
+            />
+          </View>
+        </View>
       </View>
 
-      <View style={styles.stats}>
-        <Stat label="Trades" value={i.trade_count.toLocaleString()} />
-        <Stat label="Members" value={i.politician_count.toLocaleString()} />
-        <Stat label="Purchases" value={i.purchases.toLocaleString()} />
-        <Stat label="Sales" value={i.sales.toLocaleString()} />
-        <Stat label="Est. volume" value={compactUSD(i.volume_sum)} />
-        <Stat label="Market cap" value={i.market_cap ? compactUSD(i.market_cap) : '—'} />
+      <View style={[styles.stats, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {[
+          { v: i.trade_count.toLocaleString(), l: 'Trades' },
+          { v: i.politician_count.toLocaleString(), l: 'Members' },
+          { v: compactUSD(i.volume_sum), l: 'Est. volume' },
+        ].map((s, idx) => (
+          <View
+            key={s.l}
+            style={[
+              styles.statCell,
+              idx > 0 && { borderLeftColor: c.border, borderLeftWidth: StyleSheet.hairlineWidth },
+            ]}>
+            <Text variant="subhead" numberOfLines={1} adjustsFontSizeToFit>
+              {s.v}
+            </Text>
+            <Text variant="footnote" tone="muted">
+              {s.l}
+            </Text>
+          </View>
+        ))}
       </View>
-      <ThemedText style={[styles.note, { color: colors.textSecondary }]}>
-        Last traded {shortDate(i.last_traded)}, last disclosed {shortDate(i.last_filed)}. Volume is estimated from the
-        midpoints of the disclosed ranges.
-      </ThemedText>
+
+      <View style={[styles.lean, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Text variant="subhead">How Congress is leaning</Text>
+        <View style={styles.leanBlock}>
+          <Text variant="caption" tone="muted">
+            Filed in the last {RECENT_DAYS} days
+          </Text>
+          {recent.buys + recent.sells ? (
+            <SentimentBar buys={recent.buys} sells={recent.sells} />
+          ) : (
+            <Text variant="caption" tone="faint">
+              No trades filed in this window.
+            </Text>
+          )}
+        </View>
+        <View style={styles.leanBlock}>
+          <Text variant="caption" tone="muted">
+            All time
+          </Text>
+          <SentimentBar buys={i.purchases} sells={i.sales} />
+        </View>
+        <Text variant="footnote" tone="faint">
+          Last traded {shortDate(i.last_traded)} · last disclosed {shortDate(i.last_filed)}
+        </Text>
+      </View>
 
       {detail.traders.length ? (
-        <>
-          <ThemedText style={styles.section}>Who traded it</ThemedText>
+        <View style={styles.block}>
+          <Text variant="headline" style={styles.blockTitle}>
+            Who traded it
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.traders}>
             {detail.traders.map((t) => (
-              <Pressable
+              <Tap
                 key={t.slug ?? t.member_name}
                 disabled={!t.slug}
+                feedback="tap"
+                scaleTo={0.93}
                 onPress={() => t.slug && router.push({ pathname: '/politician/[slug]', params: { slug: t.slug } })}
-                style={[styles.trader, { backgroundColor: colors.backgroundElement }]}>
-                {t.photo_url ? (
-                  <Image source={{ uri: t.photo_url }} style={styles.traderPhoto} contentFit="cover" />
-                ) : (
-                  <View style={[styles.traderPhoto, { backgroundColor: colors.backgroundSelected }]} />
-                )}
-                <View style={[styles.traderParty, { backgroundColor: partyColor(t.party) }]} />
-                <ThemedText numberOfLines={2} style={styles.traderName}>
-                  {t.display}
-                </ThemedText>
-                <ThemedText style={[styles.traderCount, { color: colors.textSecondary }]}>
+                style={styles.trader}>
+                <Avatar
+                  uri={t.photo_url}
+                  name={t.display || memberDisplayNameFromFiledName(t.member_name)}
+                  party={t.party}
+                  size={60}
+                  ring
+                />
+                <Text variant="footnote" numberOfLines={1} style={styles.traderName}>
+                  {(t.display || memberDisplayNameFromFiledName(t.member_name)).split(' ').slice(-1)[0]}
+                </Text>
+                <Text variant="footnote" tone="faint" style={styles.traderCount}>
                   {t.trade_count} {t.trade_count === 1 ? 'trade' : 'trades'}
-                </ThemedText>
-              </Pressable>
+                </Text>
+              </Tap>
             ))}
           </ScrollView>
-        </>
+        </View>
       ) : null}
 
-      <ThemedText style={styles.section}>
-        {trades.length < i.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
-      </ThemedText>
+      <View style={styles.block}>
+        <Text variant="headline" style={styles.blockTitle}>
+          {trades.length < i.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
+        </Text>
+      </View>
     </View>
   );
 
   return (
-    <ThemedView style={styles.screen}>
-      <Stack.Screen options={{ title: i.ticker }} />
-      <FlatList
-        data={trades}
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
+      <SectionList
+        sections={sections}
         keyExtractor={(t) => String(t.id)}
-        renderItem={({ item }) => <CompactTradeRow trade={item} lead="member" />}
+        renderItem={({ item, index, section }) => <TradeRow trade={item} divider={index < section.data.length - 1} />}
+        renderSectionHeader={({ section }) => (
+          <View style={[styles.month, { backgroundColor: c.background }]}>
+            <Text variant="label" tone="faint">
+              {section.title.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        stickySectionHeadersEnabled={false}
         ListHeaderComponent={header}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              void load();
+              void load(true);
             }}
+            tintColor={c.textMuted}
           />
         }
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
       />
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  list: { paddingBottom: 32 },
-  header: { padding: 16, gap: 12 },
-  ticker: { fontSize: 26, fontWeight: '800', lineHeight: 32 },
-  company: { fontSize: 15 },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  stat: { flexGrow: 1, flexBasis: '30%', padding: 12, borderRadius: 12, gap: 2 },
-  statValue: { fontSize: 17, fontWeight: '700' },
-  statLabel: { fontSize: 12 },
-  note: { fontSize: 12, lineHeight: 17 },
-  section: { marginTop: 8, fontSize: 16, fontWeight: '700' },
-  traders: { gap: 8 },
-  trader: { width: 104, padding: 10, borderRadius: 12, gap: 6, alignItems: 'center' },
-  traderPhoto: { width: 48, height: 48, borderRadius: 24 },
-  traderParty: { width: 20, height: 3, borderRadius: 2 },
-  traderName: { fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
-  traderCount: { fontSize: 11 },
+  list: { paddingBottom: 48 },
+  loading: { alignItems: 'center', gap: 12, paddingTop: 24 },
+  hero: { alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 4 },
+  center: { textAlign: 'center' },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 14, alignSelf: 'stretch' },
+  flex: { flex: 1 },
+  alertButton: { height: 42, borderRadius: radius.pill },
+  stats: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 22,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+  },
+  statCell: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 4 },
+  lean: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    gap: 14,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  leanBlock: { gap: 6 },
+  block: { paddingTop: 26, gap: 12 },
+  blockTitle: { paddingHorizontal: 20 },
+  traders: { paddingHorizontal: 16, gap: 8 },
+  trader: { width: 76, alignItems: 'center', gap: 6 },
+  traderName: { fontWeight: '600', maxWidth: 74 },
+  traderCount: { marginTop: -4 },
+  month: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 },
 });

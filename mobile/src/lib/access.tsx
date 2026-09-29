@@ -41,7 +41,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   // The server's answer, tagged with whose it is. An answer for someone who
   // has since signed out or switched accounts is not an answer for this person.
   const [answer, setAnswer] = useState<{ userId: string; status: AccessStatus; renewing: RenewingProvider[] } | null>(
-    null,
+    null
   );
   const [devSkipped, setDevSkipped] = useState(false);
   const getTokenRef = useRef(getToken);
@@ -85,7 +85,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const skipForDevelopment = useCallback(() => setDevSkipped(true), []);
   const value = useMemo(
     () => ({ status, renewing, locked, refresh, skipForDevelopment: __DEV__ ? skipForDevelopment : undefined }),
-    [status, renewing, locked, refresh, skipForDevelopment],
+    [status, renewing, locked, refresh, skipForDevelopment]
   );
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }

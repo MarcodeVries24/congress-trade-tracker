@@ -1,198 +1,271 @@
-import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View, useColorScheme } from 'react-native';
+import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 
-import { CompactTradeRow } from '@/components/compact-trade-row';
-import { ListState } from '@/components/list-state';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
-import { fetchPolitician, type PoliticianDetail } from '@/lib/api';
+import type { PoliticianDetail } from '@/lib/api';
+import { getPolitician } from '@/lib/detail-cache';
 import { tradesFromPolitician } from '@/lib/detail-trades';
-import { compactUSD, partyColor, shortDate } from '@/lib/format';
+import { useFollows } from '@/lib/follows';
+import { compactUSD, shortDate } from '@/lib/format';
+import { byMonth } from '@/lib/group';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
-
-function Stat({ label, value }: { label: string; value: string }) {
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
-  return (
-    <View style={[styles.stat, { backgroundColor: colors.backgroundElement }]}>
-      <ThemedText style={styles.statValue}>{value}</ThemedText>
-      <ThemedText style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</ThemedText>
-    </View>
-  );
-}
+import { partyTone, radius, useTheme } from '@/theme';
+import { Avatar } from '@/ui/avatar';
+import { Button } from '@/ui/button';
+import { EmptyState } from '@/ui/empty-state';
+import { FollowButton } from '@/ui/follow-button';
+import { RowSkeleton, Skeleton } from '@/ui/skeleton';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
+import { TickerLogo } from '@/ui/ticker-logo';
+import { TradeRow } from '@/ui/trade-row';
 
 /**
- * One member: who they are, how much they trade, what they trade most, and
- * their hundred most recent trades.
+ * One member, as a profile: face, name and role, a follow button, the numbers
+ * that matter, what they trade most, and every recent trade grouped by the
+ * month it was filed.
  *
  * The same data as the website's member page, from the same function, so the
- * totals match to the trade. The trades open the trade screen, which is where
- * the source filing is one tap away.
+ * totals match to the trade.
  */
 export default function PoliticianScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const colors = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
-
+  const follows = useFollows();
   const [detail, setDetail] = useState<PoliticianDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      let found = await fetchPolitician(slug, await authed());
-      // An old spelling's slug answers with where the member lives now.
-      if (found.redirectTo) found = await fetchPolitician(found.redirectTo, await authed());
-      setDetail(found);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setRefreshing(false);
-    }
-  }, [slug, authed]);
+  const load = useCallback(
+    async (fresh = false) => {
+      try {
+        setDetail(await getPolitician(slug, await authed(), fresh));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Something went wrong.');
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [slug, authed]
+  );
 
   useEffect(() => {
-    // Every state update in load is behind an await, as in the trades screen.
+    // Every state update in load is behind an await.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
   const trades = useMemo(() => (detail ? tradesFromPolitician(detail) : []), [detail]);
-  // So a tap on one opens the trade screen straight from memory.
   useEffect(() => rememberTrades(trades), [trades]);
+  const sections = useMemo(() => byMonth(trades), [trades]);
 
   if (!detail) {
     return (
-      <ThemedView style={styles.screen}>
-        <Stack.Screen options={{ title: '' }} />
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
         {error ? (
-          <ListState
-            kind="error"
+          <EmptyState
+            icon="cloud-offline-outline"
             title="Couldn't load this member"
             body={error}
-            onRetry={() => {
-              setError(null);
-              void load();
-            }}
+            action="Try again"
+            onAction={() => void load(true)}
           />
         ) : (
-          <ListState kind="loading" />
+          <View style={styles.loading}>
+            <Skeleton width={104} height={104} round={52} />
+            <Skeleton width={180} height={22} />
+            <Skeleton width={140} height={14} />
+            <RowSkeleton count={5} />
+          </View>
         )}
-      </ThemedView>
+      </View>
     );
   }
 
   const p = detail.profile;
   const where = p.chamber === 'senate' ? p.state : (p.state_district ?? p.state);
-  const role = p.chamber === 'senate' ? 'Senator' : p.chamber === 'house' ? 'Representative' : null;
+  const role = p.chamber === 'senate' ? 'Senator' : p.chamber === 'house' ? 'Representative' : 'Member';
+  const following = follows.isFollowingMember(p.slug);
+  const subtitle = [where, p.chamber === 'senate' ? 'Senate' : 'House'].filter(Boolean).join(' · ');
 
   const header = (
-    <View style={styles.header}>
-      <View style={styles.identity}>
-        {p.photo_url ? (
-          <Image source={{ uri: p.photo_url }} style={styles.photo} contentFit="cover" transition={150} />
-        ) : (
-          <View style={[styles.photo, { backgroundColor: colors.backgroundSelected }]} />
-        )}
-        <View style={styles.identityText}>
-          <ThemedText style={styles.name}>{p.display}</ThemedText>
-          <View style={styles.subtitleRow}>
-            {p.party ? <View style={[styles.partyBar, { backgroundColor: partyColor(p.party) }]} /> : null}
-            <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {[role, where, p.party].filter(Boolean).join(' · ')}
-            </ThemedText>
+    <View>
+      <View style={styles.hero}>
+        <Avatar uri={p.photo_url} name={p.display} party={p.party} size={104} ring />
+        <Text variant="title" style={styles.center}>
+          {p.display}
+        </Text>
+        <View style={styles.roleRow}>
+          <View style={[styles.partyDot, { backgroundColor: partyTone(p.party) }]} />
+          <Text variant="callout" tone="muted">
+            {[role, where, p.party].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+        <View style={styles.actions}>
+          <View style={styles.flex}>
+            <FollowButton
+              following={following}
+              onPress={() =>
+                follows.toggleMember({
+                  slug: p.slug,
+                  name: p.display,
+                  photo_url: p.photo_url,
+                  party: p.party,
+                  subtitle,
+                })
+              }
+            />
+          </View>
+          <View style={styles.flex}>
+            <Button
+              label="Email alert"
+              icon="notifications-outline"
+              kind="secondary"
+              size="md"
+              onPress={() =>
+                router.push({
+                  pathname: '/alert/[id]',
+                  params: { id: 'new', members: p.names.join('|'), name: `Trades by ${p.display}` },
+                })
+              }
+              style={styles.alertButton}
+            />
           </View>
         </View>
       </View>
 
-      <View style={styles.stats}>
-        <Stat label="Trades" value={p.trade_count.toLocaleString()} />
-        <Stat label="Est. volume" value={compactUSD(p.volume_sum)} />
-        <Stat label="Purchases" value={p.purchases.toLocaleString()} />
-        <Stat label="Sales" value={p.sales.toLocaleString()} />
+      <View style={[styles.stats, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {[
+          { v: p.trade_count.toLocaleString(), l: 'Trades' },
+          { v: compactUSD(p.volume_sum), l: 'Est. volume' },
+          { v: p.purchases.toLocaleString(), l: 'Bought', tone: c.gain },
+          { v: p.sales.toLocaleString(), l: 'Sold', tone: c.loss },
+        ].map((s, i) => (
+          <View
+            key={s.l}
+            style={[
+              styles.statCell,
+              i > 0 && { borderLeftColor: c.border, borderLeftWidth: StyleSheet.hairlineWidth },
+            ]}>
+            <Text variant="subhead" color={s.tone} numberOfLines={1} adjustsFontSizeToFit>
+              {s.v}
+            </Text>
+            <Text variant="footnote" tone="muted">
+              {s.l}
+            </Text>
+          </View>
+        ))}
       </View>
-      <ThemedText style={[styles.note, { color: colors.textSecondary }]}>
+      <Text variant="footnote" tone="faint" style={styles.note}>
         Filing since {shortDate(p.first_filed)}, most recently {shortDate(p.last_filed)}. Volume is estimated from the
         midpoints of the disclosed ranges.
-      </ThemedText>
+      </Text>
 
       {p.top_tickers.length ? (
-        <>
-          <ThemedText style={styles.section}>Most traded</ThemedText>
-          <View style={styles.tickers}>
+        <View style={styles.block}>
+          <Text variant="headline" style={styles.blockTitle}>
+            Trades most
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tickers}>
             {p.top_tickers.map((t) => (
-              <Pressable
+              <Tap
                 key={t.ticker}
+                feedback="tap"
+                scaleTo={0.94}
                 onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: t.ticker.toLowerCase() } })}
-                style={[styles.ticker, { backgroundColor: colors.backgroundElement }]}>
-                <ThemedText style={styles.tickerLabel}>{t.ticker}</ThemedText>
-                <ThemedText style={[styles.tickerCount, { color: colors.textSecondary }]}>{t.count}</ThemedText>
-              </Pressable>
+                style={[styles.tickerCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+                <TickerLogo ticker={t.ticker} size={40} />
+                <View>
+                  <Text variant="bodyStrong">{t.ticker}</Text>
+                  <Text variant="footnote" tone="muted">
+                    {t.count} {t.count === 1 ? 'trade' : 'trades'}
+                  </Text>
+                </View>
+              </Tap>
             ))}
-          </View>
-        </>
+          </ScrollView>
+        </View>
       ) : null}
 
-      <ThemedText style={styles.section}>
-        {trades.length < p.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
-      </ThemedText>
+      <View style={styles.block}>
+        <Text variant="headline" style={styles.blockTitle}>
+          {trades.length < p.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
+        </Text>
+      </View>
     </View>
   );
 
   return (
-    <ThemedView style={styles.screen}>
-      <Stack.Screen options={{ title: p.display }} />
-      <FlatList
-        data={trades}
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
+      <SectionList
+        sections={sections}
         keyExtractor={(t) => String(t.id)}
-        renderItem={({ item }) => <CompactTradeRow trade={item} lead="asset" />}
+        renderItem={({ item, index, section }) => (
+          <TradeRow trade={item} lead="asset" divider={index < section.data.length - 1} />
+        )}
+        renderSectionHeader={({ section }) => (
+          <View style={[styles.month, { backgroundColor: c.background }]}>
+            <Text variant="label" tone="faint">
+              {section.title.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        stickySectionHeadersEnabled={false}
         ListHeaderComponent={header}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              void load();
+              void load(true);
             }}
+            tintColor={c.textMuted}
           />
         }
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
       />
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  list: { paddingBottom: 32 },
-  header: { padding: 16, gap: 12 },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  photo: { width: 72, height: 72, borderRadius: 36 },
-  identityText: { flex: 1, gap: 4 },
-  name: { fontSize: 22, fontWeight: '700', lineHeight: 28 },
-  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  partyBar: { width: 4, height: 14, borderRadius: 2 },
-  subtitle: { fontSize: 13, flexShrink: 1 },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  stat: { flexGrow: 1, flexBasis: '45%', padding: 12, borderRadius: 12, gap: 2 },
-  statValue: { fontSize: 18, fontWeight: '700' },
-  statLabel: { fontSize: 12 },
-  note: { fontSize: 12, lineHeight: 17 },
-  section: { marginTop: 8, fontSize: 16, fontWeight: '700' },
-  tickers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  ticker: {
+  list: { paddingBottom: 48 },
+  loading: { alignItems: 'center', gap: 12, paddingTop: 24 },
+  hero: { alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 4 },
+  center: { textAlign: 'center', marginTop: 6 },
+  roleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  partyDot: { width: 10, height: 10, borderRadius: 5 },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 12, alignSelf: 'stretch' },
+  flex: { flex: 1 },
+  alertButton: { height: 42, borderRadius: radius.pill },
+  stats: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
+    marginHorizontal: 16,
+    marginTop: 22,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
   },
-  tickerLabel: { fontSize: 13, fontWeight: '700' },
-  tickerCount: { fontSize: 12 },
+  statCell: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 4 },
+  note: { paddingHorizontal: 22, paddingTop: 10 },
+  block: { paddingTop: 26, gap: 12 },
+  blockTitle: { paddingHorizontal: 20 },
+  tickers: { paddingHorizontal: 16, gap: 10 },
+  tickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 16,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  month: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 },
 });

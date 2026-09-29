@@ -22,7 +22,7 @@ export type OnboardingAnswers = {
   notify: Notify;
 };
 
-const EMPTY: OnboardingAnswers = { goal: null, chamber: 'both', members: [], notify: 'push' };
+const EMPTY: OnboardingAnswers = { goal: null, chamber: 'both', members: [], notify: 'both' };
 
 const ANSWERS_KEY = 'congtrade.onboarding.answers';
 const DONE_KEY = 'congtrade.onboarding.done';

@@ -1,11 +1,15 @@
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
+import { haptic } from '@/lib/haptics';
+import { radius, useTheme } from '@/theme';
+import { Button, IconButton } from '@/ui/button';
+import { Icon, type IconName } from '@/ui/icon';
+import { Tap } from '@/ui/tap';
+import { Text } from '@/ui/text';
 
 export const ONBOARDING_STEPS = 5;
 
@@ -25,6 +29,7 @@ export function OnboardingStep({
   continueLabel = 'Continue',
   canContinue = true,
   skip,
+  back = true,
 }: {
   step: number;
   title: string;
@@ -34,80 +39,120 @@ export function OnboardingStep({
   continueLabel?: string;
   canContinue?: boolean;
   skip?: () => void;
+  back?: boolean;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const progress = useSharedValue(Math.max(0, step - 1) / ONBOARDING_STEPS);
+
+  useEffect(() => {
+    progress.set(withTiming(step / ONBOARDING_STEPS, { duration: 450 }));
+  }, [step, progress]);
+
+  const fill = useAnimatedStyle(() => ({ width: `${Math.min(1, progress.value) * 100}%` }));
 
   return (
-    <ThemedView style={styles.screen}>
-      <View style={[styles.progress, { paddingTop: insets.top + 12 }]}>
-        {Array.from({ length: ONBOARDING_STEPS }, (_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.pip,
-              { backgroundColor: i <= step ? '#3b7ddd' : colors.backgroundElement },
-            ]}
-          />
-        ))}
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
+      <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
+        {back && router.canGoBack() ? (
+          <IconButton name="chevron-back" label="Back" onPress={() => router.back()} size={36} />
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
+        <View style={[styles.track, { backgroundColor: c.surfaceMuted }]}>
+          <Animated.View style={[styles.fill, { backgroundColor: c.accent }, fill]} />
+        </View>
+        {skip ? (
+          <Tap onPress={skip} hitSlop={10}>
+            <Text variant="callout" tone="muted" style={styles.skip}>
+              Skip
+            </Text>
+          </Tap>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ThemedText style={styles.title}>{title}</ThemedText>
-        {subtitle ? (
-          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</ThemedText>
-        ) : null}
-        <View style={styles.body}>{children}</View>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        <Animated.View entering={FadeInDown.duration(380)} style={styles.titles}>
+          <Text variant="display">{title}</Text>
+          {subtitle ? (
+            <Text variant="body" tone="muted">
+              {subtitle}
+            </Text>
+          ) : null}
+        </Animated.View>
+        <Animated.View entering={FadeInDown.duration(420).delay(80)} style={styles.body}>
+          {children}
+        </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
-          disabled={!canContinue}
-          onPress={onContinue}
-          style={[styles.cta, { backgroundColor: '#3b7ddd', opacity: canContinue ? 1 : 0.4 }]}>
-          <ThemedText style={styles.ctaLabel}>{continueLabel}</ThemedText>
-        </Pressable>
-        {skip ? (
-          <Pressable onPress={skip} style={styles.skip}>
-            <ThemedText style={[styles.skipLabel, { color: colors.textSecondary }]}>Skip</ThemedText>
-          </Pressable>
-        ) : null}
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: insets.bottom + 14, borderTopColor: c.border, backgroundColor: c.background },
+        ]}>
+        <Button label={continueLabel} onPress={onContinue} disabled={!canContinue} />
       </View>
-    </ThemedView>
+    </View>
   );
 }
 
-/** A tappable answer. Multi-select shows a tick, single-select just fills. */
+/** A tappable answer card. Selected fills navy-tinted with a check. */
 export function Choice({
   label,
   hint,
   selected,
   onPress,
+  icon,
 }: {
   label: string;
   hint?: string;
   selected: boolean;
   onPress: () => void;
+  icon?: IconName;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const { c } = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
+    <Tap
+      onPress={() => {
+        haptic.select();
+        onPress();
+      }}
+      scaleTo={0.98}
       style={[
         styles.choice,
         {
-          backgroundColor: selected ? 'rgba(59,125,221,0.16)' : colors.backgroundElement,
-          borderColor: selected ? '#3b7ddd' : 'transparent',
+          backgroundColor: c.surface,
+          borderColor: selected ? c.primary : c.border,
+          borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
         },
       ]}>
+      {icon ? (
+        <View style={[styles.choiceIcon, { backgroundColor: selected ? c.primary : c.surfaceMuted }]}>
+          <Icon name={icon} size={22} color={selected ? c.primaryText : c.text} />
+        </View>
+      ) : null}
       <View style={styles.choiceText}>
-        <ThemedText style={styles.choiceLabel}>{label}</ThemedText>
-        {hint ? <ThemedText style={[styles.choiceHint, { color: colors.textSecondary }]}>{hint}</ThemedText> : null}
+        <Text variant="bodyStrong">{label}</Text>
+        {hint ? (
+          <Text variant="caption" tone="muted">
+            {hint}
+          </Text>
+        ) : null}
       </View>
-      {selected ? <ThemedText style={styles.tick}>✓</ThemedText> : null}
-    </Pressable>
+      <View
+        style={[
+          styles.check,
+          selected ? { backgroundColor: c.primary, borderColor: c.primary } : { borderColor: c.borderStrong },
+        ]}>
+        {selected ? <Icon name="checkmark" size={15} color={c.primaryText} /> : null}
+      </View>
+    </Tap>
   );
 }
 
@@ -115,35 +160,33 @@ export function Choice({
 export function useOnboardingNav() {
   const router = useRouter();
   return {
-    go: (path: string) => router.push(path as never),
+    go: (path: string) => {
+      haptic.tap();
+      router.push(path as never);
+    },
     replace: (path: string) => router.replace(path as never),
   };
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  progress: { flexDirection: 'row', gap: 6, paddingHorizontal: 24, paddingBottom: 8 },
-  pip: { flex: 1, height: 4, borderRadius: 2 },
-  content: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 },
-  title: { fontSize: 26, fontWeight: '700', lineHeight: 32 },
-  subtitle: { marginTop: 8, fontSize: 15, lineHeight: 21 },
-  body: { marginTop: 24, gap: 10 },
-  footer: { paddingHorizontal: 24, paddingTop: 8, gap: 4 },
-  cta: { alignItems: 'center', borderRadius: 14, paddingVertical: 16 },
-  ctaLabel: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
-  skip: { alignItems: 'center', paddingVertical: 10 },
-  skipLabel: { fontSize: 14 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 8 },
+  track: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
+  skip: { fontWeight: '600' },
+  content: { paddingHorizontal: 22, paddingTop: 18, paddingBottom: 28 },
+  titles: { gap: 10 },
+  body: { marginTop: 26, gap: 12 },
+  footer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   choice: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    gap: 14,
+    borderRadius: radius.xl,
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingVertical: 16,
   },
+  choiceIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   choiceText: { flex: 1, gap: 2 },
-  choiceLabel: { fontSize: 15, fontWeight: '600' },
-  choiceHint: { fontSize: 13, lineHeight: 18 },
-  tick: { fontSize: 16, fontWeight: '700', color: '#3b7ddd' },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });

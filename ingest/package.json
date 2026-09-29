@@ -24,7 +24,8 @@
     "pdf-to-img": "^5.0.0",
     "playwright": "^1.63.0",
     "sharp": "^0.35.4",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "@congtrade/shared": "*"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

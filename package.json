@@ -2,6 +2,7 @@
   "name": "congress-trade-tracker",
   "private": true,
   "workspaces": [
+    "shared",
     "ingest",
     "web"
   ],

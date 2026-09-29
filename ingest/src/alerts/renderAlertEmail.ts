@@ -1,7 +1,7 @@
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { describeAlert } from "../../../web/lib/alertFilters";
 import { amountLabel } from "../../../web/lib/api";
-import { memberDisplayName } from "../../../web/lib/memberDisplay";
+import { memberDisplayName } from "@congtrade/shared/memberDisplay";
 
 /**
  * The alert email itself.

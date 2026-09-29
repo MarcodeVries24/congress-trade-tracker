@@ -12,7 +12,7 @@ import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
 import { radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
-import { Button } from '@/ui/button';
+import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
@@ -193,13 +193,17 @@ export default function DiscoverScreen() {
     <View>
       <TabHeader
         right={
-          <Tap onPress={() => router.push('/sign-in')} scaleTo={0.9} accessibilityLabel="Account" hitSlop={8}>
-            <Avatar
-              uri={user?.imageUrl}
-              name={user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'You'}
-              size={34}
-            />
-          </Tap>
+          user ? (
+            <Tap onPress={() => router.push('/sign-in')} scaleTo={0.9} accessibilityLabel="Account" hitSlop={8}>
+              <Avatar
+                uri={user.imageUrl}
+                name={user.fullName ?? user.primaryEmailAddress?.emailAddress ?? 'You'}
+                size={34}
+              />
+            </Tap>
+          ) : (
+            <IconButton name="person-circle-outline" label="Sign in" onPress={() => router.push('/sign-in')} />
+          )
         }
       />
 

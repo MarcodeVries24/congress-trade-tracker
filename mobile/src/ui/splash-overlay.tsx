@@ -1,14 +1,15 @@
+import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useTheme } from '@/theme';
-import { Logo } from '@/ui/logo';
 
 /**
- * The hand-off from the native splash: the same mark on the same colour, held
- * for a beat and faded out, so the app appears rather than snaps in.
+ * The hand-off from the native splash: the same icon, the same size, on the
+ * same colour, held for a beat and faded out, so the app appears rather than
+ * snaps in.
  */
 export function SplashOverlay() {
   const { c } = useTheme();
@@ -24,7 +25,7 @@ export function SplashOverlay() {
             .catch(() => {})
             .finally(() => setTimeout(() => setVisible(false), 450));
         }}>
-        <Logo size={34} />
+        <Image source={require('@/assets/images/splash-icon.png')} style={styles.icon} contentFit="contain" />
       </View>
     </Animated.View>
   );
@@ -32,4 +33,6 @@ export function SplashOverlay() {
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  // Matches imageWidth in the expo-splash-screen plugin config.
+  icon: { width: 112, height: 112 },
 });

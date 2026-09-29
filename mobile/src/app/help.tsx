@@ -88,7 +88,7 @@ export default function HelpScreen() {
         <Icon name="chatbubbles-outline" size={28} color={c.primary} />
         <Text variant="subhead">Still stuck?</Text>
         <Text variant="callout" tone="muted" style={styles.centerText}>
-          Email {SUPPORT_EMAIL}. A person reads every message, usually within a working day.
+          Email {SUPPORT_EMAIL}. We read every message and reply as soon as we can.
         </Text>
         <Button
           label="Email support"

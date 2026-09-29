@@ -1,56 +1,62 @@
-# Welcome to your Expo app 👋
+# CongTrade mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo (React Native) app for iOS and Android. Reads the same Next.js API the
+website does, shares entitlement and name resolution through
+`@congtrade/shared`, and sells CongTrade Pro through the App Store and Play.
 
-## Get started
+## Running it
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Two servers, because the Expo web target and the API are different origins:
 
 ```bash
-npm run reset-project
+npm run dev --workspace web      # the API, on :3000
+npm --prefix mobile run web      # the app, on :8081
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`mobile/.env.local` points at both. Copy it from `.env.example`.
 
-### Other setup steps
+**Expo web is a development convenience, not a shipping target.** It has caught
+several real bugs, but a green web run proves nothing about native: SF Symbols,
+native tabs, SecureStore, the OAuth redirect and every part of in-app purchase
+behave differently or not at all there. `use-purchases.web.ts` exists precisely
+because `expo-iap` has no web implementation.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Two constraints are web-only and neither affects a device build:
 
-## Learn more
+- The API sends CORS headers for localhost **in development only**, which is
+  what lets :8081 reach :3000. A native build is not origin-checked.
+- Clerk's production key is locked to `congtrade.com` and is rejected on
+  localhost, so local runs use the development instance. Native builds are not
+  origin-checked either, which is why the EAS profiles carry the live key.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Builds
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Nothing about in-app purchase runs in Expo Go: it is a native module, so it
+needs a development build.
 
-## Join the community
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init            # once, writes extra.eas.projectId
+npx eas-cli@latest build --profile development --platform ios
+```
 
-Join our community of developers creating universal apps.
+Install the result on a device, then `npm --prefix mobile start` and open it
+from the dev client.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+All three profiles point at the production API with the live Clerk key. A
+device cannot reach the laptop's localhost, and a token from the development
+Clerk instance would be rejected by the production API, so pointing a device
+build at anything else does not work.
+
+## Testing a purchase
+
+1. App Store Connect → Users and Access → Sandbox → create a tester
+2. On the device: Settings → App Store → Sandbox Account → sign in as it
+3. Run the development build and complete a purchase from the paywall
+
+Sandbox renewals are accelerated: a one-week subscription renews every three
+minutes, which is how a year of renewal notifications gets tested in an hour.
+
+The first thing to check if the paywall shows no prices is App Store Connect,
+not the code. A product with no price, no localization or no availability is
+returned by no store.

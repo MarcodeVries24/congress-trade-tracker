@@ -170,6 +170,164 @@ export async function fetchMemberOptions(options: RequestOptions = {}): Promise<
   return [...groups.values()].sort((a, b) => b.trade_count - a.trade_count);
 }
 
+export interface PoliticianSummary {
+  member_name: string;
+  slug: string;
+  state_district: string | null;
+  party: string | null;
+  photo_url: string | null;
+  member_state: string | null;
+  chamber: "house" | "senate";
+  trade_count: number;
+  volume_sum: number;
+  last_filed: string | null;
+}
+
+export interface ListQuery {
+  page?: number;
+  limit?: number;
+  q?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+  chamber?: ("house" | "senate")[];
+}
+
+function listParams(query: ListQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  if (query.q) params.set("q", query.q);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.order) params.set("order", query.order);
+  for (const c of query.chamber ?? []) params.append("chamber", c);
+  return params;
+}
+
+/** One row per person, merged across filed spellings by the server. */
+export function fetchPoliticians(query: ListQuery = {}, options: RequestOptions = {}): Promise<Page<PoliticianSummary>> {
+  return get<Page<PoliticianSummary>>("/api/politicians", listParams(query), options);
+}
+
+/** The trade fields the member and issuer pages carry, a subset of Trade. */
+export interface DetailTrade {
+  id: number;
+  asset_name: string;
+  ticker: string | null;
+  asset_type_code: string | null;
+  company_name: string | null;
+  owner: string | null;
+  transaction_type: string;
+  transaction_date: string | null;
+  amount_range: string | null;
+  amount_low: number | null;
+  amount_high: number | null;
+  filing_date: string | null;
+  pdf_url: string;
+  days_to_file: number | null;
+}
+
+export interface PoliticianDetail {
+  profile: {
+    slug: string;
+    display: string;
+    names: string[];
+    party: string | null;
+    state: string | null;
+    state_district: string | null;
+    chamber: "house" | "senate" | null;
+    photo_url: string | null;
+    trade_count: number;
+    volume_sum: number;
+    first_filed: string | null;
+    last_filed: string | null;
+    purchases: number;
+    sales: number;
+    top_tickers: { ticker: string; count: number }[];
+  };
+  /** The most recent hundred, newest first. */
+  trades: DetailTrade[];
+  /** Set when the slug was an old spelling: ask again under this one. */
+  redirectTo: string | null;
+}
+
+export function fetchPolitician(slug: string, options: RequestOptions = {}): Promise<PoliticianDetail> {
+  return get<PoliticianDetail>(`/api/politicians/${encodeURIComponent(slug)}`, undefined, options);
+}
+
+export interface IssuerSummary {
+  ticker: string;
+  slug: string;
+  company_name: string | null;
+  market_cap: number | null;
+  trade_count: number;
+  volume_sum: number;
+  politician_count: number;
+  purchases: number;
+  sales: number;
+  last_traded: string | null;
+  last_filed: string | null;
+}
+
+export function fetchIssuers(query: ListQuery = {}, options: RequestOptions = {}): Promise<Page<IssuerSummary>> {
+  return get<Page<IssuerSummary>>("/api/issuers", listParams(query), options);
+}
+
+export interface IssuerDetail {
+  issuer: IssuerSummary;
+  traders: {
+    member_name: string;
+    bioguide_id: string | null;
+    slug: string | null;
+    display: string;
+    party: string | null;
+    photo_url: string | null;
+    trade_count: number;
+    volume_sum: number;
+  }[];
+  trades: (DetailTrade & {
+    member_name: string;
+    bioguide_id: string | null;
+    member_slug: string | null;
+    party: string | null;
+    photo_url: string | null;
+    chamber: "house" | "senate";
+  })[];
+}
+
+export function fetchIssuer(slug: string, options: RequestOptions = {}): Promise<IssuerDetail> {
+  return get<IssuerDetail>(`/api/issuers/${encodeURIComponent(slug)}`, undefined, options);
+}
+
+export interface NewsItem {
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: string | null;
+  image: string | null;
+}
+
+export interface NewsSection {
+  key: string;
+  publisher: string;
+  homepage: string;
+  blurb: string;
+  items: NewsItem[];
+}
+
+/**
+ * The publishers' feeds, grouped by publisher.
+ *
+ * Feed image URLs arrive HTML-escaped (`&amp;` between query parameters), which
+ * a browser forgives inside an attribute and an image loader does not.
+ */
+export async function fetchNews(options: RequestOptions = {}): Promise<NewsSection[]> {
+  const raw = await get<{ sections: NewsSection[] }>("/api/news", undefined, options);
+  return raw.sections.map((section) => ({
+    ...section,
+    items: section.items.map((item) => ({ ...item, image: item.image ? item.image.replace(/&amp;/g, "&") : null })),
+  }));
+}
+
 export interface SiteStats {
   totalTransactions: number;
   totalFilings: number;

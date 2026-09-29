@@ -1,4 +1,4 @@
-import { memberDisplayName } from '@congtrade/shared/memberDisplay';
+import { memberDisplayName, memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 
 /**
  * Display helpers the app needs and the website does not.
@@ -8,7 +8,7 @@ import { memberDisplayName } from '@congtrade/shared/memberDisplay';
  * title-caser, which got "Richard Blumenthal" right and would have got "Ro
  * Khanna" wrong, because the curated per-bioguide names were not reachable.
  */
-export { memberDisplayName };
+export { memberDisplayName, memberDisplayNameFromFiledName };
 
 /** The name for a trade row, resolved the same way every other surface does. */
 export function memberName(row: { member_name: string; bioguide_id?: string | null }): string {
@@ -64,4 +64,32 @@ export function partyColor(party: string | null): string {
   if (p.startsWith("d")) return "#3b7ddd";
   if (p.startsWith("r")) return "#d6455d";
   return "#8a95a1";
+}
+
+/** 432267815 -> "$432M". Volumes are estimates from bracket midpoints, so precision would be false. */
+export function compactUSD(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "$0";
+  if (n >= 1_000_000_000_000) return `$${(n / 1_000_000_000_000).toFixed(1).replace(/\.0$/, "")}T`;
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1_000_000) return `$${Math.round(n / 1_000_000)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n)}`;
+}
+
+/** "Democrat" -> "D". The colour carries the rest. */
+export function partyLetter(party: string | null): string {
+  if (!party) return "";
+  return party.trim().charAt(0).toUpperCase();
+}
+
+/** An ISO timestamp as "3h ago" / "2d ago", for news, where recency is the point. */
+export function timeAgo(iso: string | null): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.max(0, Math.round((Date.now() - then) / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }

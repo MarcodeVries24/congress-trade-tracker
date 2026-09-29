@@ -40,6 +40,8 @@ function Navigation() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
         <Stack.Screen name="trade/[id]" options={{ headerShown: true }} />
+        <Stack.Screen name="politician/[slug]" options={{ headerShown: true, title: '' }} />
+        <Stack.Screen name="issuer/[slug]" options={{ headerShown: true, title: '' }} />
         <Stack.Screen name="sign-in" options={{ presentation: 'modal', headerShown: true, title: 'Sign in' }} />
       </Stack>
     </>

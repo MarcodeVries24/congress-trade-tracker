@@ -522,26 +522,74 @@ export async function fetchStats(chambers?: string[]): Promise<Stats> {
 // Option lists for the searchable Member / Ticker filters — fetched once
 // (not per-keystroke; filtering as the user types happens client-side
 // against this list, same as every other checkbox filter here).
-export async function fetchMemberOptions(): Promise<{ member_name: string; bioguide_id: string | null; trade_count: number }[]> {
+export interface MemberOption {
+  /** The spelling that stands for the group: the one with the most trades. */
+  member_name: string;
+  /** Every filed spelling in the group, because the filter matches exactly. */
+  names: string[];
+  bioguide_id: string | null;
+  trade_count: number;
+}
+
+export async function fetchMemberOptions(): Promise<MemberOption[]> {
   const res = await fetch("/api/members");
   if (!res.ok) throw new Error(`Failed to fetch members: ${res.status}`);
-  const rows: { member_name: string; bioguide_id: string | null; trade_count: number }[] = (await res.json()).data;
-  // /api/members groups by (member_name, state_district) — a member who's
-  // been redistricted can appear more than once under the same name, which
-  // would otherwise show as duplicate options. bioguide_id comes along so the
-  // option can be *labelled* with the curated name while its value stays the
-  // filed spelling the filter actually queries on.
-  const byName = new Map<string, { bioguide_id: string | null; trade_count: number }>();
-  for (const r of rows) {
-    const seen = byName.get(r.member_name);
-    byName.set(r.member_name, {
-      bioguide_id: seen?.bioguide_id ?? r.bioguide_id,
-      trade_count: (seen?.trade_count ?? 0) + r.trade_count,
-    });
+  // COUNT(*) comes back from Postgres as a string, so it is coerced here once
+  // rather than summed with + and silently concatenated. It only feeds the
+  // ordering, which is why "0101" went unnoticed until a group had two rows to
+  // add together.
+  const raw: { member_name: string; bioguide_id: string | null; trade_count: number | string }[] = (await res.json()).data;
+  const rows = raw.map((r) => ({ ...r, trade_count: Number(r.trade_count) || 0 }));
+  // Grouped by bioguide id, not by the filed spelling. /api/members already
+  // folds a redistricted member's rows together, but one person can also be
+  // filed under two spellings — Blumenthal's scanned filings say "RICHARD
+  // BLUMENTHAL" and his electronic ones say "Richard Blumenthal". Both get the
+  // same curated label from memberDisplayName, so grouping by name left two
+  // options reading identically, which is what a filter list must never do.
+  // Boozman and Fetterman are split the same way.
+  //
+  // The filter matches member_name exactly (t.member_name = ANY(...)), so the
+  // option has to carry every spelling and query on all of them. Grouping only
+  // for display would have shown one option that found a third of the trades.
+  // Two passes, because a filing whose member never resolved carries a null
+  // bioguide id and would otherwise open a group of its own under a name that
+  // already has one. Hern, Franklin and Miller each had a handful of such rows,
+  // which left a second option with an identical label after the merge above.
+  const groups = new Map<string, MemberOption>();
+  const byName = new Map<string, MemberOption>();
+
+  const add = (group: MemberOption, r: { member_name: string; bioguide_id: string | null; trade_count: number }) => {
+    if (!group.names.includes(r.member_name)) group.names.push(r.member_name);
+    group.bioguide_id = group.bioguide_id ?? r.bioguide_id;
+    group.trade_count += r.trade_count;
+    byName.set(r.member_name, group);
+  };
+
+  // /api/members returns rows ordered by trade_count, so the first spelling
+  // seen for a group is its busiest and stays the representative.
+  for (const r of rows.filter((r) => r.bioguide_id)) {
+    const existing = groups.get(r.bioguide_id as string);
+    if (existing) {
+      add(existing, r);
+      continue;
+    }
+    const group: MemberOption = { member_name: r.member_name, names: [], bioguide_id: r.bioguide_id, trade_count: 0 };
+    groups.set(r.bioguide_id as string, group);
+    add(group, r);
   }
-  return [...byName.entries()]
-    .map(([member_name, v]) => ({ member_name, ...v }))
-    .sort((a, b) => b.trade_count - a.trade_count);
+
+  for (const r of rows.filter((r) => !r.bioguide_id)) {
+    const existing = byName.get(r.member_name);
+    if (existing) {
+      add(existing, r);
+      continue;
+    }
+    const group: MemberOption = { member_name: r.member_name, names: [], bioguide_id: null, trade_count: 0 };
+    groups.set(r.member_name, group);
+    add(group, r);
+  }
+
+  return [...groups.values()].sort((a, b) => b.trade_count - a.trade_count);
 }
 
 export async function fetchTickerOptions(): Promise<{ ticker: string; trade_count: number }[]> {

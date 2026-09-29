@@ -227,6 +227,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const [memberOptions, setMemberOptions] = useState<{ value: string; label: string }[]>([]);
+  // One option can stand for several filed spellings of the same person, so
+  // the query has to name all of them. Keyed by every spelling, not just the
+  // representative, so an older saved link built on the other one still
+  // expands to the whole group.
+  const [memberSpellings, setMemberSpellings] = useState<Map<string, string[]>>(new Map());
   const [tickerOptions, setTickerOptions] = useState<{ value: string; label: string }[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
 
@@ -234,6 +239,7 @@ export default function Home() {
     Promise.all([fetchMemberOptions(), fetchTickerOptions()])
       .then(([memberRows, tickerRows]) => {
         setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: memberDisplayName(m) })));
+        setMemberSpellings(new Map(memberRows.flatMap((m) => m.names.map((n) => [n, m.names] as const))));
         setTickerOptions(tickerRows.map((t) => ({ value: t.ticker, label: t.ticker })));
       })
       .catch(() => {})
@@ -242,11 +248,19 @@ export default function Home() {
 
   const debouncedQ = useDebounced(q);
 
+  // `members` holds one value per person, which is what the select shows and
+  // what the URL carries. The trade query and a saved alert both match on the
+  // filed spelling, so both use this expansion instead.
+  const queriedMembers = useMemo(
+    () => members.flatMap((m) => memberSpellings.get(m) ?? [m]),
+    [members, memberSpellings]
+  );
+
   const filters: TradeFilters = useMemo(
     () => ({
       chamber: chamber === "both" ? ["house", "senate"] : [chamber],
       q: debouncedQ || undefined,
-      members: members.length ? members : undefined,
+      members: queriedMembers.length ? queriedMembers : undefined,
       parties: parties.length ? parties : undefined,
       states: states.length ? states : undefined,
       tickers: tickers.length ? tickers : undefined,
@@ -267,7 +281,7 @@ export default function Home() {
     [
       chamber,
       debouncedQ,
-      members,
+      queriedMembers,
       parties,
       states,
       tickers,
@@ -307,7 +321,7 @@ export default function Home() {
     () => ({
       q: debouncedQ || undefined,
       chambers: chamber === "both" ? undefined : [chamber],
-      members: members.length ? members : undefined,
+      members: queriedMembers.length ? queriedMembers : undefined,
       parties: parties.length ? parties : undefined,
       states: states.length ? states : undefined,
       tickers: tickers.length ? tickers : undefined,
@@ -322,7 +336,7 @@ export default function Home() {
     [
       debouncedQ,
       chamber,
-      members,
+      queriedMembers,
       parties,
       states,
       tickers,

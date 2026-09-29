@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "September 28, 2026";
 
-// TODO(marco): section 2 still needs the one statutory trader detail Dutch and
-// EU e-commerce law require that we do not have: the geographical business
-// address. It is left out rather than guessed at. Everything else on this page
-// is accurate as written.
+// Section 2 names the trader but not its street address, deliberately: the
+// address is published once, in the Privacy Policy, which the footer links from
+// every page and which section 12 makes part of these terms. Don't add it here
+// as a tidying-up; that placement is a decision, not an omission.
 
 export default function TermsPage() {
   return (

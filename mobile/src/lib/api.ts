@@ -111,4 +111,82 @@ export function fetchTrades(query: TradeQuery = {}, options: RequestOptions = {}
   return get<Page<Trade>>("/api/trades", params, options);
 }
 
+export interface MemberOption {
+  member_name: string;
+  /** Every filed spelling of this person, because the filter matches exactly. */
+  names: string[];
+  bioguide_id: string | null;
+  trade_count: number;
+}
+
+/**
+ * The member list, grouped one option per person.
+ *
+ * /api/members returns a row per (name, bioguide), and one person can be filed
+ * under several spellings: Blumenthal's scanned filings shout his name and his
+ * electronic ones do not. Grouping here is the same rule the website applies,
+ * and it is why an option carries every spelling rather than just its own.
+ */
+export async function fetchMemberOptions(options: RequestOptions = {}): Promise<MemberOption[]> {
+  const raw = await get<{ data: { member_name: string; bioguide_id: string | null; trade_count: number | string }[] }>(
+    "/api/members",
+    undefined,
+    options
+  );
+  const groups = new Map<string, MemberOption>();
+  const byName = new Map<string, MemberOption>();
+
+  const add = (group: MemberOption, r: { member_name: string; bioguide_id: string | null; trade_count: number | string }) => {
+    if (!group.names.includes(r.member_name)) group.names.push(r.member_name);
+    group.bioguide_id = group.bioguide_id ?? r.bioguide_id;
+    group.trade_count += Number(r.trade_count) || 0;
+    byName.set(r.member_name, group);
+  };
+
+  for (const r of raw.data.filter((r) => r.bioguide_id)) {
+    const existing = groups.get(r.bioguide_id as string);
+    if (existing) {
+      add(existing, r);
+      continue;
+    }
+    const group: MemberOption = { member_name: r.member_name, names: [], bioguide_id: r.bioguide_id, trade_count: 0 };
+    groups.set(r.bioguide_id as string, group);
+    add(group, r);
+  }
+  // A filing whose member never resolved carries a null id; fold it into the
+  // group that already has that spelling rather than opening a second option
+  // with an identical label.
+  for (const r of raw.data.filter((r) => !r.bioguide_id)) {
+    const existing = byName.get(r.member_name);
+    if (existing) {
+      add(existing, r);
+      continue;
+    }
+    const group: MemberOption = { member_name: r.member_name, names: [], bioguide_id: null, trade_count: 0 };
+    groups.set(r.member_name, group);
+    add(group, r);
+  }
+
+  return [...groups.values()].sort((a, b) => b.trade_count - a.trade_count);
+}
+
+export interface SiteStats {
+  totalTransactions: number;
+  totalFilings: number;
+  totalMembers: number;
+}
+
+/** The corpus totals, so nothing in the app has to claim a number by hand. */
+export async function fetchStats(options: RequestOptions = {}): Promise<SiteStats> {
+  const params = new URLSearchParams();
+  for (const c of ["house", "senate"]) params.append("chamber", c);
+  const raw = await get<{ data?: SiteStats } & Partial<SiteStats>>("/api/stats", params, options);
+  const stats = raw.data ?? (raw as SiteStats);
+  return {
+    totalTransactions: Number(stats.totalTransactions) || 0,
+    totalFilings: Number(stats.totalFilings) || 0,
+    totalMembers: Number(stats.totalMembers) || 0,
+  };
+}
+
 export { ApiError };

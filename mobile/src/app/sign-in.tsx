@@ -1,7 +1,7 @@
 import { useOAuth, useAuth, useUser } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -33,7 +33,10 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Warming the browser makes the first tap open noticeably faster on Android.
+  // Native only: on web these two throw outright rather than no-oping, which
+  // took the whole sign-in screen down with an uncaught error.
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     void WebBrowser.warmUpAsync();
     return () => {
       void WebBrowser.coolDownAsync();

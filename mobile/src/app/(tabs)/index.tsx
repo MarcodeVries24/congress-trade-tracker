@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+  useColorScheme,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -113,7 +122,11 @@ export default function TradesScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <View style={[styles.segmented, { paddingTop: insets.top + 8 }]}>
+      {/* On iOS and Android the tab bar is along the bottom, so the only thing
+          to clear up here is the notch. Expo Router's web fallback puts the
+          tab bar across the top instead and floats it over the content, which
+          left this row clipped behind it. */}
+      <View style={[styles.segmented, { paddingTop: Platform.OS === 'web' ? 60 : insets.top + 8 }]}>
         {CHAMBERS.map((c) => {
           const selected = c.key === chamber;
           return (

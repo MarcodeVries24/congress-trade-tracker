@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appleConfigured, statusForNotification, verifyNotification, verifyTransaction } from "@/lib/appleStore";
+import { appleNotificationsConfigured, statusForNotification, verifyNotification, verifyTransaction } from "@/lib/appleStore";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -17,7 +17,7 @@ import { upsertSubscription } from "@/lib/subscriptionWrite";
  * enough that an endpoint erroring on a duplicate would hammer itself.
  */
 export async function POST(req: NextRequest) {
-  if (!appleConfigured()) {
+  if (!appleNotificationsConfigured()) {
     return NextResponse.json({ error: "Apple notifications are not configured" }, { status: 503 });
   }
 

@@ -1,34 +1,18 @@
-/**
- * Display helpers.
- *
- * These are a deliberate interim copy of the website's, narrowed to what a
- * trade card needs. The real versions live in web/lib and carry a curated
- * name-per-bioguide map that this cannot reach yet; when the shared workspace
- * package lands, this file is deleted rather than kept in step by hand.
- */
-
-/** Strips the filing honorific, the way every surface on the site does. */
-export function displayName(name: string): string {
-  return name.replace(/^Hon\.\s+/, "").trim();
-}
+import { memberDisplayName } from '@congtrade/shared/memberDisplay';
 
 /**
- * Title-cases a name that is filed entirely in capitals.
+ * Display helpers the app needs and the website does not.
  *
- * Only when the name carries no case information at all, so "McConnell" and
- * "DelBene" are never touched. Blumenthal's scanned filings are the reason
- * this exists.
+ * Anything both have to agree on lives in @congtrade/shared instead. The name
+ * resolution in particular: this file used to carry its own honorific strip and
+ * title-caser, which got "Richard Blumenthal" right and would have got "Ro
+ * Khanna" wrong, because the curated per-bioguide names were not reachable.
  */
-export function titleCaseIfShouted(name: string): string {
-  if (name !== name.toUpperCase()) return name;
-  return name
-    .toLowerCase()
-    .replace(/\b[a-z]/g, (c) => c.toUpperCase())
-    .replace(/\bMc([a-z])/g, (_, c: string) => `Mc${c.toUpperCase()}`);
-}
+export { memberDisplayName };
 
-export function memberName(row: { member_name: string }): string {
-  return titleCaseIfShouted(displayName(row.member_name));
+/** The name for a trade row, resolved the same way every other surface does. */
+export function memberName(row: { member_name: string; bioguide_id?: string | null }): string {
+  return memberDisplayName(row);
 }
 
 /** "Purchase" | "Sale" | "Sale (partial)" | "Exchange", from the stored code. */

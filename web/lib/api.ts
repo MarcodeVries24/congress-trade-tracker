@@ -349,9 +349,7 @@ export const DEFAULT_ASSET_TYPES = ["ST"];
 
 // Filings carry honorifics ("Hon.") as part of the disclosed name — strip
 // them only for display, never when filtering/searching against the data.
-export function displayName(name: string): string {
-  return name.replace(/^Hon\.\s+/, "").trim();
-}
+export { displayName } from "@congtrade/shared/memberDisplay";
 
 // A trailing "(TICKER)" or "(TICKER) [TYPE]" (House), or an OCR paper
 // filing's "(Stock)(TICKER)" pair — ticker/type are already shown as

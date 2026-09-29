@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@congtrade/shared/*": [
+        "../shared/src/*"
       ]
     }
   },

@@ -141,6 +141,15 @@ export default function PaywallScreen() {
           </Pressable>
         ) : null}
 
+        {/* The only way into the account screen before subscribing. Someone
+            who already pays on the website, and a store reviewer holding a
+            test login, both arrive here with nothing to buy. */}
+        <Pressable onPress={() => router.push('/sign-in')} style={styles.secondary}>
+          <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
+            Already subscribed? Sign in
+          </ThemedText>
+        </Pressable>
+
         <Pressable onPress={() => router.replace('/(tabs)')} style={styles.secondary}>
           <ThemedText style={[styles.secondaryLabel, { color: colors.textSecondary }]}>
             Skip for now, look around

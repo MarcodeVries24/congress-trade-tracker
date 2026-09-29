@@ -344,4 +344,16 @@ export const SCHEMA_STATEMENTS = [
     type TEXT NOT NULL,
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // The same ledger for the two stores. Apple redelivers a notification for
+  // five days until it gets a 200, and Google's Pub/Sub push is at-least-once,
+  // so both will arrive twice; the id is what makes a replay free rather than
+  // merely harmless. Kept apart from stripe_events because the id spaces are
+  // different and a collision between them would be silent.
+  `CREATE TABLE IF NOT EXISTS store_events (
+    provider TEXT NOT NULL,
+    id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (provider, id)
+  )`,
 ];

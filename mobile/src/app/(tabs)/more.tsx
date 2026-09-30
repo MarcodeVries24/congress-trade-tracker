@@ -72,16 +72,10 @@ export default function MoreScreen() {
 
         <Group>
           <ListRow
-            icon="trending-up-outline"
-            label="My Portfolio"
-            detail={`${follows.stocks.length} ${follows.stocks.length === 1 ? 'stock' : 'stocks'}`}
-            onPress={() => router.push({ pathname: '/portfolio', params: { view: 'holdings' } })}
-          />
-          <ListRow
             icon="star-outline"
             label="Watchlist"
-            detail={`${follows.members.length} ${follows.members.length === 1 ? 'member' : 'members'}`}
-            onPress={() => router.push({ pathname: '/portfolio', params: { view: 'watchlist' } })}
+            detail={`${follows.members.length} ${follows.members.length === 1 ? 'politician' : 'politicians'}`}
+            onPress={() => router.push({ pathname: '/politicians', params: { view: 'watchlist' } })}
           />
           <ListRow
             icon="notifications-outline"
@@ -92,13 +86,6 @@ export default function MoreScreen() {
         </Group>
 
         <Group title="Browse">
-          <ListRow
-            icon="options-outline"
-            label="All trades"
-            detail="Search with every filter"
-            onPress={() => router.push('/trades')}
-          />
-          <ListRow icon="people-outline" label="Politicians" onPress={() => router.push('/politicians')} />
           <ListRow icon="business-outline" label="Companies" onPress={() => router.push('/issuers')} />
           <ListRow icon="newspaper-outline" label="News" onPress={() => router.push('/news')} />
           <ListRow icon="albums-outline" label="Swipe through Congress" onPress={() => router.push('/swipe')} last />

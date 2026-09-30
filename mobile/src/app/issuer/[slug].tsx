@@ -5,7 +5,6 @@ import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react
 import type { IssuerDetail } from '@/lib/api';
 import { getIssuer } from '@/lib/detail-cache';
 import { tradesFromIssuer } from '@/lib/detail-trades';
-import { useFollows } from '@/lib/follows';
 import { compactUSD, memberDisplayNameFromFiledName, shortDate, surname } from '@/lib/format';
 import { byMonth } from '@/lib/group';
 import { rememberTrades } from '@/lib/trade-cache';
@@ -14,7 +13,6 @@ import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
-import { FollowButton } from '@/ui/follow-button';
 import { SentimentBar } from '@/ui/sentiment-bar';
 import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
@@ -36,7 +34,6 @@ export default function IssuerScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
-  const follows = useFollows();
   const [detail, setDetail] = useState<IssuerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,7 +97,6 @@ export default function IssuerScreen() {
   }
 
   const i = detail.issuer;
-  const following = follows.isFollowingStock(i.ticker);
 
   const header = (
     <View>
@@ -115,9 +111,14 @@ export default function IssuerScreen() {
         </Text>
         <View style={styles.actions}>
           <View style={styles.flex}>
-            <FollowButton
-              following={following}
-              onPress={() => follows.toggleStock({ ticker: i.ticker, slug: i.slug, company_name: i.company_name })}
+            <Button
+              label="All trades"
+              icon="options-outline"
+              size="md"
+              onPress={() =>
+                router.push({ pathname: '/trades', params: { filters: JSON.stringify({ tickers: [i.ticker] }) } })
+              }
+              style={styles.alertButton}
             />
           </View>
           <View style={styles.flex}>

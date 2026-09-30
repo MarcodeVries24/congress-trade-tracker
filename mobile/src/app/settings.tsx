@@ -111,7 +111,7 @@ export default function SettingsScreen() {
         <ListRow
           icon="star-half-outline"
           label={confirm === 'follows' ? 'Tap again to clear' : 'Clear follows'}
-          detail={`${follows.members.length} members and ${follows.stocks.length} stocks`}
+          detail={`${follows.members.length} ${follows.members.length === 1 ? 'politician' : 'politicians'} on your watchlist`}
           destructive={confirm === 'follows'}
           chevron={false}
           onPress={() => ask('follows', follows.clear)}

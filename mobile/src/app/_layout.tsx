@@ -59,8 +59,6 @@ function Navigation() {
         <Stack.Screen name="trade/[id]" options={pushed} />
         <Stack.Screen name="politician/[slug]" options={pushed} />
         <Stack.Screen name="issuer/[slug]" options={pushed} />
-        <Stack.Screen name="trades" options={{ ...pushed, title: 'All trades' }} />
-        <Stack.Screen name="politicians" options={{ ...pushed, title: 'Politicians' }} />
         <Stack.Screen name="issuers" options={{ ...pushed, title: 'Companies' }} />
         <Stack.Screen name="news" options={{ ...pushed, title: 'News' }} />
         <Stack.Screen name="email-alerts" options={{ ...pushed, title: 'Email alerts' }} />

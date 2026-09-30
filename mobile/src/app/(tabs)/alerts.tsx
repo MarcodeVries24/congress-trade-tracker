@@ -3,8 +3,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 
 import { ApiError, fetchAlerts, type Trade } from '@/lib/api';
-import { getIssuer, getPolitician, settleAll } from '@/lib/detail-cache';
-import { tradesFromIssuer, tradesFromPolitician } from '@/lib/detail-trades';
+import { getPolitician, settleAll } from '@/lib/detail-cache';
+import { tradesFromPolitician } from '@/lib/detail-trades';
 import { useFollows } from '@/lib/follows';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
@@ -17,7 +17,6 @@ import { RowSkeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-import { TickerLogo } from '@/ui/ticker-logo';
 import { TradeRow } from '@/ui/trade-row';
 
 const WINDOW_DAYS = 120;
@@ -32,12 +31,10 @@ function bucket(iso: string | null): string {
 }
 
 /**
- * Alerts: what the people and stocks you follow have done, newest first.
+ * Alerts: what the politicians on your watchlist have done, newest first.
  *
- * Assembled from each followed member's and company's latest trades rather
- * than a single query, because a watchlist is a union ("Pelosi, or anyone
- * trading NVDA"), and the trade filters combine criteria with AND. Trades
- * appear once even when both a member and their stock are followed.
+ * Assembled from each followed member's latest trades, which the detail cache
+ * already holds for the Watchlist, rather than a fresh query per visit.
  *
  * Email alerts, the ones that arrive when you are not looking, are one tap
  * away at the top.
@@ -54,11 +51,8 @@ export default function AlertsScreen() {
   const load = useCallback(
     async (fresh = false) => {
       const options = await authed();
-      const [members, issuers] = await Promise.all([
-        settleAll(follows.members.map((m) => getPolitician(m.slug, options, fresh))),
-        settleAll(follows.stocks.map((s) => getIssuer(s.slug, options, fresh))),
-      ]);
-      const all = [...members.flatMap(tradesFromPolitician), ...issuers.flatMap(tradesFromIssuer)];
+      const members = await settleAll(follows.members.map((m) => getPolitician(m.slug, options, fresh)));
+      const all = members.flatMap(tradesFromPolitician);
       const cutoff = Date.now() - WINDOW_DAYS * 86_400_000;
       const unique = new Map<number, Trade>();
       for (const t of all) {
@@ -79,7 +73,7 @@ export default function AlertsScreen() {
         setEmailCount(err instanceof ApiError && err.status === 401 ? 'signed-out' : null);
       }
     },
-    [authed, follows.members, follows.stocks]
+    [authed, follows.members]
   );
 
   useFocusEffect(
@@ -97,11 +91,11 @@ export default function AlertsScreen() {
     return [...groups.entries()].map(([title, data]) => ({ title, data }));
   }, [trades]);
 
-  const following = follows.members.length + follows.stocks.length;
+  const following = follows.members.length;
 
   const header = (
     <View>
-      <TabHeader title="Alerts" subtitle="Get notified when lawmakers trade stocks you're watching." />
+      <TabHeader title="Alerts" subtitle="Every trade by the politicians on your watchlist." />
 
       <View style={styles.inset}>
         <Tap
@@ -136,19 +130,11 @@ export default function AlertsScreen() {
                 <Avatar uri={m.photo_url} name={m.name} party={m.party} size={28} />
               </View>
             ))}
-            {follows.stocks.slice(0, 4 - Math.min(4, follows.members.length)).map((s, i) => (
-              <View
-                key={s.ticker}
-                style={[styles.face, { marginLeft: i || follows.members.length ? -10 : 0, borderColor: c.background }]}>
-                <TickerLogo ticker={s.ticker} size={28} />
-              </View>
-            ))}
           </View>
           <Text variant="caption" tone="muted" style={styles.followText}>
-            Watching {follows.members.length} {follows.members.length === 1 ? 'member' : 'members'} and{' '}
-            {follows.stocks.length} {follows.stocks.length === 1 ? 'stock' : 'stocks'}
+            Watching {follows.members.length} {follows.members.length === 1 ? 'politician' : 'politicians'}
           </Text>
-          <Tap onPress={() => router.push({ pathname: '/portfolio', params: { view: 'watchlist' } })} hitSlop={8}>
+          <Tap onPress={() => router.push({ pathname: '/politicians', params: { view: 'watchlist' } })} hitSlop={8}>
             <Text variant="callout" style={styles.manage}>
               Manage
             </Text>
@@ -178,13 +164,17 @@ export default function AlertsScreen() {
             <View>
               <EmptyState
                 icon="notifications-outline"
-                title="Follow someone to fill this up"
-                body="Every trade by the members and stocks you follow lands here, newest first."
+                title="Follow a politician to fill this up"
+                body="Every trade by the politicians on your watchlist lands here, newest first."
                 compact
               />
               <View style={styles.ctas}>
                 <Button label="Swipe through Congress" icon="albums" onPress={() => router.push('/swipe')} />
-                <Button label="Browse politicians" kind="secondary" onPress={() => router.push('/politicians')} />
+                <Button
+                  label="Browse politicians"
+                  kind="secondary"
+                  onPress={() => router.push({ pathname: '/politicians', params: { view: 'all' } })}
+                />
               </View>
             </View>
           ) : trades === null ? (
@@ -193,7 +183,7 @@ export default function AlertsScreen() {
             <EmptyState
               icon="time-outline"
               title="Quiet for now"
-              body={`Nothing you follow has filed a trade in the last ${WINDOW_DAYS} days. New filings appear here as they land.`}
+              body={`Nobody on your watchlist has filed a trade in the last ${WINDOW_DAYS} days. New filings appear here as they land.`}
               compact
             />
           )

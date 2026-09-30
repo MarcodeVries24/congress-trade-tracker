@@ -27,12 +27,12 @@ const FAQ: { q: string; a: string }[] = [
     a: 'The law only asks members to report a value bracket, such as $1,001 – $15,000, not the exact amount. Volumes in the app are estimates based on the middle of each bracket.',
   },
   {
-    q: 'What does the % on my Portfolio mean?',
-    a: 'It is the share of Congress trades in that stock over the last 90 days that were purchases. Above 50% means members have mostly been buying. It is not a price change: CongTrade does not show market prices.',
+    q: 'Why do some filters need Pro?',
+    a: 'Searching and choosing a chamber work for everyone. The rest (members, tickers, party, amounts, dates and so on) are part of CongTrade Pro, and the Trades tab says so when they are not being applied.',
   },
   {
     q: 'How do alerts work?',
-    a: 'The Alerts tab shows every recent trade by the members and stocks you follow. Email alerts go further: they email you as soon as a new filing matches the criteria you set. Push notifications are on the way.',
+    a: 'The Alerts tab shows every recent trade by the politicians on your watchlist. Email alerts go further: they email you as soon as a new filing matches the criteria you set. Push notifications are on the way.',
   },
   {
     q: 'How do I cancel my subscription?',

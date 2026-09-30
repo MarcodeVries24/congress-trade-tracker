@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAccess } from '@/lib/access';
 import { fetchTrades } from '@/lib/api';
 import { memberDisplayNameFromFiledName } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -46,6 +47,7 @@ import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
 import { MemberPicker } from '@/ui/member-picker';
 import { SearchBar } from '@/ui/search-bar';
+import { TabHeader } from '@/ui/tab-header';
 import { RowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -329,13 +331,26 @@ function parsePreset(raw: string | undefined): TradeFilters {
  */
 export default function TradesScreen() {
   const { c, scheme } = useTheme();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const authed = useAuthedRequest();
   const params = useLocalSearchParams<{ filters?: string }>();
   const [filters, setFilters] = useState<TradeFilters>(() => parsePreset(params.filters));
   const [query, setQuery] = useState(filters.q ?? '');
   const [sheet, setSheet] = useState(false);
+  const { status } = useAccess();
+
+  // A tab stays mounted, so a preset handed over later ("See all of NVDA's
+  // trades") arrives as a changed param rather than a fresh screen. Adopted
+  // while rendering, the way React recommends for state that follows a prop.
+  const [lastPreset, setLastPreset] = useState(params.filters);
+  if (params.filters !== lastPreset) {
+    setLastPreset(params.filters);
+    if (params.filters) {
+      const preset = parsePreset(params.filters);
+      setFilters(preset);
+      setQuery(preset.q ?? '');
+    }
+  }
   const q = useDebounced(query.trim(), 350);
 
   const applied = useMemo<TradeFilters>(() => ({ ...filters, q: q || undefined }), [filters, q]);
@@ -402,8 +417,18 @@ export default function TradesScreen() {
   const active = countActive(filters);
   const sort = sortOf(filters);
 
+  // Everything but search, chamber, asset type and sort is a Pro filter, which
+  // the server silently ignores for anyone else. Past the paywall that is no
+  // one; this is for the moments it is someone (a development build's skip, a
+  // lapsed subscription), so the page says why nothing changed.
+  const proFiltersIgnored =
+    status !== 'pro' &&
+    status !== 'loading' &&
+    countActive({ ...filters, chamber: undefined, assetTypes: undefined }) > 0;
+
   const header = (
     <View style={styles.header}>
+      <TabHeader title="Trades" />
       <View style={styles.searchRow}>
         <View style={styles.flex}>
           <SearchBar value={query} onChangeText={setQuery} placeholder="Member, ticker or company" />
@@ -479,6 +504,20 @@ export default function TradesScreen() {
         </ScrollView>
       ) : null}
 
+      {proFiltersIgnored ? (
+        <Tap
+          onPress={() => router.push(status === 'signed-out' ? '/sign-in' : '/paywall')}
+          style={[styles.notice, { backgroundColor: c.warnSoft }]}>
+          <Icon name="lock-closed" size={16} color={c.warn} />
+          <Text variant="caption" style={styles.flex}>
+            {status === 'signed-out'
+              ? 'These filters need CongTrade Pro. Sign in to apply them; for now the list shows every trade.'
+              : 'These filters need CongTrade Pro, so the list still shows every trade.'}
+          </Text>
+          <Icon name="chevron-forward" size={16} color={c.warn} />
+        </Tap>
+      ) : null}
+
       <Text variant="caption" tone="muted" style={styles.count}>
         {list.status === 'ready'
           ? `${list.total.toLocaleString()} ${list.total === 1 ? 'trade' : 'trades'}`
@@ -538,7 +577,7 @@ export default function TradesScreen() {
       />
 
       {/* The step after finding something: be told when it happens again. */}
-      <View style={[styles.fabWrap, { bottom: insets.bottom + 14 }]} pointerEvents="box-none">
+      <View style={[styles.fabWrap, { bottom: 14 }]} pointerEvents="box-none">
         <Tap
           feedback="commit"
           scaleTo={0.95}
@@ -613,6 +652,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   count: { paddingHorizontal: 20 },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    padding: 12,
+    borderRadius: radius.lg,
+  },
   footer: { paddingVertical: 24, alignItems: 'center', paddingBottom: 110 },
   fabWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   fab: {

@@ -14,6 +14,7 @@ import { IconButton } from '@/ui/button';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
 import { FollowStar } from '@/ui/follow-button';
+import { Icon } from '@/ui/icon';
 import { SearchBar } from '@/ui/search-bar';
 import { RowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
@@ -134,10 +135,7 @@ export default function SearchScreen() {
             {s.company_name ?? 'Listed company'} · {s.trade_count.toLocaleString()} trades
           </Text>
         </View>
-        <FollowStar
-          following={follows.isFollowingStock(s.ticker)}
-          onPress={() => follows.toggleStock({ ticker: s.ticker, slug: s.slug, company_name: s.company_name })}
-        />
+        <Icon name="chevron-forward" size={18} color={c.textFaint} />
       </Tap>
     );
   };

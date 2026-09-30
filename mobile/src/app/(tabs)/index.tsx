@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { fetchTrades, type Trade } from '@/lib/api';
-import { useFollows } from '@/lib/follows';
 import { memberName, surname } from '@/lib/format';
 import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
@@ -16,7 +15,6 @@ import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
-import { FollowStar } from '@/ui/follow-button';
 import { Icon, type IconName } from '@/ui/icon';
 import { SearchBar } from '@/ui/search-bar';
 import { SectionHeader } from '@/ui/section';
@@ -103,7 +101,6 @@ export default function DiscoverScreen() {
   const authed = useAuthedRequest();
   const { user } = useUser();
   const { answers } = useOnboarding();
-  const follows = useFollows();
 
   const [chamber, setChamber] = useState<ChamberKey>(answers.chamber === 'both' ? 'both' : answers.chamber);
   const [recent, setRecent] = useState<Trade[] | null>(null);
@@ -183,14 +180,7 @@ export default function DiscoverScreen() {
 
   const firstName = user?.firstName;
 
-  const browse: {
-    icon: IconName;
-    label: string;
-    hint: string;
-    href: '/trades' | '/politicians' | '/issuers' | '/news';
-  }[] = [
-    { icon: 'options-outline', label: 'All trades', hint: 'Every filter', href: '/trades' },
-    { icon: 'people-outline', label: 'Politicians', hint: 'Every member who trades', href: '/politicians' },
+  const browse: { icon: IconName; label: string; hint: string; href: '/issuers' | '/news' }[] = [
     { icon: 'business-outline', label: 'Companies', hint: 'Who holds what', href: '/issuers' },
     { icon: 'newspaper-outline', label: 'News', hint: 'Markets and Washington', href: '/news' },
   ];
@@ -273,7 +263,7 @@ export default function DiscoverScreen() {
                 Swipe through Congress
               </Text>
               <Text variant="callout" color="rgba(255,255,255,0.8)">
-                Right to follow, left to pass. Your picks land in Portfolio.
+                Right to follow, left to pass. Your picks land on your Watchlist.
               </Text>
             </View>
             <View style={styles.swipeIcon}>
@@ -306,12 +296,7 @@ export default function DiscoverScreen() {
                   style={styles.trendCard}>
                   <View style={styles.trendTop}>
                     <TickerLogo ticker={t.ticker} size={52} />
-                    <FollowStar
-                      following={follows.isFollowingStock(t.ticker)}
-                      onPress={() =>
-                        follows.toggleStock({ ticker: t.ticker, slug: t.ticker.toLowerCase(), company_name: t.company })
-                      }
-                    />
+                    <Icon name="arrow-forward" size={18} color={c.textFaint} />
                   </View>
                   <View style={styles.trendText}>
                     <Text variant="subhead">{t.ticker}</Text>

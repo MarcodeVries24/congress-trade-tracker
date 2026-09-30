@@ -3,14 +3,13 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { fetchIssuers, type IssuerSummary } from '@/lib/api';
-import { useFollows } from '@/lib/follows';
 import { compactUSD } from '@/lib/format';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useDebounced, usePaged } from '@/lib/use-paged';
 import { radius, useTheme } from '@/theme';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
-import { FollowStar } from '@/ui/follow-button';
+import { Icon } from '@/ui/icon';
 import { SearchBar } from '@/ui/search-bar';
 import { SentimentBar } from '@/ui/sentiment-bar';
 import { RowSkeleton } from '@/ui/skeleton';
@@ -38,7 +37,6 @@ export default function IssuersScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
-  const follows = useFollows();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('trade_count');
   const q = useDebounced(query.trim());
@@ -63,10 +61,7 @@ export default function IssuersScreen() {
             {item.company_name ?? 'Listed company'}
           </Text>
         </View>
-        <FollowStar
-          following={follows.isFollowingStock(item.ticker)}
-          onPress={() => follows.toggleStock({ ticker: item.ticker, slug: item.slug, company_name: item.company_name })}
-        />
+        <Icon name="chevron-forward" size={18} color={c.textFaint} />
       </View>
       <View style={styles.meta}>
         <Text variant="footnote" tone="muted">

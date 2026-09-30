@@ -3,7 +3,7 @@ import { fetchIssuer, fetchPolitician, type IssuerDetail, type PoliticianDetail,
 /**
  * Member and company pages, kept for a few minutes and shared between screens.
  *
- * Portfolio and the Alerts feed both need the detail of everything followed,
+ * The Watchlist and the Alerts feed both need the detail of everyone followed,
  * and switching between them should not fetch it all twice. Requests in
  * flight are shared too, so two screens asking at once make one request.
  */

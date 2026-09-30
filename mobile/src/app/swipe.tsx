@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -16,7 +16,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { fetchIssuers, fetchPoliticians, type IssuerSummary, type PoliticianSummary } from '@/lib/api';
+import { fetchPoliticians, type PoliticianSummary } from '@/lib/api';
 import { useFollows } from '@/lib/follows';
 import { compactUSD, memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -25,14 +25,11 @@ import { brand, partyTone, radius, shadow, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
-import { SentimentBar } from '@/ui/sentiment-bar';
 import { Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-import { TickerLogo } from '@/ui/ticker-logo';
 
-type Card =
-  { kind: 'member'; key: string; row: PoliticianSummary } | { kind: 'stock'; key: string; row: IssuerSummary };
+type Card = { key: string; row: PoliticianSummary };
 
 const SWIPE_OUT = 0.28;
 
@@ -42,115 +39,71 @@ function memberSubtitle(m: PoliticianSummary): string {
     .join(' · ');
 }
 
+/** A member, full bleed: the photo, and the three numbers that say who they are as a trader. */
 function CardFace({ card }: { card: Card }) {
   const { c } = useTheme();
-  if (card.kind === 'member') {
-    const m = card.row;
-    const name = memberDisplayNameFromFiledName(m.member_name);
-    return (
-      <View style={[styles.face, { backgroundColor: c.surfaceMuted }]}>
-        {m.photo_url ? (
-          <Image
-            source={{ uri: m.photo_url }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            contentPosition="top"
-            transition={200}
-          />
-        ) : (
-          <LinearGradient colors={[partyTone(m.party), brand.ink]} style={StyleSheet.absoluteFill} />
-        )}
-        <LinearGradient
-          colors={['transparent', 'rgba(8,16,28,0.55)', 'rgba(8,16,28,0.95)']}
-          locations={[0.35, 0.65, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.faceBottom}>
-          <View style={styles.tagRow}>
-            <View style={[styles.tag, { backgroundColor: partyTone(m.party) }]}>
-              <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-                {m.party ?? 'Member'}
-              </Text>
-            </View>
-            <View style={[styles.tag, styles.glass]}>
-              <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-                {memberSubtitle(m)}
-              </Text>
-            </View>
-          </View>
-          <Text variant="display" color="#FFFFFF">
-            {name}
-          </Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCell}>
-              <Text variant="headline" color="#FFFFFF">
-                {m.trade_count.toLocaleString()}
-              </Text>
-              <Text variant="footnote" color="rgba(255,255,255,0.7)">
-                trades
-              </Text>
-            </View>
-            <View style={styles.statCell}>
-              <Text variant="headline" color="#FFFFFF">
-                {compactUSD(m.volume_sum)}
-              </Text>
-              <Text variant="footnote" color="rgba(255,255,255,0.7)">
-                est. volume
-              </Text>
-            </View>
-            <View style={styles.statCell}>
-              <Text variant="headline" color="#FFFFFF" numberOfLines={1}>
-                {shortDate(m.last_filed).replace(/ \d{4}$/, '')}
-              </Text>
-              <Text variant="footnote" color="rgba(255,255,255,0.7)">
-                last filed
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  const s = card.row;
+  const m = card.row;
+  const name = memberDisplayNameFromFiledName(m.member_name);
   return (
-    <View style={[styles.face, { backgroundColor: c.surface }]}>
-      <LinearGradient colors={[brand.ink, brand.blueDeep]} style={styles.stockTop}>
-        <TickerLogo ticker={s.ticker} size={112} />
-        <View style={[styles.tag, styles.glass, styles.stockTag]}>
-          <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-            Stock
-          </Text>
-        </View>
-      </LinearGradient>
-      <View style={styles.stockBody}>
-        <View>
-          <Text variant="display">{s.ticker}</Text>
-          <Text variant="body" tone="muted" numberOfLines={1}>
-            {s.company_name ?? 'Listed company'}
-          </Text>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statCell}>
-            <Text variant="headline">{s.politician_count}</Text>
-            <Text variant="footnote" tone="muted">
-              members traded it
+    <View style={[styles.face, { backgroundColor: c.surfaceMuted }]}>
+      {m.photo_url ? (
+        <Image
+          source={{ uri: m.photo_url }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          contentPosition="top"
+          transition={200}
+        />
+      ) : (
+        <LinearGradient colors={[partyTone(m.party), brand.ink]} style={StyleSheet.absoluteFill} />
+      )}
+      <LinearGradient
+        colors={['transparent', 'rgba(8,16,28,0.55)', 'rgba(8,16,28,0.95)']}
+        locations={[0.35, 0.65, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.faceBottom}>
+        <View style={styles.tagRow}>
+          <View style={[styles.tag, { backgroundColor: partyTone(m.party) }]}>
+            <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
+              {m.party ?? 'Member'}
             </Text>
           </View>
+          <View style={[styles.tag, styles.glass]}>
+            <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
+              {memberSubtitle(m)}
+            </Text>
+          </View>
+        </View>
+        <Text variant="display" color="#FFFFFF">
+          {name}
+        </Text>
+        <View style={styles.statsRow}>
           <View style={styles.statCell}>
-            <Text variant="headline">{s.trade_count.toLocaleString()}</Text>
-            <Text variant="footnote" tone="muted">
+            <Text variant="headline" color="#FFFFFF">
+              {m.trade_count.toLocaleString()}
+            </Text>
+            <Text variant="footnote" color="rgba(255,255,255,0.7)">
               trades
             </Text>
           </View>
           <View style={styles.statCell}>
-            <Text variant="headline">{s.market_cap ? compactUSD(s.market_cap) : '—'}</Text>
-            <Text variant="footnote" tone="muted">
-              market cap
+            <Text variant="headline" color="#FFFFFF">
+              {compactUSD(m.volume_sum)}
+            </Text>
+            <Text variant="footnote" color="rgba(255,255,255,0.7)">
+              est. volume
+            </Text>
+          </View>
+          <View style={styles.statCell}>
+            <Text variant="headline" color="#FFFFFF" numberOfLines={1}>
+              {shortDate(m.last_filed).replace(/ \d{4}$/, '')}
+            </Text>
+            <Text variant="footnote" color="rgba(255,255,255,0.7)">
+              last filed
             </Text>
           </View>
         </View>
-        <SentimentBar buys={s.purchases} sells={s.sales} />
       </View>
     </View>
   );
@@ -264,9 +217,8 @@ function NextCard({ card, progress }: { card: Card; progress: SharedValue<number
  * Swipe through Congress: the Tinder deck.
  *
  * Right follows, left passes; the buttons do the same for anyone who would
- * rather tap. Members and stocks are dealt two to one, most active first, and
- * anything already followed is left out of the deck. Every follow lands in
- * Portfolio immediately.
+ * rather tap. Members are dealt most active first, anyone already on the
+ * watchlist is left out, and every follow lands on the Watchlist at once.
  */
 export default function SwipeScreen() {
   const { c, scheme } = useTheme();
@@ -282,36 +234,18 @@ export default function SwipeScreen() {
   const [followed, setFollowed] = useState(0);
   const [command, setCommand] = useState<{ dir: 1 | -1; key: string } | null>(null);
   const progress = useSharedValue(0);
-  // Snapshot of what was followed when the deck was dealt, so following a card
-  // does not reshuffle the cards still to come.
-  const initialFollows = useRef({ members: follows.members, stocks: follows.stocks });
+  // Who was followed when the deck was dealt, so following a card does not
+  // reshuffle the cards still to come.
+  const initialFollows = useRef(follows.members);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const options = await authed();
-        const [members, stocks] = await Promise.all([
-          fetchPoliticians({ limit: 60, sort: 'trade_count' }, options),
-          fetchIssuers({ limit: 30, sort: 'politician_count' }, options),
-        ]);
+        const members = await fetchPoliticians({ limit: 80, sort: 'trade_count' }, await authed());
         if (cancelled) return;
-        const followedMembers = new Set(initialFollows.current.members.map((m) => m.slug));
-        const followedStocks = new Set(initialFollows.current.stocks.map((s) => s.ticker));
-        const m = members.data.filter((row) => !followedMembers.has(row.slug));
-        const s = stocks.data.filter((row) => !followedStocks.has(row.ticker));
-        const dealt: Card[] = [];
-        while (m.length || s.length) {
-          for (let i = 0; i < 2 && m.length; i++) {
-            const row = m.shift()!;
-            dealt.push({ kind: 'member', key: `m:${row.slug}`, row });
-          }
-          if (s.length) {
-            const row = s.shift()!;
-            dealt.push({ kind: 'stock', key: `s:${row.slug}`, row });
-          }
-        }
-        setDeck(dealt);
+        const already = new Set(initialFollows.current.map((m) => m.slug));
+        setDeck(members.data.filter((row) => !already.has(row.slug)).map((row) => ({ key: row.slug, row })));
       } catch {
         if (!cancelled) setDeck([]);
       }
@@ -324,24 +258,20 @@ export default function SwipeScreen() {
   const current = deck?.[index];
   const next = deck?.[index + 1];
 
-  const decide = useMemo(
-    () => (follow: boolean) => {
+  const decide = useCallback(
+    (follow: boolean) => {
       const card = deck?.[index];
       if (!card) return;
       if (follow) {
-        if (card.kind === 'member') {
-          const m = card.row;
-          if (!follows.isFollowingMember(m.slug)) {
-            follows.toggleMember({
-              slug: m.slug,
-              name: memberDisplayNameFromFiledName(m.member_name),
-              photo_url: m.photo_url,
-              party: m.party,
-              subtitle: memberSubtitle(m),
-            });
-          }
-        } else if (!follows.isFollowingStock(card.row.ticker)) {
-          follows.toggleStock({ ticker: card.row.ticker, slug: card.row.slug, company_name: card.row.company_name });
+        const m = card.row;
+        if (!follows.isFollowingMember(m.slug)) {
+          follows.toggleMember({
+            slug: m.slug,
+            name: memberDisplayNameFromFiledName(m.member_name),
+            photo_url: m.photo_url,
+            party: m.party,
+            subtitle: memberSubtitle(m),
+          });
         }
         haptic.success();
         setFollowed((n) => n + 1);
@@ -389,9 +319,13 @@ export default function SwipeScreen() {
             <EmptyState
               icon="checkmark-done-circle-outline"
               title={followed ? `Nice, ${followed} followed` : "That's the whole deck"}
-              body="Everything you followed is in Portfolio, and their trades show up in Alerts."
+              body="Everyone you followed is on your Watchlist, and their trades show up in Alerts."
             />
-            <Button label="Open my Portfolio" onPress={() => router.replace('/portfolio')} style={styles.done} />
+            <Button
+              label="Open my Watchlist"
+              onPress={() => router.replace({ pathname: '/politicians', params: { view: 'watchlist' } })}
+              style={styles.done}
+            />
           </View>
         ) : (
           <View style={{ width: cardWidth, flex: 1, maxHeight: 620 }}>
@@ -420,14 +354,7 @@ export default function SwipeScreen() {
             <Icon name="close" size={32} color={c.loss} />
           </Tap>
           <Tap
-            onPress={() => {
-              const card = current;
-              router.push(
-                card.kind === 'member'
-                  ? { pathname: '/politician/[slug]', params: { slug: card.row.slug } }
-                  : { pathname: '/issuer/[slug]', params: { slug: card.row.slug } }
-              );
-            }}
+            onPress={() => router.push({ pathname: '/politician/[slug]', params: { slug: current.row.slug } })}
             scaleTo={0.88}
             accessibilityLabel="Open"
             style={[styles.action, styles.small, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -438,7 +365,7 @@ export default function SwipeScreen() {
             scaleTo={0.88}
             accessibilityLabel="Follow"
             style={[styles.action, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Icon name="star" size={30} color={c.gain} />
+            <Icon name="star" size={30} color={c.accent} />
           </Tap>
         </View>
       ) : null}
@@ -463,9 +390,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
   statCell: { flex: 1, gap: 1 },
-  stockTop: { height: '48%', alignItems: 'center', justifyContent: 'center' },
-  stockTag: { position: 'absolute', top: 18, left: 18 },
-  stockBody: { flex: 1, padding: 22, gap: 18, justifyContent: 'space-between' },
   stamp: { position: 'absolute', top: 36, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 4, borderRadius: 10 },
   stampLeft: { left: 24, transform: [{ rotate: '-14deg' }] },
   stampRight: { right: 24, transform: [{ rotate: '14deg' }] },

@@ -9,14 +9,16 @@ import { Icon, type IconName } from '@/ui/icon';
 
 const TABS: { name: string; title: string; icon: IconName; active: IconName }[] = [
   { name: 'index', title: 'Discover', icon: 'flame-outline', active: 'flame' },
-  { name: 'portfolio', title: 'Portfolio', icon: 'trending-up-outline', active: 'trending-up' },
+  { name: 'trades', title: 'Trades', icon: 'swap-vertical-outline', active: 'swap-vertical' },
+  { name: 'politicians', title: 'Politicians', icon: 'people-outline', active: 'people' },
   { name: 'alerts', title: 'Alerts', icon: 'notifications-outline', active: 'notifications' },
   { name: 'more', title: 'More', icon: 'person-outline', active: 'person' },
 ];
 
 /**
- * Four tabs, as in the design: Discover is where you find things, Portfolio is
- * what you follow, Alerts is what they did, More is you.
+ * Five tabs: Discover is where you find things, Trades is every trade with
+ * every filter, Politicians is everyone who files with your Watchlist beside
+ * them, Alerts is what the people you follow did, More is you.
  *
  * A JavaScript tab bar rather than the native one, so the red active state,
  * the filled icons and the spacing are identical on iOS and Android.

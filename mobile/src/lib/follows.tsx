@@ -4,12 +4,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { haptic } from '@/lib/haptics';
 
 /**
- * Who and what this person follows: members (the Watchlist) and stocks (the
- * Holdings they track). Kept on the device, the way a like or a saved listing
- * is, so following is instant and needs no account round trip.
+ * The members this person follows: their Watchlist. Kept on the device, the
+ * way a like or a saved listing is, so following is instant and needs no
+ * account round trip.
  *
  * Each follow carries enough to draw its row without a request (name, photo,
- * party) so Portfolio opens full rather than as a column of spinners.
+ * party), so the Watchlist opens full rather than as a column of spinners.
+ *
+ * Members only, on purpose: the app follows people, and a stock is something
+ * to search or set an alert for rather than to hold.
  */
 export type FollowedMember = {
   slug: string;
@@ -19,20 +22,11 @@ export type FollowedMember = {
   subtitle: string | null;
 };
 
-export type FollowedStock = {
-  ticker: string;
-  slug: string;
-  company_name: string | null;
-};
-
 type Store = {
   loaded: boolean;
   members: FollowedMember[];
-  stocks: FollowedStock[];
   isFollowingMember: (slug: string) => boolean;
-  isFollowingStock: (ticker: string) => boolean;
   toggleMember: (member: FollowedMember) => boolean;
-  toggleStock: (stock: FollowedStock) => boolean;
   addMembers: (members: FollowedMember[]) => void;
   clear: () => void;
 };
@@ -43,7 +37,6 @@ const FollowsContext = createContext<Store | null>(null);
 export function FollowsProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<FollowedMember[]>([]);
-  const [stocks, setStocks] = useState<FollowedStock[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +44,9 @@ export function FollowsProvider({ children }: { children: ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(KEY);
         if (cancelled || !raw) return;
-        const saved = JSON.parse(raw) as { members?: FollowedMember[]; stocks?: FollowedStock[] };
+        // Older saves also held stocks; they are simply not read any more.
+        const saved = JSON.parse(raw) as { members?: FollowedMember[] };
         setMembers(saved.members ?? []);
-        setStocks(saved.stocks ?? []);
       } catch {
         // Unreadable storage is an empty watchlist, not a crash.
       } finally {
@@ -67,14 +60,10 @@ export function FollowsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    void AsyncStorage.setItem(KEY, JSON.stringify({ members, stocks })).catch(() => {});
-  }, [loaded, members, stocks]);
+    void AsyncStorage.setItem(KEY, JSON.stringify({ members })).catch(() => {});
+  }, [loaded, members]);
 
   const isFollowingMember = useCallback((slug: string) => members.some((m) => m.slug === slug), [members]);
-  const isFollowingStock = useCallback(
-    (ticker: string) => stocks.some((s) => s.ticker.toUpperCase() === ticker.toUpperCase()),
-    [stocks]
-  );
 
   const toggleMember = useCallback(
     (member: FollowedMember) => {
@@ -86,40 +75,15 @@ export function FollowsProvider({ children }: { children: ReactNode }) {
     [members]
   );
 
-  const toggleStock = useCallback(
-    (stock: FollowedStock) => {
-      const following = stocks.some((s) => s.ticker.toUpperCase() === stock.ticker.toUpperCase());
-      haptic.commit();
-      setStocks((prev) =>
-        following ? prev.filter((s) => s.ticker.toUpperCase() !== stock.ticker.toUpperCase()) : [stock, ...prev]
-      );
-      return !following;
-    },
-    [stocks]
-  );
-
   const addMembers = useCallback((incoming: FollowedMember[]) => {
     setMembers((prev) => [...prev, ...incoming.filter((m) => !prev.some((p) => p.slug === m.slug))]);
   }, []);
 
-  const clear = useCallback(() => {
-    setMembers([]);
-    setStocks([]);
-  }, []);
+  const clear = useCallback(() => setMembers([]), []);
 
   const value = useMemo(
-    () => ({
-      loaded,
-      members,
-      stocks,
-      isFollowingMember,
-      isFollowingStock,
-      toggleMember,
-      toggleStock,
-      addMembers,
-      clear,
-    }),
-    [loaded, members, stocks, isFollowingMember, isFollowingStock, toggleMember, toggleStock, addMembers, clear]
+    () => ({ loaded, members, isFollowingMember, toggleMember, addMembers, clear }),
+    [loaded, members, isFollowingMember, toggleMember, addMembers, clear]
   );
   return <FollowsContext.Provider value={value}>{children}</FollowsContext.Provider>;
 }

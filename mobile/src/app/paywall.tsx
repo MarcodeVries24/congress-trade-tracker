@@ -19,7 +19,7 @@ import { Text } from '@/ui/text';
 
 const BENEFITS: { icon: IconName; title: string; body: string }[] = [
   { icon: 'flash', title: 'Every trade, the day it is filed', body: 'Both chambers, every member who files.' },
-  { icon: 'star', title: 'Follow members and stocks', body: 'Your Portfolio and Alerts fill up by themselves.' },
+  { icon: 'star', title: 'A watchlist of politicians', body: 'Follow members and see every trade they file.' },
   { icon: 'mail-unread', title: 'Email alerts on your terms', body: 'By member, ticker, size or chamber.' },
   { icon: 'document-text', title: 'Straight from the filings', body: 'Every trade links to the original disclosure.' },
 ];

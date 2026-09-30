@@ -9,7 +9,7 @@ import { Text } from '@/ui/text';
 
 /**
  * Two or three mutually exclusive views, with a navy thumb that slides to the
- * chosen one. The Holdings / Watchlist switch on Portfolio.
+ * chosen one. The All / Watchlist switch on Politicians.
  */
 export function Segmented<K extends string>({
   options,

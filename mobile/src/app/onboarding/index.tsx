@@ -22,7 +22,7 @@ import { Text } from '@/ui/text';
 const POINTS: { icon: IconName; text: string }[] = [
   { icon: 'document-text', text: 'Every disclosed trade, straight from the filings' },
   { icon: 'flash', text: 'On your phone within hours of being published' },
-  { icon: 'star', text: 'Follow members and stocks, get told when they move' },
+  { icon: 'star', text: 'Follow politicians, see every trade they make' },
 ];
 
 /**

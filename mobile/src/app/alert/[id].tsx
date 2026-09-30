@@ -22,6 +22,7 @@ import {
   type MemberOption,
 } from '@/lib/api';
 import { recallAlert } from '@/lib/alert-cache';
+import { activeChips } from '@/lib/trade-filters';
 import { haptic } from '@/lib/haptics';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useDebounced } from '@/lib/use-paged';
@@ -87,27 +88,40 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * The count underneath is the server running the same query the sender will.
  */
 export default function AlertEditorScreen() {
-  const params = useLocalSearchParams<{ id: string; members?: string; tickers?: string; name?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    members?: string;
+    tickers?: string;
+    name?: string;
+    filters?: string;
+  }>();
   const { id } = params;
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
   const existing = id === 'new' ? undefined : recallAlert(id);
+  // A whole filter set handed over by the trades page ("get alerts for this
+  // search"); the editor starts from it exactly as it would from a saved alert.
+  const [preset] = useState<AlertFilters | undefined>(() => {
+    if (!params.filters) return undefined;
+    try {
+      return JSON.parse(params.filters) as AlertFilters;
+    } catch {
+      return undefined;
+    }
+  });
+  const base: AlertFilters | undefined = existing?.filters ?? preset;
 
   const [name, setName] = useState(existing?.name ?? params.name ?? '');
   const [members, setMembers] = useState<string[]>(
-    existing?.filters.members ?? (params.members ? params.members.split('|').filter(Boolean) : [])
+    base?.members ?? (params.members ? params.members.split('|').filter(Boolean) : [])
   );
-  const [tickers, setTickers] = useState(
-    (existing?.filters.tickers ?? (params.tickers ? [params.tickers] : [])).join(', ')
-  );
+  const [tickers, setTickers] = useState((base?.tickers ?? (params.tickers ? [params.tickers] : [])).join(', '));
   const [chamber, setChamber] = useState<ChamberKey>(
-    existing?.filters.chambers?.length === 1 ? (existing.filters.chambers[0] as ChamberKey) : 'any'
+    base?.chambers?.length === 1 ? (base.chambers[0] as ChamberKey) : 'any'
   );
-  const [type, setType] = useState<TypeKey>(
-    existing?.filters.types?.length === 1 ? (existing.filters.types[0] as TypeKey) : 'any'
-  );
-  const savedMin = existing?.filters.minAmount;
+  const [type, setType] = useState<TypeKey>(base?.types?.length === 1 ? (base.types[0] as TypeKey) : 'any');
+  const savedMin = base?.minAmount;
   const minOptions = useMemo(
     () =>
       savedMin && !MIN_AMOUNTS.some((m) => m.key === String(savedMin))
@@ -140,14 +154,34 @@ export default function AlertEditorScreen() {
       .filter(Boolean);
     // Start from what was saved so criteria this screen does not show survive.
     return {
-      ...(existing?.filters ?? {}),
+      ...(base ?? {}),
       members: members.length ? members : undefined,
       tickers: tickerList.length ? tickerList : undefined,
-      chambers: chamber === 'any' ? undefined : [chamber],
-      types: type === 'any' ? undefined : [type],
+      // "Any" here only means this screen's single choice is unset; a saved
+      // combination it cannot show (purchases and exchanges, say) is kept.
+      chambers:
+        chamber === 'any' ? (base?.chambers && base.chambers.length > 1 ? base.chambers : undefined) : [chamber],
+      types: type === 'any' ? (base?.types && base.types.length > 1 ? base.types : undefined) : [type],
       minAmount: minAmount === 'any' ? undefined : Number(minAmount),
     };
-  }, [existing, members, tickers, chamber, type, minAmount]);
+  }, [base, members, tickers, chamber, type, minAmount]);
+
+  // Criteria the alert carries that this screen does not edit, listed so an
+  // alert made from a search, or on the website, says everything it matches.
+  const hidden = useMemo(
+    () =>
+      activeChips({
+        q: base?.q,
+        parties: base?.parties,
+        states: base?.states,
+        owners: base?.owners,
+        assetTypes: base?.assetTypes,
+        amountRanges: base?.amountRanges,
+        marketCapTiers: base?.marketCapTiers,
+        filedStatus: base?.filedStatus,
+      }),
+    [base]
+  );
 
   const settled = useDebounced(filters, 500);
   useEffect(() => {
@@ -341,6 +375,20 @@ export default function AlertEditorScreen() {
           <Field label="Minimum amount">
             <ChipRow options={minOptions} value={minAmount} onChange={setMinAmount} inset={0} />
           </Field>
+          {hidden.length ? (
+            <Field label="Also matching">
+              <View style={styles.picked}>
+                {hidden.map((chip) => (
+                  <View key={chip.key} style={[styles.token, { backgroundColor: c.accentSoft }]}>
+                    <Text variant="callout" tone="accent" style={styles.bold}>
+                      {chip.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Field>
+          ) : null}
+
           <Field label="Email me">
             <ChipRow options={FREQUENCIES} value={frequency} onChange={setFrequency} inset={0} />
           </Field>

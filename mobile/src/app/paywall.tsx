@@ -11,7 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod } from '@/lib/products';
 import { usePurchases } from '@/lib/use-purchases';
-import { radius, useTheme } from '@/theme';
+import { brand, radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { Icon, type IconName } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
@@ -94,7 +94,7 @@ export default function PaywallScreen() {
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#0B2A4A', '#15406E', '#0B2A4A']}
+          colors={[...brand.hero]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 22 }]}>

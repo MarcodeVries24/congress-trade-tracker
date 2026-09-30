@@ -14,6 +14,7 @@ import {
 } from '@/lib/format';
 import { openPage } from '@/lib/links';
 import { recallTrade } from '@/lib/trade-cache';
+import { ASSET_TYPES } from '@/lib/trade-filters';
 import { partyTone, radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
@@ -25,16 +26,8 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { TickerLogo } from '@/ui/ticker-logo';
 
-const ASSET_TYPES: Record<string, string> = {
-  ST: 'Stock',
-  OP: 'Stock option',
-  EF: 'Exchange-traded fund',
-  MF: 'Mutual fund',
-  GS: 'Government security',
-  CS: 'Corporate bond',
-  PS: 'Private stock',
-  OT: 'Other',
-};
+// The website's labels, so a code reads the same on both.
+const ASSET_TYPE_LABELS: Record<string, string> = Object.fromEntries(ASSET_TYPES.map((a) => [a.key, a.label]));
 
 const OWNERS: Record<string, string> = { SP: 'Spouse', JT: 'Joint', DC: 'Dependent child', self: 'The member' };
 
@@ -120,6 +113,7 @@ export default function TradeDetailScreen() {
         </View>
         <Tap
           disabled={!trade.ticker}
+          dimWhenDisabled={false}
           scaleTo={0.98}
           onPress={() =>
             trade.ticker && router.push({ pathname: '/issuer/[slug]', params: { slug: trade.ticker.toLowerCase() } })
@@ -147,6 +141,7 @@ export default function TradeDetailScreen() {
 
       <Tap
         disabled={!trade.member_slug}
+        dimWhenDisabled={false}
         feedback="tap"
         scaleTo={0.98}
         onPress={() =>
@@ -203,7 +198,10 @@ export default function TradeDetailScreen() {
       <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
         <Text variant="subhead">Details</Text>
         {[
-          ['Asset type', trade.asset_type_code ? (ASSET_TYPES[trade.asset_type_code] ?? trade.asset_type_code) : null],
+          [
+            'Asset type',
+            trade.asset_type_code ? (ASSET_TYPE_LABELS[trade.asset_type_code] ?? trade.asset_type_code) : null,
+          ],
           ['Owner', trade.owner ? (OWNERS[trade.owner] ?? trade.owner) : 'The member'],
           ['Chamber', trade.chamber === 'senate' ? 'Senate' : 'House'],
         ]

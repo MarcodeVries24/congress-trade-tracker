@@ -18,12 +18,15 @@ export function Tap({
   scaleTo = 0.97,
   feedback = 'none',
   disabled,
+  dimWhenDisabled = true,
   ...rest
 }: Omit<PressableProps, 'style' | 'children'> & {
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
   scaleTo?: number;
   feedback?: 'none' | 'tap' | 'select' | 'commit';
+  /** False where "disabled" only means "nothing to open", not "unavailable". */
+  dimWhenDisabled?: boolean;
 }) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -43,7 +46,7 @@ export function Tap({
         if (feedback !== 'none') haptic[feedback]();
         onPress?.(e);
       }}
-      style={[style, animated, disabled ? { opacity: 0.5 } : null]}>
+      style={[style, animated, disabled && dimWhenDisabled ? { opacity: 0.5 } : null]}>
       {children}
     </AnimatedPressable>
   );

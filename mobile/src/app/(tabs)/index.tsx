@@ -6,11 +6,11 @@ import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Vi
 
 import { fetchTrades, type Trade } from '@/lib/api';
 import { useFollows } from '@/lib/follows';
-import { memberName } from '@/lib/format';
+import { memberName, surname } from '@/lib/format';
 import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
-import { radius, shadow, useTheme } from '@/theme';
+import { brand, radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
@@ -183,10 +183,16 @@ export default function DiscoverScreen() {
 
   const firstName = user?.firstName;
 
-  const browse: { icon: IconName; label: string; href: '/politicians' | '/issuers' | '/news' }[] = [
-    { icon: 'people-outline', label: 'Politicians', href: '/politicians' },
-    { icon: 'business-outline', label: 'Companies', href: '/issuers' },
-    { icon: 'newspaper-outline', label: 'News', href: '/news' },
+  const browse: {
+    icon: IconName;
+    label: string;
+    hint: string;
+    href: '/trades' | '/politicians' | '/issuers' | '/news';
+  }[] = [
+    { icon: 'options-outline', label: 'All trades', hint: 'Every filter', href: '/trades' },
+    { icon: 'people-outline', label: 'Politicians', hint: 'Every member who trades', href: '/politicians' },
+    { icon: 'business-outline', label: 'Companies', hint: 'Who holds what', href: '/issuers' },
+    { icon: 'newspaper-outline', label: 'News', hint: 'Markets and Washington', href: '/news' },
   ];
 
   const header = (
@@ -241,7 +247,7 @@ export default function DiscoverScreen() {
                 style={styles.story}>
                 <Avatar uri={s.photo} name={s.name} party={s.party} size={64} ring />
                 <Text variant="footnote" numberOfLines={1} style={styles.storyName}>
-                  {s.name.split(' ').slice(-1)[0]}
+                  {surname(s.name)}
                 </Text>
                 <Text variant="footnote" tone="faint" style={styles.storyCount}>
                   {s.count} {s.count === 1 ? 'trade' : 'trades'}
@@ -255,7 +261,7 @@ export default function DiscoverScreen() {
       <View style={styles.inset}>
         <Tap onPress={() => router.push('/swipe')} feedback="commit" scaleTo={0.98}>
           <LinearGradient
-            colors={['#0B2A4A', '#173E6B', '#8E2B35']}
+            colors={[...brand.hero]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.swipeCard, scheme === 'light' ? shadow.raised : null]}>
@@ -329,16 +335,26 @@ export default function DiscoverScreen() {
             feedback="tap"
             onPress={() => router.push(b.href)}
             style={[styles.browseTile, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Icon name={b.icon} size={24} color={c.primary} />
-            <Text variant="callout" style={styles.browseLabel}>
-              {b.label}
-            </Text>
+            <View style={[styles.browseIcon, { backgroundColor: c.accentSoft }]}>
+              <Icon name={b.icon} size={20} color={c.accent} />
+            </View>
+            <View style={styles.flex}>
+              <Text variant="bodyStrong">{b.label}</Text>
+              <Text variant="footnote" tone="muted" numberOfLines={1}>
+                {b.hint}
+              </Text>
+            </View>
           </Tap>
         ))}
       </View>
 
       <View style={styles.feedHead}>
-        <SectionHeader title="Latest trades" subtitle="Newest disclosures first" />
+        <SectionHeader
+          title="Latest trades"
+          subtitle="Newest disclosures first"
+          action="Filters"
+          onAction={() => router.push('/trades')}
+        />
         <ChipRow options={CHAMBERS} value={chamber} onChange={setChamber} />
       </View>
       {status === 'loading' && feed.length === 0 ? <RowSkeleton count={6} /> : null}
@@ -420,16 +436,19 @@ const styles = StyleSheet.create({
   trendCard: { width: 176, gap: 12, borderRadius: radius.xl, padding: 16, borderWidth: StyleSheet.hairlineWidth },
   trendTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   trendText: { gap: 1 },
-  browse: { flexDirection: 'row', gap: 10 },
+  browse: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   browseTile: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: 10,
+    padding: 12,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  browseLabel: { fontWeight: '600' },
+  browseIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  flex: { flex: 1 },
   feedHead: { paddingTop: 30, gap: 14, paddingBottom: 6 },
   footer: { paddingVertical: 28, alignItems: 'center' },
   toast: {

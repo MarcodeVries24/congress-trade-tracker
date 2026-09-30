@@ -92,6 +92,12 @@ export default function MoreScreen() {
         </Group>
 
         <Group title="Browse">
+          <ListRow
+            icon="options-outline"
+            label="All trades"
+            detail="Search with every filter"
+            onPress={() => router.push('/trades')}
+          />
           <ListRow icon="people-outline" label="Politicians" onPress={() => router.push('/politicians')} />
           <ListRow icon="business-outline" label="Companies" onPress={() => router.push('/issuers')} />
           <ListRow icon="newspaper-outline" label="News" onPress={() => router.push('/news')} />

@@ -6,7 +6,7 @@ import type { IssuerDetail } from '@/lib/api';
 import { getIssuer } from '@/lib/detail-cache';
 import { tradesFromIssuer } from '@/lib/detail-trades';
 import { useFollows } from '@/lib/follows';
-import { compactUSD, memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
+import { compactUSD, memberDisplayNameFromFiledName, shortDate, surname } from '@/lib/format';
 import { byMonth } from '@/lib/group';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
@@ -195,6 +195,7 @@ export default function IssuerScreen() {
               <Tap
                 key={t.slug ?? t.member_name}
                 disabled={!t.slug}
+                dimWhenDisabled={false}
                 feedback="tap"
                 scaleTo={0.93}
                 onPress={() => t.slug && router.push({ pathname: '/politician/[slug]', params: { slug: t.slug } })}
@@ -207,7 +208,7 @@ export default function IssuerScreen() {
                   ring
                 />
                 <Text variant="footnote" numberOfLines={1} style={styles.traderName}>
-                  {(t.display || memberDisplayNameFromFiledName(t.member_name)).split(' ').slice(-1)[0]}
+                  {surname(t.display || memberDisplayNameFromFiledName(t.member_name))}
                 </Text>
                 <Text variant="footnote" tone="faint" style={styles.traderCount}>
                   {t.trade_count} {t.trade_count === 1 ? 'trade' : 'trades'}
@@ -219,9 +220,20 @@ export default function IssuerScreen() {
       ) : null}
 
       <View style={styles.block}>
-        <Text variant="headline" style={styles.blockTitle}>
-          {trades.length < i.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
-        </Text>
+        <View style={styles.blockRow}>
+          <Text variant="headline" style={styles.blockTitle}>
+            {trades.length < i.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
+          </Text>
+          <Tap
+            hitSlop={8}
+            onPress={() =>
+              router.push({ pathname: '/trades', params: { filters: JSON.stringify({ tickers: [i.ticker] }) } })
+            }>
+            <Text variant="callout" style={styles.seeAll}>
+              {trades.length < i.trade_count ? `See all ${i.trade_count.toLocaleString()}` : 'Filter'}
+            </Text>
+          </Tap>
+        </View>
       </View>
     </View>
   );
@@ -287,6 +299,8 @@ const styles = StyleSheet.create({
   leanBlock: { gap: 6 },
   block: { paddingTop: 26, gap: 12 },
   blockTitle: { paddingHorizontal: 20 },
+  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 20 },
+  seeAll: { fontWeight: '700', textDecorationLine: 'underline' },
   traders: { paddingHorizontal: 16, gap: 8 },
   trader: { width: 76, alignItems: 'center', gap: 6 },
   traderName: { fontWeight: '600', maxWidth: 74 },

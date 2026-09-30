@@ -53,9 +53,27 @@ export interface TradeQuery {
   page?: number;
   limit?: number;
   q?: string;
-  /** Repeated on the wire: chamber=house&chamber=senate. */
+  /** Repeated on the wire: chamber=house&chamber=senate. Empty means both. */
   chamber?: ("house" | "senate")[];
   assetTypes?: string[];
+  // The structured filters. The route honours them for a Pro account only,
+  // which is everyone past the paywall.
+  members?: string[];
+  tickers?: string[];
+  parties?: string[];
+  states?: string[];
+  /** "P" | "S" | "E", matched as a prefix, so "S" also covers partial sales. */
+  types?: string[];
+  owners?: string[];
+  minAmount?: number;
+  amountRanges?: string[];
+  marketCapTiers?: string[];
+  filedStatus?: "late" | "onTime";
+  /** Filing dates, inclusive, as YYYY-MM-DD. */
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: string;
+  order?: "asc" | "desc";
 }
 
 class ApiError extends Error {
@@ -108,8 +126,30 @@ export function fetchTrades(query: TradeQuery = {}, options: RequestOptions = {}
   if (query.q) params.set("q", query.q);
   // Repeated keys rather than a comma list, because that is what the route's
   // searchParams.getAll expects.
-  for (const c of query.chamber ?? []) params.append("chamber", c);
-  for (const t of query.assetTypes ?? []) params.append("assetTypes", t);
+  //
+  // Both chambers are always named explicitly: the route reads no chamber as
+  // House only, a default kept from before the Senate was ingested, and that
+  // quietly dropped every Senate trade from anything that asked for "all".
+  const chambers = query.chamber?.length ? query.chamber : ["house", "senate"];
+  for (const c of chambers) params.append("chamber", c);
+  const lists: [string, string[] | undefined][] = [
+    ["assetTypes", query.assetTypes],
+    ["members", query.members],
+    ["tickers", query.tickers],
+    ["parties", query.parties],
+    ["states", query.states],
+    ["types", query.types],
+    ["owners", query.owners],
+    ["amountRanges", query.amountRanges],
+    ["marketCapTiers", query.marketCapTiers],
+  ];
+  for (const [key, values] of lists) for (const v of values ?? []) params.append(key, v);
+  if (query.minAmount) params.set("minAmount", String(query.minAmount));
+  if (query.filedStatus) params.set("filedStatus", query.filedStatus);
+  if (query.dateFrom) params.set("dateFrom", query.dateFrom);
+  if (query.dateTo) params.set("dateTo", query.dateTo);
+  if (query.sort) params.set("sort", query.sort);
+  if (query.order) params.set("order", query.order);
   return get<Page<Trade>>("/api/trades", params, options);
 }
 

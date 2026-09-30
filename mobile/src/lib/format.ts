@@ -158,3 +158,12 @@ export function tradePill(code: string): string {
   if (code.startsWith("E")) return "Exchange";
   return code;
 }
+
+/** "James Conley Justice, II" -> "Justice": the surname, for a label under a face. */
+export function surname(name: string): string {
+  const words = name
+    .replace(/,/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !/^(jr|sr|ii|iii|iv|v|md|phd)\.?$/i.test(w));
+  return words[words.length - 1] ?? name;
+}

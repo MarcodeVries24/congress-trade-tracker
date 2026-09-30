@@ -6,7 +6,7 @@ import { Text } from '@/ui/text';
 // Deep, saturated tones that all carry white text. Picked from the ticker by
 // a hash, so a company always wears the same colour everywhere in the app.
 const TONES = [
-  '#0B2A4A',
+  '#101729',
   '#1D4ED8',
   '#0F766E',
   '#7C3AED',
@@ -15,7 +15,7 @@ const TONES = [
   '#15803D',
   '#334155',
   '#9D174D',
-  '#0369A1',
+  '#3A82C2',
 ];
 
 function hash(s: string): number {

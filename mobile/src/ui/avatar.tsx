@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { partyTone, useTheme } from '@/theme';
+import { brand, partyTone, useTheme } from '@/theme';
 import { Text } from '@/ui/text';
 
 function initials(name: string): string {
@@ -61,7 +61,7 @@ export function Avatar({
   const outer = size + 8;
   return (
     <LinearGradient
-      colors={dim ? [c.borderStrong, c.borderStrong] : ['#E03A3E', '#F59E0B', '#2F6FEB']}
+      colors={dim ? [c.borderStrong, c.borderStrong] : [...brand.ring]}
       start={{ x: 0, y: 1 }}
       end={{ x: 1, y: 0 }}
       style={{ width: outer, height: outer, borderRadius: outer / 2, alignItems: 'center', justifyContent: 'center' }}>

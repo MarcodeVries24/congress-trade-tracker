@@ -21,7 +21,7 @@ import { useFollows } from '@/lib/follows';
 import { compactUSD, memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { useAuthedRequest } from '@/lib/use-api';
-import { partyTone, radius, shadow, useTheme } from '@/theme';
+import { brand, partyTone, radius, shadow, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
@@ -58,7 +58,7 @@ function CardFace({ card }: { card: Card }) {
             transition={200}
           />
         ) : (
-          <LinearGradient colors={[partyTone(m.party), '#0B2A4A']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[partyTone(m.party), brand.ink]} style={StyleSheet.absoluteFill} />
         )}
         <LinearGradient
           colors={['transparent', 'rgba(8,16,28,0.55)', 'rgba(8,16,28,0.95)']}
@@ -115,7 +115,7 @@ function CardFace({ card }: { card: Card }) {
   const s = card.row;
   return (
     <View style={[styles.face, { backgroundColor: c.surface }]}>
-      <LinearGradient colors={['#0B2A4A', '#1B4B7E']} style={styles.stockTop}>
+      <LinearGradient colors={[brand.ink, brand.blueDeep]} style={styles.stockTop}>
         <TickerLogo ticker={s.ticker} size={112} />
         <View style={[styles.tag, styles.glass, styles.stockTag]}>
           <Text variant="footnote" color="#FFFFFF" style={styles.bold}>

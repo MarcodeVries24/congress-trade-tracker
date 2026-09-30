@@ -1,41 +1,58 @@
 import { Platform, useColorScheme } from 'react-native';
 
 /**
+ * The two colours of the CongTrade wordmark: "Cong" in ink, "Trade" in blue.
+ * Everything that is chrome (buttons, the active tab, rings, heroes) is drawn
+ * from these. Green and red are kept for what they mean, bought and sold.
+ */
+export const brand = {
+  ink: '#101729',
+  blue: '#3A82C2',
+  blueDeep: '#1F5C96',
+  blueLight: '#8CC0EC',
+  page: '#F9FAFC',
+  /** The navy-to-blue sweep behind heroes and the swipe card. */
+  hero: ['#101729', '#1B3556', '#2A6BA8'] as const,
+  /** The story ring, Instagram's gradient in the logo's blues. */
+  ring: ['#1F5C96', '#3A82C2', '#8CC0EC'] as const,
+};
+
+/**
  * The app's design tokens.
  *
  * One palette per scheme, one spacing scale, one set of radii and shadows, so
  * no screen invents its own grey. The look is a white, card-based app in the
- * manner of the consumer apps people already know how to use: a navy that
- * reads as serious and civic, and the flag's red kept for the one thing on
- * each screen that should draw the eye.
+ * manner of the consumer apps people already know how to use, in the logo's
+ * ink and blue, with the blue kept for the one thing on each screen that
+ * should draw the eye.
  */
 const light = {
-  background: '#F5F6F8',
+  background: '#F7F8FB',
   surface: '#FFFFFF',
   surfaceMuted: '#F0F2F5',
   surfacePressed: '#E9ECF1',
   border: '#E5E8ED',
   borderStrong: '#D4D9E1',
-  text: '#0D1B2E',
+  text: '#101729',
   textMuted: '#667085',
   textFaint: '#98A2B3',
-  primary: '#0B2A4A',
+  primary: '#101729',
   primaryText: '#FFFFFF',
-  accent: '#E03A3E',
-  accentSoft: '#FDECEC',
+  accent: '#3A82C2',
+  accentSoft: '#E8F1FA',
   gain: '#16A34A',
   gainSoft: '#E7F6EC',
   loss: '#DC2626',
   lossSoft: '#FDECEC',
   warn: '#B45309',
   warnSoft: '#FEF3C7',
-  overlay: 'rgba(13, 27, 46, 0.45)',
+  overlay: 'rgba(16, 23, 41, 0.45)',
   tabBar: '#FFFFFF',
   skeleton: '#E9ECF1',
 };
 
 const dark: typeof light = {
-  background: '#0A0E14',
+  background: '#0A0E17',
   surface: '#141A23',
   surfaceMuted: '#1B2330',
   surfacePressed: '#222C3A',
@@ -44,10 +61,10 @@ const dark: typeof light = {
   text: '#F3F5F8',
   textMuted: '#9AA4B2',
   textFaint: '#6B7686',
-  primary: '#E8EEF6',
-  primaryText: '#0B2A4A',
-  accent: '#F0484C',
-  accentSoft: '#3A1719',
+  primary: '#E9EEF6',
+  primaryText: '#101729',
+  accent: '#5B9BD8',
+  accentSoft: '#13263A',
   gain: '#34D17A',
   gainSoft: '#11291C',
   loss: '#F26464',

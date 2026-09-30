@@ -192,9 +192,20 @@ export default function PoliticianScreen() {
       ) : null}
 
       <View style={styles.block}>
-        <Text variant="headline" style={styles.blockTitle}>
-          {trades.length < p.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
-        </Text>
+        <View style={styles.blockRow}>
+          <Text variant="headline" style={styles.blockTitle}>
+            {trades.length < p.trade_count ? `Latest ${trades.length} trades` : 'Trades'}
+          </Text>
+          <Tap
+            hitSlop={8}
+            onPress={() =>
+              router.push({ pathname: '/trades', params: { filters: JSON.stringify({ members: p.names }) } })
+            }>
+            <Text variant="callout" style={styles.seeAll}>
+              {trades.length < p.trade_count ? `See all ${p.trade_count.toLocaleString()}` : 'Filter'}
+            </Text>
+          </Tap>
+        </View>
       </View>
     </View>
   );
@@ -256,6 +267,8 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: 22, paddingTop: 10 },
   block: { paddingTop: 26, gap: 12 },
   blockTitle: { paddingHorizontal: 20 },
+  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 20 },
+  seeAll: { fontWeight: '700', textDecorationLine: 'underline' },
   tickers: { paddingHorizontal: 16, gap: 10 },
   tickerCard: {
     flexDirection: 'row',

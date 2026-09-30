@@ -52,7 +52,7 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchTrades({ limit: 60, assetTypes: ['ST'] }, { signal: controller.signal })
+    fetchTrades({ limit: 200, assetTypes: ['ST'] }, { signal: controller.signal })
       .then((res) => {
         // Three different people: one busy filer would otherwise fill the stack.
         const seen = new Set<string>();

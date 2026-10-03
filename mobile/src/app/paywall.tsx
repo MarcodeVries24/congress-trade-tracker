@@ -236,7 +236,7 @@ export default function PaywallScreen() {
         ) : null}
         <Button
           kind="accent"
-          label={purchases.available ? `Continue with ${chosen.title}` : 'Not available on the web preview'}
+          label={purchases.available ? `Continue with ${chosen.title}` : (purchases.unavailableReason ?? 'Not available here')}
           loading={purchases.busy !== null}
           disabled={!purchases.available}
           onPress={() => {

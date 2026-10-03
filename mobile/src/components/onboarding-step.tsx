@@ -84,19 +84,7 @@ export function OnboardingStep({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        <Animated.View entering={FadeInDown.duration(380)} style={styles.guide}>
-          <CongBadge width={52} wave={false} halo={c.accentSoft} />
-          <View style={[styles.bubble, { backgroundColor: c.surface, borderColor: c.border }]}>
-            {/* The bubble's tail, pointing at Cong. */}
-            <View style={[styles.tail, { backgroundColor: c.surface, borderColor: c.border }]} />
-            <Text variant="headline">{title}</Text>
-            {subtitle ? (
-              <Text variant="callout" tone="muted">
-                {subtitle}
-              </Text>
-            ) : null}
-          </View>
-        </Animated.View>
+        <CongSays title={title} subtitle={subtitle} />
         <Animated.View entering={FadeInDown.duration(420).delay(80)} style={styles.body}>
           {children}
         </Animated.View>
@@ -112,6 +100,36 @@ export function OnboardingStep({
     </View>
   );
 }
+
+/**
+ * Cong asking something from a speech bubble: the head of every setup step
+ * and of the plans screen, drawn by this one component so he sits in the same
+ * place on each.
+ */
+export function CongSays({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { c } = useTheme();
+  return (
+    <Animated.View entering={FadeInDown.duration(380)} style={styles.guide}>
+      <CongBadge width={52} wave={false} halo={c.accentSoft} />
+      <View style={[styles.bubble, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {/* The bubble's tail, pointing at Cong. */}
+        <View style={[styles.tail, { backgroundColor: c.surface, borderColor: c.border }]} />
+        <Text variant="headline">{title}</Text>
+        {subtitle ? (
+          <Text variant="callout" tone="muted">
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
+ * The space a setup step's top bar takes (back, progress, skip), for a screen
+ * without one that should still put Cong at the same height.
+ */
+export const STEP_TOP_BAR = { paddingTop: 8, row: 36, paddingBottom: 8 };
 
 /** A tappable answer card. Selected fills navy-tinted with a check. */
 export function Choice({

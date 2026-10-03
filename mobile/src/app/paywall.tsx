@@ -1,5 +1,4 @@
 import { getProPricing } from '@congtrade/shared/plans';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -11,23 +10,26 @@ import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod } from '@/lib/products';
 import { usePurchases } from '@/lib/use-purchases';
-import { brand, radius, useTheme } from '@/theme';
+import { CongSays, STEP_TOP_BAR } from '@/components/onboarding-step';
+import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
-import { Icon, type IconName } from '@/ui/icon';
+import { Icon } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
-const BENEFITS: { icon: IconName; title: string; body: string }[] = [
-  { icon: 'flash', title: 'Every trade, the day it is filed', body: 'Both chambers, every member who files.' },
-  { icon: 'star', title: 'A watchlist of politicians', body: 'Follow members and see every trade they file.' },
-  { icon: 'notifications', title: 'Alerts on your terms', body: 'Push or email, by member, ticker, size or any filter.' },
-  { icon: 'document-text', title: 'Straight from the filings', body: 'Every trade links to the original disclosure.' },
+const BENEFITS = [
+  'Every trade, the day it is filed',
+  'Alerts by push or email, on any filter',
+  'Follow the politicians you choose',
 ];
 
 const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'month', annual: 'year' };
 
 /**
  * The paywall.
+ *
+ * Cong asks from the same place as on the setup steps before it, then three
+ * one-line reasons and the plans: the whole choice on one screen.
  *
  * Weekly is preselected because it is what someone who has just met the app
  * will commit to, and the longer plans carry the saving so they argue for
@@ -66,25 +68,22 @@ export default function PaywallScreen() {
 
   const storePrice = (p: BillingPeriod) => purchases.products.find((x) => x.period === p)?.displayPrice;
 
-  const plans: { key: BillingPeriod; title: string; price: string; note: string; badge?: string }[] = [
+  const plans: { key: BillingPeriod; title: string; price: string; badge?: string }[] = [
     {
       key: 'weekly',
       title: 'Weekly',
       price: storePrice('weekly') ?? `${pricing.currencySymbol}${pricing.weekly}`,
-      note: 'Most flexible',
     },
     {
       key: 'monthly',
       title: 'Monthly',
       price: storePrice('monthly') ?? `${pricing.currencySymbol}${pricing.monthly}`,
-      note: 'Billed monthly',
       badge: pricing.monthlySavingVsWeeklyPercent ? `Save ${pricing.monthlySavingVsWeeklyPercent}%` : undefined,
     },
     {
       key: 'annual',
       title: 'Yearly',
       price: storePrice('annual') ?? `${pricing.currencySymbol}${pricing.annualTotal}`,
-      note: 'Best value',
       badge: pricing.annualSavingPercent ? `Save ${pricing.annualSavingPercent}%` : undefined,
     },
   ];
@@ -92,44 +91,23 @@ export default function PaywallScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
+      {/* The height of a setup step's top bar, so Cong sits where he did. */}
+      <View style={{ height: insets.top + STEP_TOP_BAR.paddingTop + STEP_TOP_BAR.row + STEP_TOP_BAR.paddingBottom }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={[...brand.hero]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + 22 }]}>
-          <View style={styles.proBadge}>
-            <Icon name="sparkles" size={14} color="#FFFFFF" />
-            <Text variant="label" color="#FFFFFF">
-              CONGTRADE PRO
-            </Text>
-          </View>
-          <Animated.View entering={FadeInDown.duration(420)}>
-            <Text variant="display" color="#FFFFFF" style={styles.heroTitle}>
-              Know what Congress trades, first.
-            </Text>
-          </Animated.View>
-          <View style={styles.benefits}>
-            {BENEFITS.map((b, i) => (
-              <Animated.View
-                key={b.title}
-                entering={FadeInDown.duration(400).delay(90 + i * 70)}
-                style={styles.benefit}>
-                <View style={styles.benefitIcon}>
-                  <Icon name={b.icon} size={18} color="#FFFFFF" />
-                </View>
-                <View style={styles.flex}>
-                  <Text variant="bodyStrong" color="#FFFFFF">
-                    {b.title}
-                  </Text>
-                  <Text variant="caption" color="rgba(255,255,255,0.72)">
-                    {b.body}
-                  </Text>
-                </View>
-              </Animated.View>
-            ))}
-          </View>
-        </LinearGradient>
+        <CongSays title="Unlock everything with Pro." subtitle="Cancel anytime." />
+
+        <View style={styles.benefits}>
+          {BENEFITS.map((b, i) => (
+            <Animated.View key={b} entering={FadeInDown.duration(380).delay(80 + i * 60)} style={styles.benefit}>
+              <View style={[styles.check, { backgroundColor: c.accentSoft }]}>
+                <Icon name="checkmark" size={14} color={c.accent} />
+              </View>
+              <Text variant="callout" style={styles.flex}>
+                {b}
+              </Text>
+            </Animated.View>
+          ))}
+        </View>
 
         <View style={styles.plans}>
           {plans.map((p) => {
@@ -157,36 +135,32 @@ export default function PaywallScreen() {
                   ]}>
                   {selected ? <Icon name="checkmark" size={14} color={c.primaryText} /> : null}
                 </View>
-                <View style={styles.flex}>
-                  <View style={styles.planHead}>
-                    <Text variant="subhead">{p.title}</Text>
-                    {p.badge ? (
-                      <View style={[styles.badge, { backgroundColor: c.accent }]}>
-                        <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-                          {p.badge}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text variant="caption" tone="muted">
-                    {p.note}
-                  </Text>
+                <View style={[styles.flex, styles.planHead]}>
+                  <Text variant="subhead">{p.title}</Text>
+                  {p.badge ? (
+                    <View style={[styles.badge, { backgroundColor: c.accent }]}>
+                      <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
+                        {p.badge}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-                <View style={styles.price}>
-                  <Text variant="subhead">{p.price}</Text>
+                <Text variant="subhead">
+                  {p.price}
                   <Text variant="footnote" tone="muted">
-                    per {PERIOD_WORD[p.key]}
+                    {' '}
+                    / {PERIOD_WORD[p.key]}
                   </Text>
-                </View>
+                </Text>
               </Tap>
             );
           })}
         </View>
 
-        <Text variant="footnote" tone="muted" style={styles.legal}>
-          {chosen.price} per {PERIOD_WORD[chosen.key]}, renewing automatically until you cancel. Cancel any time in your
-          App Store or Google Play settings, at least 24 hours before the period ends. By subscribing you agree to the
-          Terms of Service and the Privacy Policy.
+        {/* Apple 3.1.2: the price per period, that it renews, and how to stop it. */}
+        <Text variant="footnote" tone="faint" style={styles.legal}>
+          {chosen.price} per {PERIOD_WORD[chosen.key]}, renews automatically. Cancel anytime in your App Store or Google
+          Play settings, at least 24 hours before it renews.
         </Text>
         <View style={styles.links}>
           <Tap onPress={() => openPage(LINKS.terms)} hitSlop={8}>
@@ -236,7 +210,11 @@ export default function PaywallScreen() {
         ) : null}
         <Button
           kind="accent"
-          label={purchases.available ? `Continue with ${chosen.title}` : (purchases.unavailableReason ?? 'Not available here')}
+          label={
+            purchases.available
+              ? `Continue with ${chosen.title}`
+              : (purchases.unavailableReason ?? 'Not available here')
+          }
           loading={purchases.busy !== null}
           disabled={!purchases.available}
           onPress={() => {
@@ -273,41 +251,28 @@ export default function PaywallScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingBottom: 24 },
-  flex: { flex: 1, gap: 2 },
+  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 },
+  flex: { flex: 1 },
   bold: { fontWeight: '700' },
   center: { textAlign: 'center' },
-  hero: { paddingHorizontal: 24, paddingBottom: 28, gap: 18, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  proBadge: {
+  benefits: { gap: 10, paddingTop: 22, paddingHorizontal: 4 },
+  benefit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  check: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  plans: { paddingTop: 22, gap: 10 },
+  plan: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: radius.xl,
   },
-  heroTitle: { maxWidth: 340 },
-  benefits: { gap: 14 },
-  benefit: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  benefitIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  plans: { paddingHorizontal: 16, paddingTop: 22, gap: 10 },
-  plan: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: radius.xl },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill },
-  price: { alignItems: 'flex-end' },
-  legal: { paddingHorizontal: 22, paddingTop: 16, textAlign: 'center' },
-  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 10 },
+  legal: { paddingTop: 14, textAlign: 'center' },
+  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 8 },
   link: { fontWeight: '700', textDecorationLine: 'underline' },
-  footer: { paddingHorizontal: 20, paddingTop: 12, gap: 6, borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: 16, paddingTop: 12, gap: 4, borderTopWidth: StyleSheet.hairlineWidth },
   secondary: { alignItems: 'center', paddingVertical: 8 },
 });

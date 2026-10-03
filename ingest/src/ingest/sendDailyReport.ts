@@ -178,6 +178,15 @@ async function main() {
     <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111;">
       <h2 style="margin-bottom:4px;">CongTrade — daily ingest report</h2>
       <p style="color:#666;margin-top:0;">PTR filings newly published since the last report — ${reportDate}.</p>
+      ${
+        approvalBacklog > 0
+          ? `<p style="margin:16px 0;">
+               <a href="${SITE_URL}/admin" style="display:inline-block;background:#0284c7;color:#fff;text-decoration:none;font-weight:600;padding:10px 18px;border-radius:999px;">
+                 Review ${approvalBacklog} filing${approvalBacklog === 1 ? "" : "s"} waiting for approval →
+               </a>
+             </p>`
+          : `<p style="margin:16px 0;color:#666;font-size:13px;">Nothing waiting for approval. <a href="${SITE_URL}/admin" style="color:#0070f3;">Admin panel</a></p>`
+      }
 
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <tr>
@@ -260,7 +269,7 @@ async function main() {
   `;
 
   const text = `CongTrade daily ingest report — ${reportDate}
-
+${approvalBacklog > 0 ? `\nREVIEW ${approvalBacklog} FILING${approvalBacklog === 1 ? "" : "S"} WAITING FOR APPROVAL: ${SITE_URL}/admin\n` : `\nNothing waiting for approval. Admin panel: ${SITE_URL}/admin\n`}
 New filings: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})${reprocessedOlder ? `\nOlder filings re-processed: ${reprocessedOlder}` : ""}
 Published: ${successful.length}
 Waiting for approval: ${awaitingApproval.length} new, ${approvalBacklog} in total — ${SITE_URL}/admin

@@ -23,3 +23,16 @@ export function ensureSchema(): Promise<void> {
   }
   return schemaReady;
 }
+
+/**
+ * For an ingest upsert's ON CONFLICT clause: a filing that was published
+ * before and still parses cleanly keeps its approval, so a re-parse (the
+ * pipeline re-reads in bulk when a parser improves) does not pull it off the
+ * site. Anything else (new, or newly parseable) waits for approval in /admin.
+ */
+export const KEEP_APPROVAL_SQL = `
+  approved_at = CASE WHEN filings.parse_status IN ('ok', 'manual') AND EXCLUDED.parse_status IN ('ok', 'manual')
+                     THEN filings.approved_at END,
+  approved_by = CASE WHEN filings.parse_status IN ('ok', 'manual') AND EXCLUDED.parse_status IN ('ok', 'manual')
+                     THEN filings.approved_by END`;
+

@@ -128,7 +128,7 @@ export default function TimingScreen() {
               since. Filings give a value range, never the price paid, so this is the stock&apos;s return, not the
               member&apos;s profit. Several lots of one stock in a filing count once, no member appears more than twice,
               and moves over 400% (usually a mismatched listing) are left out. Only trades filed on time are ranked.
-              Prices update every weekday evening; new trades are priced within hours of being filed.
+              Prices update every weekday evening; new trades are priced once they are published.
             </Text>
             <NotAdvice long />
           </View>

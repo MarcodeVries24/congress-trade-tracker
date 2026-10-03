@@ -104,7 +104,11 @@ async function main() {
     process.exit(1);
   }
 
-  await sql.query(`UPDATE filings SET parse_status = 'manual' WHERE doc_id = ANY($1)`, [docIds]);
+  // Verifying the scan by hand is the approval too: no second step in /admin.
+  await sql.query(
+    `UPDATE filings SET parse_status = 'manual', approved_at = NOW(), approved_by = 'cli' WHERE doc_id = ANY($1)`,
+    [docIds]
+  );
 
   for (const r of rows) {
     console.log(`published  ${r.filing_date}  ${r.member_name}  (${r.doc_id})  ${r.actual} transaction(s)`);

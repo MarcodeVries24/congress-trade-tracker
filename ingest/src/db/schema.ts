@@ -16,7 +16,9 @@ export const SCHEMA_STATEMENTS = [
     -- pixel-by-pixel verified the scan against the transactions table by
     -- hand; treat as MORE trustworthy than 'ok', not just equivalent to it,
     -- and never let a routine/forced re-ingest run overwrite it without
-    -- deliberately re-auditing first).
+    -- deliberately re-auditing first) | 'flagged' (sent to manual review
+    -- from /admin: its parsed rows are a draft until a human has checked
+    -- the scan, like 'ocr').
     parse_status TEXT NOT NULL DEFAULT 'pending',
     transaction_count INTEGER NOT NULL DEFAULT 0,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -29,6 +31,28 @@ export const SCHEMA_STATEMENTS = [
   // members_reference-by-state_district join when this is NULL, so an
   // unresolved filing is never worse off than before this column existed.
   `ALTER TABLE filings ADD COLUMN IF NOT EXISTS bioguide_id TEXT`,
+  // Admin approval: nothing is published until a person has looked at it.
+  // approved_at NULL means "waiting in /admin"; the site's publish gate
+  // (PUBLISHED_FILING_SQL in web/lib/sql.ts) requires it alongside an
+  // 'ok'/'manual' parse_status. approved_by is the Clerk user id, or 'cli'
+  // for review:approve, or 'backfill' for what was live before the gate.
+  `ALTER TABLE filings ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`,
+  `ALTER TABLE filings ADD COLUMN IF NOT EXISTS approved_by TEXT`,
+  `CREATE INDEX IF NOT EXISTS idx_filings_awaiting_approval ON filings(ingested_at) WHERE approved_at IS NULL`,
+  // Exactly once, when the gate is introduced: everything already published
+  // stays published. The marker row is what makes it once — the INSERT only
+  // returns a row the first time, and the UPDATE only runs when it does, so
+  // a later ingest run can never auto-approve a new filing through here.
+  `CREATE TABLE IF NOT EXISTS approval_gate (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE,
+    enabled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT approval_gate_singleton CHECK (id)
+  )`,
+  `WITH first_run AS (
+     INSERT INTO approval_gate (id) VALUES (TRUE) ON CONFLICT DO NOTHING RETURNING 1
+   )
+   UPDATE filings SET approved_at = ingested_at, approved_by = 'backfill'
+   WHERE parse_status IN ('ok', 'manual') AND approved_at IS NULL AND EXISTS (SELECT 1 FROM first_run)`,
   `CREATE INDEX IF NOT EXISTS idx_filings_bioguide_id ON filings(bioguide_id)`,
   `CREATE TABLE IF NOT EXISTS transactions (
     id SERIAL PRIMARY KEY,

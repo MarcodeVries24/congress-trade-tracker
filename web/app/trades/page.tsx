@@ -44,7 +44,7 @@ import { GatedFilter } from "@/components/GatedFilter";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { AlertCta } from "@/components/AlertCta";
 import { MemberPhoto } from "@/components/MemberPhoto";
-import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, isPartialSale, memberLocation, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
+import { compactUSD, formatDate, formatDateFromTimestamp, isPartialSale, memberLocation, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
 
 // Rough magnitude tier so the eye can scan trade size without reading text.
@@ -595,7 +595,7 @@ export default function Home() {
                   Senate eFD
                 </a>
               )}
-              . Updated and refreshed every 4 hours.
+              . Updated daily.
             </p>
           </div>
         </div>
@@ -611,8 +611,8 @@ export default function Home() {
             <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
             <StatDivider />
             <StatItem
-              value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
-              label={`Last checked${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt) ? ` · ${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}` : ""}`}
+              value={formatDateFromTimestamp(stats.lastUpdatedAt ?? stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              label="Last updated"
             />
           </div>
         )}

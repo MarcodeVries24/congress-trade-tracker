@@ -37,7 +37,7 @@ export function PersonalNote() {
           </p>
           <p className="mt-2.5 text-[13px] leading-relaxed text-ink-muted">
             We&apos;re an independent project. No investors, nobody paying us to have a position talked up, no view on
-            what any of these trades mean. Pro pays for the pipeline that reads every filing every four hours. The data
+            what any of these trades mean. Pro pays for the pipeline that reads and checks every filing, every day. The data
             itself stays open to everyone, and every row links back to the document it came from, so you never have to
             take our word for any of it.
           </p>

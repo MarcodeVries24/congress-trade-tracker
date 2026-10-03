@@ -25,7 +25,7 @@ import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { HomeTiming } from "@/components/HomeTiming";
 import { TickerLogo } from "@/components/TickerLogo";
-import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
+import { compactAmountRange, compactUSD, formatDateFromTimestamp, typeBadge } from "@/lib/format";
 
 // Same free, ungated search param /trades already supports (ILIKE across
 // member_name/asset_name/ticker) — deliberately not the paid member/ticker
@@ -84,7 +84,7 @@ export default function Home() {
             <h1 className="text-base font-semibold tracking-tight sm:text-2xl">Every disclosed Congress asset trade, at a glance</h1>
             <p className="mt-1 max-w-2xl text-xs text-ink-muted sm:mt-2 sm:text-sm">
               Built directly from Periodic Transaction Reports filed with the House Clerk and Senate eFD. Every filing
-              since {archiveStart}, updated every 4 hours.
+              since {archiveStart}, updated daily.
             </p>
           </div>
         </div>
@@ -100,8 +100,8 @@ export default function Home() {
             <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
             <StatDivider />
             <StatItem
-              value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
-              label={`Last checked${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt) ? ` · ${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}` : ""}`}
+              value={formatDateFromTimestamp(stats.lastUpdatedAt ?? stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              label="Last updated"
             />
           </div>
         )}

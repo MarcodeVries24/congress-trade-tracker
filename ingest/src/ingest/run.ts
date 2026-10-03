@@ -1,5 +1,5 @@
 import "../loadEnv.js";
-import { sql, ensureSchema } from "../db/index.js";
+import { sql, ensureSchema, KEEP_APPROVAL_SQL } from "../db/index.js";
 import { fetchYearIndex } from "./fetchIndex.js";
 import { getPtrPdfBuffer, getPdfText } from "./pdfText.js";
 import { parsePtrText } from "./parsePtr.js";
@@ -119,7 +119,8 @@ async function main() {
              ON CONFLICT (doc_id) DO UPDATE SET
                parse_status = EXCLUDED.parse_status,
                transaction_count = EXCLUDED.transaction_count,
-               ingested_at = NOW()`,
+               ingested_at = NOW(),
+               ${KEEP_APPROVAL_SQL}`,
             [
               filing.docId,
               filing.memberName,

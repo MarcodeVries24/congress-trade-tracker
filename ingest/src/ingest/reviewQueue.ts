@@ -16,6 +16,9 @@ import { sql } from "../db/index.js";
  *   'unsupported' Senate paper filing the OCR declined outright. Same story —
  *                 9 of his 'unsupported' filings held 43 real transactions.
  *
+ *   'flagged'     Sent to manual review from /admin: the text parse produced
+ *                 rows, but the admin did not trust them. A draft, like 'ocr'.
+ *
  * 'failed' is deliberately excluded: that's a download/parse *error* to fix
  * in code, not a document waiting to be transcribed. It keeps its own bucket
  * in the daily report.
@@ -24,7 +27,10 @@ import { sql } from "../db/index.js";
  * read the scan, corrected the rows, and set parse_status = 'manual' — which
  * is also exactly what publishes it (see PUBLISHED_FILING_SQL in web/lib/db).
  */
-export const REVIEW_STATUSES = ["ocr", "empty", "unsupported"] as const;
+export const REVIEW_STATUSES = ["ocr", "empty", "unsupported", "flagged"] as const;
+
+/** Statuses that come with rows read off the document: a draft to check, not nothing. */
+const hasDraft = (status: string) => status === "ocr" || status === "flagged";
 
 export interface ReviewItem {
   doc_id: string;
@@ -79,7 +85,7 @@ export function renderReviewRows(items: ReviewItem[]): string {
   return items
     .map((r) => {
       const draft =
-        r.parse_status === "ocr"
+        hasDraft(r.parse_status)
           ? `${r.draft_transactions} draft row${r.draft_transactions === 1 ? "" : "s"}`
           : "nothing read";
       return `<tr>
@@ -155,7 +161,7 @@ export function reviewTextLines(backlog: ReviewItem[], maxRows = 150): string {
     .map(
       (r) =>
         `  ${r.filing_date}  ${r.chamber.padEnd(6)} ${r.parse_status.padEnd(11)} ` +
-        `${r.parse_status === "ocr" ? `${r.draft_transactions} draft` : "nothing read"}`.padEnd(14) +
+        `${hasDraft(r.parse_status) ? `${r.draft_transactions} draft` : "nothing read"}`.padEnd(14) +
         `  ${r.member_name}  ${r.doc_id}\n      ${r.pdf_url}`
     )
     .join("\n");
@@ -173,7 +179,7 @@ async function main() {
 
   console.log(`${items.length} filing(s) awaiting pixel-by-pixel review${since ? ` (ingested since ${since})` : ""}:\n`);
   for (const i of items) {
-    const draft = i.parse_status === "ocr" ? `${i.draft_transactions} draft row(s)` : "no rows read";
+    const draft = hasDraft(i.parse_status) ? `${i.draft_transactions} draft row(s)` : "no rows read";
     console.log(
       `  ${i.filing_date}  ${i.chamber.padEnd(6)} ${i.parse_status.padEnd(11)} ${draft.padEnd(17)} ${i.member_name}`
     );

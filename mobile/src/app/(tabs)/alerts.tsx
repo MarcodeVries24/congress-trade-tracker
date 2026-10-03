@@ -116,7 +116,7 @@ export default function AlertsScreen() {
               {emailCount === 'signed-out'
                 ? 'Sign in to be told when a filing matches your filters'
                 : emailCount === null
-                  ? 'A notification or email the moment a filing matches'
+                  ? 'A notification or email when a filing matches'
                   : emailCount === 0
                     ? 'None active yet. Set one up with any filter in a minute.'
                     : `${emailCount} active, by push notification or email`}

@@ -9,9 +9,11 @@ import { SITE_URL } from "../lib/siteUrl.js";
  * Daily digest of yesterday's *actually newly-filed* PTRs, sent once a day
  * (see .github/workflows/daily-report.yml) rather than after every
  * 4-hourly ingest run — this rolls all six of that day's runs up into one
- * email. Every filing in the window lands in one of three buckets:
- *  - Published: a native text parse succeeded ('ok'), or a human has already
- *    verified it ('manual'). These are live on the site.
+ * email. Every filing in the window lands in one of four buckets:
+ *  - Published: a native text parse succeeded ('ok') and the admin approved
+ *    it in /admin, or a human has verified it by hand ('manual'). Live.
+ *  - Waiting for approval: parsed cleanly, but nobody has approved it in
+ *    /admin yet. NOT published until they do.
  *  - Needs pixel-by-pixel review: a scanned document with no usable text
  *    layer ('ocr' — OCR produced a draft; 'empty'/'unsupported' — it produced
  *    nothing). NOT published. OCR is not trustworthy enough to publish
@@ -54,6 +56,7 @@ interface FilingRow {
   transaction_count: number;
   pdf_url: string;
   filing_date: string;
+  approved: boolean;
 }
 
 function escapeHtml(s: string): string {
@@ -115,7 +118,8 @@ async function main() {
   // report_runs in db/schema.ts for why the filing_date version missed
   // nearly everything.
   const rows = (await sql.query(
-    `SELECT doc_id, chamber, member_name, state_district, parse_status, transaction_count, pdf_url, filing_date
+    `SELECT doc_id, chamber, member_name, state_district, parse_status, transaction_count, pdf_url, filing_date,
+            approved_at IS NOT NULL AS approved
      FROM filings
      WHERE ingested_at > $1
        AND NULLIF(filing_date, '')::date >= CURRENT_DATE - ${NEWS_WINDOW_DAYS}
@@ -131,7 +135,14 @@ async function main() {
     [since]
   )) as { count: number }[];
 
-  const successful = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "manual");
+  const parsed = rows.filter((r) => r.parse_status === "ok" || r.parse_status === "manual");
+  const successful = parsed.filter((r) => r.approved);
+  const awaitingApproval = parsed.filter((r) => !r.approved);
+  // The whole queue in /admin, not only this window's arrivals: one left
+  // unapproved yesterday is still unpublished today.
+  const [{ count: approvalBacklog }] = (await sql.query(
+    `SELECT COUNT(*)::int AS count FROM filings WHERE parse_status IN ('ok', 'manual') AND approved_at IS NULL`
+  )) as { count: number }[];
   const undefinedRows = rows.filter((r) => r.parse_status === "failed");
 
   // Scanned filings held back from the site until verified by hand. Both
@@ -157,9 +168,11 @@ async function main() {
 
   const reviewFlag = backlog.length > 0 ? ` — ${backlog.length} awaiting review` : "";
   const subject =
-    rows.length === 0 && backlog.length === 0
+    rows.length === 0 && backlog.length === 0 && approvalBacklog === 0
       ? `CongTrade daily report — nothing new (${reportDate})`
-      : `CongTrade daily report — ${successful.length} published${reviewFlag} (${reportDate})`;
+      : `CongTrade daily report — ${successful.length} published${
+          approvalBacklog ? `, ${approvalBacklog} to approve` : ""
+        }${reviewFlag} (${reportDate})`;
 
   const html = `
     <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111;">
@@ -170,6 +183,7 @@ async function main() {
         <tr>
           <td style="padding:10px;background:#f5f5f5;border-radius:6px 0 0 6px;"><strong style="font-size:20px;">${rows.length}</strong><br/><span style="color:#666;font-size:12px;">New filings</span></td>
           <td style="padding:10px;background:#eafaf0;"><strong style="font-size:20px;color:#0a7d3c;">${successful.length}</strong><br/><span style="color:#666;font-size:12px;">Published</span></td>
+          <td style="padding:10px;background:#eaf2fb;"><strong style="font-size:20px;color:#1f5f99;">${approvalBacklog}</strong><br/><span style="color:#666;font-size:12px;">To approve</span></td>
           <td style="padding:10px;background:#fff4e5;"><strong style="font-size:20px;color:#a35c00;">${backlog.length}</strong><br/><span style="color:#666;font-size:12px;">Awaiting review</span></td>
           <td style="padding:10px;background:#fbeaea;"><strong style="font-size:20px;color:#a12b2b;">${undefinedRows.length}</strong><br/><span style="color:#666;font-size:12px;">Errors</span></td>
           <td style="padding:10px;background:#f5f5f5;border-radius:0 6px 6px 0;"><strong style="font-size:20px;">${totalNewTransactions.toLocaleString()}</strong><br/><span style="color:#666;font-size:12px;">New transactions</span></td>
@@ -185,8 +199,22 @@ async function main() {
         rows.length === 0
           ? `<p>No new filings appeared in this window.</p>`
           : `
-      <h3 style="margin-bottom:4px;color:#0a7d3c;">Published (${successful.length})</h3>
-      <p style="color:#666;font-size:13px;margin-top:0;">Native text parse succeeded, or already hand-verified. Live on the site.</p>
+      <h3 style="margin-bottom:4px;color:#1f5f99;">Waiting for your approval (${awaitingApproval.length} new, ${approvalBacklog} in total)</h3>
+      <p style="color:#666;font-size:13px;margin-top:0;">Parsed cleanly, not on the site until approved.
+        <a href="${SITE_URL}/admin" style="color:#0070f3;font-weight:600;">Open the admin panel</a></p>
+      ${
+        awaitingApproval.length === 0
+          ? `<p style="color:#666;">None new.</p>`
+          : `<table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr style="text-align:left;color:#666;font-size:12px;text-transform:uppercase;">
+          <th style="padding:6px 10px;">Member</th><th style="padding:6px 10px;">Chamber</th><th style="padding:6px 10px;">Transactions</th><th style="padding:6px 10px;">Filing</th>
+        </tr>
+        ${renderRows(awaitingApproval.slice(0, MAX_ROWS))}
+      </table>${awaitingApproval.length > MAX_ROWS ? `<p style="color:#666;font-size:13px;">and ${awaitingApproval.length - MAX_ROWS} more.</p>` : ""}`
+      }
+
+      <h3 style="margin-bottom:4px;margin-top:24px;color:#0a7d3c;">Published (${successful.length})</h3>
+      <p style="color:#666;font-size:13px;margin-top:0;">Approved in the admin panel, or hand-verified. Live on the site.</p>
       ${
         successful.length === 0
           ? `<p style="color:#666;">None.</p>`
@@ -235,6 +263,7 @@ async function main() {
 
 New filings: ${rows.length} (House: ${houseCount}, Senate: ${senateCount})${reprocessedOlder ? `\nOlder filings re-processed: ${reprocessedOlder}` : ""}
 Published: ${successful.length}
+Waiting for approval: ${awaitingApproval.length} new, ${approvalBacklog} in total — ${SITE_URL}/admin
 Errors: ${undefinedRows.length}
 New transactions: ${totalNewTransactions}
 

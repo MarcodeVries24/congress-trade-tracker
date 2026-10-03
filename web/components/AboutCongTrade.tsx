@@ -33,7 +33,7 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
       </p>
       <p className="mt-2.5 text-[13px] leading-relaxed text-ink-muted">
         CongTrade is an independent project, not a company and not funded by anyone with a position to talk up. It reads
-        every filing the House Clerk and the Senate publish, every four hours
+        every filing the House Clerk and the Senate publish, updated daily
         {trades && members ? (
           <>
             {" "}

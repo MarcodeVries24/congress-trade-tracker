@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const placeholders = chambers.map((_, i) => `$${i + 1}`).join(", ");
   const chamberFilter = `f.chamber IN (${placeholders})`;
 
-  const [totals, filings, members, volume, topTickers, lastIngested, earliestFiling, failedFilings, lastCheckedRun] = (await Promise.all([
+  const [totals, filings, members, volume, topTickers, lastIngested, earliestFiling, failedFilings, lastCheckedRun, lastApproved] = (await Promise.all([
     sql.query(
       `SELECT COUNT(*)::int as transactions
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
     // it found anything new — proves the pipeline is alive even on a quiet
     // check, unlike lastIngestedAt which only moves on actual new data.
     sql.query(`SELECT checked_at FROM ingest_runs LIMIT 1`),
+    // When the site last actually changed: the latest approval in /admin.
+    sql.query(`SELECT MAX(f.approved_at) AS last FROM filings f WHERE ${chamberFilter} AND ${PUBLISHED_FILING_SQL}`, chambers),
   ])) as [
     { transactions: number }[],
     { filings: number }[],
@@ -66,6 +68,7 @@ export async function GET(req: NextRequest) {
     { first: string | null }[],
     { count: number }[],
     { checked_at: string }[],
+    { last: string | null }[],
   ];
 
   return NextResponse.json({
@@ -77,6 +80,7 @@ export async function GET(req: NextRequest) {
     lastIngestedAt: lastIngested[0]?.last ?? null,
     earliestFiling: earliestFiling[0]?.first ?? null,
     lastCheckedAt: lastCheckedRun[0]?.checked_at ?? null,
+    lastUpdatedAt: lastApproved[0]?.last ?? null,
     failedFilings: failedFilings[0]?.count ?? 0,
   });
 }

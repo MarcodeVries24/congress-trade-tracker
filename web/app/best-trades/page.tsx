@@ -110,7 +110,7 @@ export default async function BestTradesPage({ searchParams }: { searchParams: P
               in the ranking, and moves over 400%, which are usually a mismatched listing, are left out. Only trades
               disclosed within the 45 days the law allows are ranked.
             </li>
-            <li>Prices update every weekday evening after the US close; new trades are priced within hours of being filed.</li>
+            <li>Prices update every weekday evening after the US close; new trades are priced once they are published.</li>
           </ul>
           <p className="mt-3 font-medium text-ink-muted">
             {NOT_ADVICE} A trade that has done well is not evidence of wrongdoing, and past returns say nothing about

@@ -34,7 +34,7 @@ const FREQUENCIES = [
 ] as const;
 
 const FREQUENCY_HINTS: Record<AlertFrequency, string> = {
-  instant: 'On the next check after a filing appears, at most a few hours later.',
+  instant: 'When a matching filing is published. CongTrade is updated daily.',
   daily: 'At most once a day, everything that matched in one go.',
   weekly: 'At most once a week. Nothing matched, nothing sent.',
 };

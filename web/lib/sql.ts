@@ -22,9 +22,16 @@
  * the filing to 'manual' after review is what publishes them.
  *
  * 'empty' / 'unsupported' / 'failed' / 'pending' have no transactions to show
- * anyway, and 'not-a-ptr' correctly has none.
+ * anyway, and 'not-a-ptr' correctly has none. 'flagged' is a filing the admin
+ * sent to manual review instead of approving: a draft, like 'ocr'.
+ *
+ * And nothing is shown until the admin has approved it in /admin
+ * (approved_at). Every query of the corpus goes through this fragment, the
+ * alert sender included, so an unapproved filing is not on any page, in any
+ * count, or in anyone's alert; approving it is what releases it to all of
+ * them at once. Hand verification (review:approve) sets approved_at too.
  */
-export const PUBLISHED_FILING_SQL = `f.parse_status IN ('ok', 'manual')`;
+export const PUBLISHED_FILING_SQL = `(f.parse_status IN ('ok', 'manual') AND f.approved_at IS NOT NULL)`;
 
 /**
  * A transaction dated after its own filing date is impossible — that's a typo

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { fetchStats, Stats, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
-import { compactUSD, formatDateFromTimestamp, formatTimeWithZone } from "@/lib/format";
+import { compactUSD, formatDateFromTimestamp } from "@/lib/format";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -17,7 +17,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How often is the data updated?",
-    a: 'An automated pipeline checks the House Clerk\'s and Senate\'s disclosure systems every 4 hours and ingests any newly filed PTRs it finds. The "Last checked" timestamp shown across the site reflects the most recent of these runs.',
+    a: 'CongTrade is updated daily. We check the House Clerk\'s and Senate\'s disclosure systems for newly filed PTRs, and every new filing is reviewed before it is published. The "Last updated" date shown across the site is when new filings last went live.',
   },
   {
     q: "Is CongTrade an official government site?",
@@ -80,8 +80,8 @@ export default function AboutPage() {
             <AboutStat value={stats.totalMembers.toLocaleString()} label="Members covered" />
             <AboutStatDivider />
             <AboutStat
-              value={formatDateFromTimestamp(stats.lastCheckedAt ?? stats.lastIngestedAt)}
-              label={`Last checked${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt) ? ` · ${formatTimeWithZone(stats.lastCheckedAt ?? stats.lastIngestedAt)}` : ""}`}
+              value={formatDateFromTimestamp(stats.lastUpdatedAt ?? stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              label="Last updated"
             />
           </div>
         )}
@@ -119,7 +119,7 @@ export default function AboutPage() {
               >
                 unitedstates/congress-legislators
               </a>{" "}
-              dataset. Ticker market caps, where shown, are resolved and refreshed monthly.
+              dataset. Ticker market caps, where shown, are resolved and updated monthly.
             </p>
           </Section>
 
@@ -136,10 +136,10 @@ export default function AboutPage() {
 
           <Section title="How often the data updates">
             <p>
-              An automated pipeline checks the House Clerk&rsquo;s and Senate&rsquo;s disclosure systems every 4
-              hours and ingests any newly filed PTRs it finds. Nothing about the schedule depends on any single
-              machine staying on. The &ldquo;Last checked&rdquo; timestamp in the stat strip above, and elsewhere
-              across the site, reflects the most recent of those runs.
+              CongTrade is updated daily. An automated pipeline checks the House Clerk&rsquo;s and Senate&rsquo;s
+              disclosure systems for newly filed PTRs, and every new filing is reviewed before it is published.
+              The &ldquo;Last updated&rdquo; date in the stat strip above, and elsewhere across the site, is when
+              new filings last went live.
             </p>
           </Section>
 

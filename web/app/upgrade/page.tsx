@@ -16,7 +16,7 @@ import { formatDateFromTimestamp } from "@/lib/format";
 export const metadata: Metadata = {
   title: "Upgrade | CongTrade",
   description:
-    "Filter every disclosed Congress trade by member, ticker, size and market cap, and get an email the moment a new filing matches. Built from the filings themselves.",
+    "Filter every disclosed Congress trade by member, ticker, size and market cap, and get an email when a new filing matches. Built from the filings themselves.",
 };
 
 function Stat({ value, label }: { value: string; label: string }) {
@@ -67,7 +67,7 @@ export default async function UpgradePage({
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Upgrade to CongTrade Pro</h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
           Every trade on CongTrade is free to read. Pro is for following it closely: filter the whole archive down to
-          what you care about, and get an email the moment a new filing matches.
+          what you care about, and get an email when a new filing matches.
         </p>
 
         {proof && proof.faces.length > 0 && (

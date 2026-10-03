@@ -1,5 +1,5 @@
 import "../loadEnv.js";
-import { sql, ensureSchema } from "../db/index.js";
+import { sql, ensureSchema, KEEP_APPROVAL_SQL } from "../db/index.js";
 import { launchSenateBrowser } from "./senate/browser.js";
 import { acceptAgreementAndOpenSearch, searchPeriodicTransactionReports } from "./senate/search.js";
 import { parseSenateReportPage } from "./senate/parseReport.js";
@@ -106,7 +106,8 @@ async function main() {
                  parse_status = EXCLUDED.parse_status,
                  transaction_count = EXCLUDED.transaction_count,
                  pdf_url = EXCLUDED.pdf_url,
-                 ingested_at = NOW()`,
+                 ingested_at = NOW(),
+                 ${KEEP_APPROVAL_SQL}`,
               [
                 result.reportId,
                 result.filerName,
@@ -189,7 +190,8 @@ async function main() {
                parse_status = EXCLUDED.parse_status,
                transaction_count = EXCLUDED.transaction_count,
                pdf_url = EXCLUDED.pdf_url,
-               ingested_at = NOW()`,
+               ingested_at = NOW(),
+               ${KEEP_APPROVAL_SQL}`,
             [
               result.reportId,
               result.filerName,

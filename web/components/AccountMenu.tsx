@@ -1,6 +1,6 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useProMirror } from "@/lib/useProMirror";
 
@@ -10,6 +10,15 @@ function BellIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </svg>
   );
 }
@@ -43,6 +52,9 @@ function SparkleIcon() {
 export function AccountMenu() {
   const router = useRouter();
   const { loaded, isPro } = useProMirror();
+  // Only a way in: /admin and its API check the role on the server.
+  const { user } = useUser();
+  const isAdmin = (user?.publicMetadata as { role?: unknown } | undefined)?.role === "admin";
   return (
     <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }}>
       <UserButton.MenuItems>
@@ -53,6 +65,9 @@ export function AccountMenu() {
             and naming it after only half its contents is why the way to
             upgrade was hard to find. Same label as the phone menu. */}
         <UserButton.Action label="Account & alerts" labelIcon={<BellIcon />} onClick={() => router.push("/account")} />
+        {isAdmin && (
+          <UserButton.Action label="Approve filings" labelIcon={<CheckIcon />} onClick={() => router.push("/admin")} />
+        )}
       </UserButton.MenuItems>
     </UserButton>
   );

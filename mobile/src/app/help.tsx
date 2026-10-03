@@ -21,7 +21,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'How quickly do new trades appear?',
-    a: 'We check both disclosure sites every few hours, so a filing shows up soon after it is published. Members have up to 45 days after they are notified of a trade to report it, so the trade itself can be several weeks old by then. Each trade shows both dates.',
+    a: 'CongTrade is updated daily: we check both disclosure sites and review every new filing before it goes live, so a filing usually shows up within a day of being published. Members have up to 45 days after they are notified of a trade to report it, so the trade itself can be several weeks old by then. Each trade shows both dates.',
   },
   {
     q: 'Why are amounts shown as ranges?',
@@ -41,7 +41,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What does "Before the public knew" show?',
-    a: "For every trade in a listed stock, how the price moved between the day the member traded and the day the trade was disclosed: the stretch when only they knew about it. \"Their way\" means it rose after a purchase or fell after a sale. Prices are daily closes, updated every weekday evening, and new trades are priced within a few hours of being filed. It shows timing, not profit: filings give a value range, never the price paid.",
+    a: "For every trade in a listed stock, how the price moved between the day the member traded and the day the trade was disclosed: the stretch when only they knew about it. \"Their way\" means it rose after a purchase or fell after a sale. Prices are daily closes, updated every weekday evening, and new trades are priced once they are published. It shows timing, not profit: filings give a value range, never the price paid.",
   },
   {
     q: 'Is this financial advice?',

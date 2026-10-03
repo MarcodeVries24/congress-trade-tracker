@@ -13,7 +13,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "How quickly does a new trade show up?",
-    a: "We check both chambers every four hours, so a filing is usually on the site the same day it's published. The bigger delay isn't ours: the law gives members up to 45 days after a trade to file it, so a disclosure you see today may describe a trade from weeks ago. Both dates are shown on every row.",
+    a: "CongTrade is updated daily: we check both chambers for new filings and review each one before it goes live, so a filing is usually on the site within a day of being published. The bigger delay isn't ours: the law gives members up to 45 days after a trade to file it, so a disclosure you see today may describe a trade from weeks ago. Both dates are shown on every row.",
   },
   {
     q: "Why are the amounts ranges rather than exact figures?",

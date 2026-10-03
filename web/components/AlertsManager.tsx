@@ -156,7 +156,7 @@ export function AlertsManager() {
           <h3 className="text-sm font-semibold text-ink">Email alerts are a CongTrade Pro feature</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-muted">
             Build a filter as specific as you like (a chamber, a party, a member, a ticker, a minimum trade size) and
-            get an email the moment a new disclosure matches it.
+            get an email when a new disclosure matches it.
           </p>
           {/* Carries a draft they arrived with through checkout, which hands
               it back to this page afterwards — the same handover the trades

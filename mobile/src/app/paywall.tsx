@@ -108,7 +108,7 @@ export default function PaywallScreen() {
   // Naming who was picked, without suggesting Pro is limited to them: it
   // covers every member, and anyone can be followed later.
   const benefits = [
-    "Every member's trades, the day they're filed",
+    "Every member's trades, updated daily",
     followed.length === 1
       ? `Alerts for ${followed[0]} and all of Congress`
       : followed.length > 1
@@ -158,13 +158,9 @@ export default function PaywallScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {followed.length ? (
-          <CongSays
-            pose="pro"
-            title={`Ready to watch ${who} for you.`}
-            subtitle="And anyone else in Congress, the day they trade."
-          />
+          <CongSays pose="pro" title={`Ready to watch ${who} for you.`} subtitle="And anyone else in Congress." />
         ) : (
-          <CongSays pose="pro" title="Every trade Congress makes, the day it's filed." subtitle="Cancel anytime." />
+          <CongSays pose="pro" title="Every trade Congress makes, updated daily." subtitle="Cancel anytime." />
         )}
 
         {latest ? (

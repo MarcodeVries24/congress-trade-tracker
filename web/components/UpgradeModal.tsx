@@ -2,7 +2,7 @@
 
 const BENEFITS = [
   "Filter by member, ticker, trade type, owner, size, market cap, and filing date",
-  "Save a search and get emailed the moment a new trade matches it",
+  "Save a search and get emailed when a new trade matches it",
   "Browse without ads",
 ];
 

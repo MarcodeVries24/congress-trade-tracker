@@ -50,6 +50,8 @@ export interface Stats {
   topTickers: { ticker: string; count: number }[];
   lastIngestedAt: string | null;
   lastCheckedAt: string | null;
+  /** The latest approval in /admin: when new filings last went live. */
+  lastUpdatedAt?: string | null;
   /**
    * The oldest filing held, as YYYY-MM-DD. Not the oldest *trade*: a filing
    * from 2022 can disclose a trade from 2015, and a handful do, so the date

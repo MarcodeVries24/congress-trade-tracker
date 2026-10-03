@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "The terms that govern use of CongTrade, including Dutch governing law and how complaints are handled.",
 };
 
-const LAST_UPDATED = "September 28, 2026";
+const LAST_UPDATED = "October 4, 2026";
 
 // Section 2 names the trader but not its street address, deliberately: the
 // address is published once, in the Privacy Policy, which the footer links from
@@ -139,7 +139,7 @@ export default function TermsPage() {
               transcribed and checked against the scan by hand before they appear here, but a transcription can
               still contain a mistake.
             </li>
-            <li>Filings are refreshed on a periodic schedule, not in real time, so there can be a delay before a new filing appears.</li>
+            <li>The site is updated daily, not in real time, so there can be a delay of a day or more before a new filing appears.</li>
             <li>Reported trade amounts are disclosed as ranges (e.g. &ldquo;$1,001&ndash;$15,000&rdquo;), not exact figures, because that&rsquo;s how the underlying law requires them to be reported.</li>
             <li>Company names, tickers, and market capitalization figures are matched and enriched programmatically and may occasionally be wrong or missing.</li>
           </ul>

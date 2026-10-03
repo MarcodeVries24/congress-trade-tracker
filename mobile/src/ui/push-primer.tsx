@@ -97,7 +97,7 @@ export function PushPrimer({ visible, onClose, onEnabled }: { visible: boolean; 
           ) : (
             <>
               <Text variant="title" style={styles.center}>
-                Know the moment they trade
+                Know when they trade
               </Text>
               <Text variant="body" tone="muted" style={styles.center}>
                 Get a notification on this phone when a new filing matches one of your alerts.

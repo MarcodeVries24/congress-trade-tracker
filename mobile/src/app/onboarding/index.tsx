@@ -187,7 +187,7 @@ export default function WelcomeScreen() {
       <Animated.View entering={FadeInDown.duration(450).delay(150)} style={styles.copy}>
         <Text variant="title">Every trade Congress makes, in one place.</Text>
         <Text variant="body" tone="muted">
-          Follow the stock trades of House and Senate members as they&apos;re filed.
+          Follow the stock trades of House and Senate members, updated daily.
         </Text>
       </Animated.View>
 

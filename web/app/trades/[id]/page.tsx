@@ -13,9 +13,8 @@ import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel } from "@/
 import { formatDate, isPartialSale, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import {
-  DISCLOSURE_MOVE_NOTE,
   formatMove,
-  inTheirFavour,
+  SINCE_TRADE_NOTE,
   moveBeforeDisclosure,
   moveSinceDisclosure,
   moveSinceTrade,
@@ -96,13 +95,14 @@ export default async function TradePage({
   const before = moveBeforeDisclosure(t);
   const since = moveSinceDisclosure(t);
   const overall = moveSinceTrade(t);
-  const favour = inTheirFavour(t.transaction_type, before);
+  // Since the trade, counted in the member's favour: the rise since a
+  // purchase, the fall since a sale. The page's headline figure.
+  const edgeNow = overall === null || kind === "other" ? null : kind === "buy" ? overall : -overall;
   const priced = Boolean(t.ticker && t.transaction_date && (before !== null || overall !== null));
 
-  // The close-up is the default for an old trade, where "to today" would
-  // squeeze the weeks that matter into a sliver.
-  const oldTrade = t.transaction_date ? Date.now() - Date.parse(t.transaction_date) > 400 * 86_400_000 : false;
-  const range = rangeParam === "today" || rangeParam === "around" ? rangeParam : oldTrade ? "around" : "today";
+  // To today by default, since that is the headline figure; the close-up
+  // around the trade is one tap away.
+  const range = rangeParam === "around" ? "around" : "today";
   const series =
     priced && t.ticker && t.transaction_date ? await getPriceSeries(t.ticker, offset(t.transaction_date, -MARGIN_DAYS)) : null;
   const aroundEnd = t.filing_date ? offset(t.filing_date, MARGIN_DAYS) : null;
@@ -194,33 +194,38 @@ export default async function TradePage({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-1.5 text-base font-semibold text-ink">
-                  Before the public knew
-                  <InfoTip text={DISCLOSURE_MOVE_NOTE} />
+                  Since the trade
+                  <InfoTip text={SINCE_TRADE_NOTE} />
                 </h2>
-                {before !== null && t.days_to_file ? (
+                {overall !== null ? (
                   <p className="mt-1 max-w-xl text-sm text-ink-muted">
-                    From {money(t.price_at_trade!)} on the day of the trade to {money(t.price_at_filing!)} on the day it
-                    was disclosed, {t.days_to_file} {t.days_to_file === 1 ? "day" : "days"} later
-                    {late ? `, past the ${LATE_DAYS} days the law allows` : ""}.
-                  </p>
-                ) : t.days_to_file === 0 ? (
-                  <p className="mt-1 text-sm text-ink-muted">
-                    Disclosed the same day it was made, so there was no stretch only the member knew about.
+                    From {money(t.price_at_trade!)} on the day of the trade to {money(t.price_now!)} at the latest close (
+                    {formatDate(t.price_now_day ?? null)})
+                    {kind === "sell"
+                      ? `: the stock has ${overall < 0 ? "fallen" : "risen"} ${formatMove(Math.abs(overall)).replace("+", "")} since they sold.`
+                      : "."}
+                    {before !== null && t.days_to_file ? (
+                      <>
+                        {" "}
+                        When it was disclosed, {t.days_to_file} {t.days_to_file === 1 ? "day" : "days"} later
+                        {late ? ` (past the ${LATE_DAYS} days the law allows)` : ""}, it stood at {money(t.price_at_filing!)},{" "}
+                        {formatMove(before)} from the trade.
+                      </>
+                    ) : null}
                   </p>
                 ) : null}
               </div>
-              {before !== null && t.days_to_file ? (
+              {edgeNow !== null ? (
                 <div className="text-right">
                   <div
-                    className={`text-3xl font-bold tabular-nums ${before >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
+                    className={`text-3xl font-bold tabular-nums sm:text-4xl ${edgeNow >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
                   >
-                    {formatMove(before)}
+                    {formatMove(edgeNow)}
                   </div>
-                  {favour !== null ? (
-                    <div className={`text-xs font-semibold ${favour ? "text-ink-muted" : "text-ink-faint"}`}>
-                      {favour ? "✓ went their way" : "went against them"}
-                    </div>
-                  ) : null}
+                  <div className="text-xs font-semibold text-ink-muted">
+                    {kind === "sell" ? "since they sold" : "since they bought"} ·{" "}
+                    {edgeNow >= 0 ? "✓ went their way" : "went against them"}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -246,16 +251,24 @@ export default async function TradePage({
             ) : null}
 
             <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">
-              <MoveStat label="Before disclosure" move={before} note="the stretch only the member knew about" />
               <MoveStat
-                label="Since disclosure"
-                move={since}
-                note={t.price_at_filing != null ? `from ${money(t.price_at_filing)} when it became public` : null}
-              />
-              <MoveStat
-                label="Since the trade"
+                label="Stock since the trade"
                 move={overall}
                 note={t.price_now != null ? `${money(t.price_now)} at the close on ${formatDate(t.price_now_day ?? null)}` : null}
+              />
+              <MoveStat
+                label="Stock before disclosure"
+                move={before}
+                note={
+                  t.days_to_file
+                    ? `the ${t.days_to_file} ${t.days_to_file === 1 ? "day" : "days"} only the member knew about`
+                    : "disclosed the same day"
+                }
+              />
+              <MoveStat
+                label="Stock since disclosure"
+                move={since}
+                note={t.price_at_filing != null ? `from ${money(t.price_at_filing)} when it became public` : null}
               />
             </dl>
             <p className="mt-3 text-xs text-ink-faint">

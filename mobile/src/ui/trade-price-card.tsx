@@ -8,11 +8,9 @@ import {
   fetchPriceSeries,
   formatMove,
   formatPrice,
-  inTheirFavour,
   moveBeforeDisclosure,
   moveSinceDisclosure,
   moveSinceTrade,
-  today,
   type PricePoint,
 } from '@/lib/prices';
 import { radius, useTheme } from '@/theme';
@@ -34,13 +32,13 @@ function daysBetween(a: string, b: string): number {
 }
 
 /**
- * What the stock did around one trade: while only the member knew, and since.
+ * What the stock has done since one trade.
  *
- * The headline number is the move between the trade and its disclosure, the
- * stretch the STOCK Act exists to keep short, with whether it went the way
- * the trade bet. Under it, the price with that stretch shaded, and the two
- * moves anyone else could have had: from the day it was published, and from
- * the trade itself to now.
+ * The headline is the move from the trade date to the latest close, counted
+ * in the member's favour (the rise since a purchase, the fall since a sale),
+ * with whether it went their way. Under it, the price with the stretch before
+ * disclosure shaded, and the two parts of that move: while only the member
+ * knew, and since the public could see it.
  *
  * Drawn only when there is something to show: an asset with a ticker that the
  * price source knows.
@@ -64,11 +62,9 @@ export function TradePriceCard({ trade }: { trade: Trade }) {
     };
   }, [priced, trade.ticker, traded]);
 
-  // The close-up is the default for an old trade, where "to today" would
-  // squeeze the weeks that matter into a sliver.
-  const [range, setRange] = useState<Range>(() =>
-    traded && daysBetween(traded, today()) > 400 ? 'around' : 'today'
-  );
+  // To today by default, since that is the headline figure; the close-up
+  // around the trade is one tap away.
+  const [range, setRange] = useState<Range>('today');
   const aroundEnd = filed ? dayOffset(filed, MARGIN_DAYS) : null;
   const shown = useMemo(() => {
     if (!points) return null;
@@ -80,7 +76,10 @@ export function TradePriceCard({ trade }: { trade: Trade }) {
   if (!priced || !traded) return null;
 
   const buy = /^P/i.test(trade.transaction_type);
-  const verdict = inTheirFavour(trade.transaction_type, before);
+  const sell = /^S/i.test(trade.transaction_type);
+  // Since the trade, counted in the member's favour: the rise since a
+  // purchase, the fall since a sale. The card's headline figure.
+  const edgeNow = overall === null || (!buy && !sell) ? null : buy ? overall : -overall;
   const gap = filed ? daysBetween(traded, filed) : null;
   const late = gap !== null && gap > DEADLINE_DAYS;
   const sameDay = gap === 0;
@@ -88,28 +87,40 @@ export function TradePriceCard({ trade }: { trade: Trade }) {
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={styles.head}>
-        <Text variant="subhead">Before the public knew</Text>
-        {verdict !== null && !sameDay ? (
-          <Pill label={verdict ? 'Went their way' : 'Went against them'} tone={verdict ? 'gain' : 'loss'} solid={false} />
+        <Text variant="subhead">Since the trade</Text>
+        {edgeNow !== null && edgeNow !== 0 ? (
+          <Pill
+            label={edgeNow > 0 ? 'Went their way' : 'Went against them'}
+            tone={edgeNow > 0 ? 'gain' : 'loss'}
+            solid={false}
+          />
         ) : null}
       </View>
 
-      {before !== null && !sameDay ? (
+      {overall !== null ? (
         <View style={styles.hero}>
-          <Text variant="display" tone={before >= 0 ? 'gain' : 'loss'}>
-            {formatMove(before)}
-          </Text>
+          {edgeNow !== null ? (
+            <View style={styles.figureRow}>
+              <Text variant="display" tone={edgeNow >= 0 ? 'gain' : 'loss'}>
+                {formatMove(edgeNow)}
+              </Text>
+              <Text variant="caption" tone="muted" style={styles.figureNote}>
+                {buy ? 'since they bought' : 'since they sold'}
+              </Text>
+            </View>
+          ) : null}
           <Text variant="callout" tone="muted">
-            From {formatPrice(trade.price_at_trade!)} when {buy ? 'they bought' : /^S/i.test(trade.transaction_type) ? 'they sold' : 'it was traded'} on {shortDate(traded)}{' '}
-            to {formatPrice(trade.price_at_filing!)} when it was disclosed
-            {gap !== null ? `, ${gap} ${gap === 1 ? 'day' : 'days'} later` : ''}.
-            {late ? ` That is past the ${DEADLINE_DAYS} days the law allows.` : ''}
+            From {formatPrice(trade.price_at_trade!)} on {shortDate(traded)} to {formatPrice(trade.price_now!)} at the
+            latest close
+            {sell ? `: the stock has ${overall < 0 ? 'fallen' : 'risen'} ${formatMove(Math.abs(overall)).replace('+', '')} since they sold` : ''}
+            .
+            {before !== null && gap ? (
+              ` When it was disclosed, ${gap} ${gap === 1 ? 'day' : 'days'} later${late ? ` (past the ${DEADLINE_DAYS} days the law allows)` : ''}, it stood at ${formatPrice(trade.price_at_filing!)}, ${formatMove(before)} from the trade.`
+            ) : sameDay ? (
+              ' It was disclosed the same day.'
+            ) : null}
           </Text>
         </View>
-      ) : sameDay ? (
-        <Text variant="callout" tone="muted">
-          Disclosed the same day it was made, so there was no stretch only the member knew about.
-        </Text>
       ) : null}
 
       {canToggle ? (
@@ -145,26 +156,24 @@ export function TradePriceCard({ trade }: { trade: Trade }) {
       <View style={[styles.stats, { borderTopColor: c.border }]}>
         <View style={styles.stat}>
           <Text variant="caption" tone="muted">
+            Before disclosure
+          </Text>
+          <Text variant="headline" tone={before === null ? 'muted' : before >= 0 ? 'gain' : 'loss'}>
+            {before === null ? '—' : formatMove(before)}
+          </Text>
+          <Text variant="footnote" tone="faint">
+            {sameDay ? 'disclosed the same day' : gap ? `the ${gap} ${gap === 1 ? 'day' : 'days'} only they knew` : 'not priced yet'}
+          </Text>
+        </View>
+        <View style={[styles.stat, styles.statDivider, { borderLeftColor: c.border }]}>
+          <Text variant="caption" tone="muted">
             Since disclosure
           </Text>
           <Text variant="headline" tone={since === null ? 'muted' : since >= 0 ? 'gain' : 'loss'}>
             {since === null ? '—' : formatMove(since)}
           </Text>
           <Text variant="footnote" tone="faint">
-            {trade.price_at_filing != null ? `from ${formatPrice(trade.price_at_filing)}` : 'not priced yet'}
-          </Text>
-        </View>
-        <View style={[styles.stat, styles.statDivider, { borderLeftColor: c.border }]}>
-          <Text variant="caption" tone="muted">
-            Since the trade
-          </Text>
-          <Text variant="headline" tone={overall === null ? 'muted' : overall >= 0 ? 'gain' : 'loss'}>
-            {overall === null ? '—' : formatMove(overall)}
-          </Text>
-          <Text variant="footnote" tone="faint">
-            {trade.price_now != null
-              ? `${formatPrice(trade.price_now)} on ${shortDate(trade.price_now_day ?? null)}`
-              : 'no recent close'}
+            {trade.price_at_filing != null ? `from ${formatPrice(trade.price_at_filing)} when it became public` : 'not priced yet'}
           </Text>
         </View>
       </View>
@@ -182,6 +191,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, padding: 16, gap: 14, borderWidth: StyleSheet.hairlineWidth },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   hero: { gap: 4 },
+  figureRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+  figureNote: { fontWeight: '600' },
   stats: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14 },
   stat: { flex: 1, gap: 2, paddingRight: 10 },
   statDivider: { borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: 14 },

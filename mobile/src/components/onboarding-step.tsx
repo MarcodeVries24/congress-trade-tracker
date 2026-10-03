@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -7,12 +8,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic } from '@/lib/haptics';
 import { radius, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
-import { CongBadge } from '@/ui/cong-mascot';
 import { Icon, type IconName } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 export const ONBOARDING_STEPS = 5;
+
+/**
+ * Cong's pose on each screen he asks from (design "CongTrade avatar
+ * onboarding"): waving hello, choosing a chamber, looking for someone to
+ * follow, ringing the alert bell, reading a filing, and crowned for Pro. Each
+ * image carries its own soft disc.
+ */
+const POSES = {
+  goal: require('../../assets/images/cong/goal.png'),
+  chamber: require('../../assets/images/cong/chamber.png'),
+  members: require('../../assets/images/cong/members.png'),
+  notify: require('../../assets/images/cong/notify.png'),
+  filings: require('../../assets/images/cong/filings.png'),
+  pro: require('../../assets/images/cong/pro.png'),
+};
+export type CongPose = keyof typeof POSES;
+const STEP_POSES: CongPose[] = ['goal', 'chamber', 'members', 'notify', 'filings'];
 
 // Where each step's back arrow leads, by step number: step 1 goes back to the
 // welcome screen.
@@ -115,7 +132,7 @@ export function OnboardingStep({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        <CongSays title={title} subtitle={subtitle} />
+        <CongSays pose={STEP_POSES[step - 1]} title={title} subtitle={subtitle} />
         <Animated.View entering={FadeInDown.duration(420).delay(80)} style={styles.body}>
           {children}
         </Animated.View>
@@ -137,11 +154,17 @@ export function OnboardingStep({
  * and of the plans screen, drawn by this one component so he sits in the same
  * place on each.
  */
-export function CongSays({ title, subtitle }: { title: string; subtitle?: string }) {
+export function CongSays({ pose, title, subtitle }: { pose: CongPose; title: string; subtitle?: string }) {
   const { c } = useTheme();
   return (
     <Animated.View entering={FadeInDown.duration(380)} style={styles.guide}>
-      <CongBadge width={52} wave={false} halo={c.accentSoft} />
+      <Image
+        source={POSES[pose]}
+        style={styles.cong}
+        contentFit="contain"
+        accessibilityLabel="Cong, the CongTrade monkey"
+        accessible
+      />
       <View style={[styles.bubble, { backgroundColor: c.surface, borderColor: c.border }]}>
         {/* The bubble's tail, pointing at Cong. */}
         <View style={[styles.tail, { backgroundColor: c.surface, borderColor: c.border }]} />
@@ -169,12 +192,15 @@ export function Choice({
   selected,
   onPress,
   icon,
+  leading,
 }: {
   label: string;
   hint?: string;
   selected: boolean;
   onPress: () => void;
   icon?: IconName;
+  /** In place of an icon, such as a member's face. */
+  leading?: ReactNode;
 }) {
   const { c } = useTheme();
   return (
@@ -192,6 +218,7 @@ export function Choice({
           borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
         },
       ]}>
+      {leading}
       {icon ? (
         <View style={[styles.choiceIcon, { backgroundColor: selected ? c.primary : c.surfaceMuted }]}>
           <Icon name={icon} size={22} color={selected ? c.primaryText : c.text} />
@@ -239,6 +266,7 @@ const styles = StyleSheet.create({
   skip: { fontWeight: '600' },
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
   guide: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  cong: { width: 84, height: 84 },
   bubble: {
     flex: 1,
     gap: 4,

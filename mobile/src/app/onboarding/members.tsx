@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Choice, OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
+import { Avatar } from '@/ui/avatar';
 import { SearchBar } from '@/ui/search-bar';
 import { Text } from '@/ui/text';
 import { fetchMemberOptions, type MemberOption } from '@/lib/api';
+import { memberPhotoUrl } from '@/lib/member-photo';
 import { useOnboarding } from '@/lib/onboarding';
 
 const SHOWN = 40;
@@ -81,6 +83,13 @@ export default function MembersScreen() {
           <Choice
             key={o.bioguide_id ?? o.member_name}
             label={memberDisplayName(o)}
+            leading={
+              <Avatar
+                uri={o.bioguide_id ? memberPhotoUrl(o.bioguide_id) : null}
+                name={memberDisplayName(o)}
+                size={40}
+              />
+            }
             hint={`${o.trade_count.toLocaleString()} disclosed trades`}
             selected={o.names.some((n) => answers.members.includes(n))}
             onPress={() => toggle(o)}

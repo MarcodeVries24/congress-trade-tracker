@@ -1,7 +1,7 @@
 import { getProPricing } from '@congtrade/shared/plans';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +22,9 @@ const BENEFITS = [
   'Alerts by push or email, on any filter',
   'Follow the politicians you choose',
 ];
+
+// Where the subscription is managed: only the store this phone buys from.
+const STORE = Platform.select({ ios: 'App Store', android: 'Google Play', default: 'app store' });
 
 const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'month', annual: 'year' };
 
@@ -94,14 +97,20 @@ export default function PaywallScreen() {
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       {/* A setup step's top bar, so Cong sits where he did and the way back is
           where it was. Back always leads to the last step, also when this was
-          opened at launch for an account without Pro. */}
+          opened at launch for an account without Pro. Sign in takes the place
+          Skip has on the steps: the way in for anyone who already pays on the
+          website, and for a store reviewer holding a test login. */}
       <View style={[styles.top, { paddingTop: insets.top + STEP_TOP_BAR.paddingTop }]}>
-        <View style={styles.topRow}>
-          <IconButton name="chevron-back" label="Back" onPress={goBack} size={STEP_TOP_BAR.row} />
-        </View>
+        <IconButton name="chevron-back" label="Back" onPress={goBack} size={STEP_TOP_BAR.row} />
+        <Tap onPress={() => router.push('/sign-in')} hitSlop={10}>
+          <Text variant="callout" tone="muted" style={styles.semibold}>
+            Sign in
+          </Text>
+        </Tap>
       </View>
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <CongSays title="Unlock everything with Pro." subtitle="Cancel anytime." />
+        <CongSays pose="pro" title="Unlock everything with Pro." subtitle="Cancel anytime." />
 
         <View style={styles.benefits}>
           {BENEFITS.map((b, i) => (
@@ -127,20 +136,21 @@ export default function PaywallScreen() {
                   haptic.select();
                   setPeriod(p.key);
                 }}
+                accessibilityState={{ selected }}
                 style={[
                   styles.plan,
                   {
-                    backgroundColor: c.surface,
-                    borderColor: selected ? c.primary : c.border,
+                    backgroundColor: selected ? c.accentSoft : c.surface,
+                    borderColor: selected ? c.accent : c.border,
                     borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
                   },
                 ]}>
                 <View
                   style={[
                     styles.radio,
-                    selected ? { borderColor: c.primary, backgroundColor: c.primary } : { borderColor: c.borderStrong },
+                    selected ? { borderColor: c.accent, backgroundColor: c.accent } : { borderColor: c.borderStrong },
                   ]}>
-                  {selected ? <Icon name="checkmark" size={14} color={c.primaryText} /> : null}
+                  {selected ? <Icon name="checkmark" size={14} color="#FFFFFF" /> : null}
                 </View>
                 <View style={[styles.flex, styles.planHead]}>
                   <Text variant="subhead">{p.title}</Text>
@@ -163,52 +173,15 @@ export default function PaywallScreen() {
             );
           })}
         </View>
-
-        {/* Apple 3.1.2: the price per period, that it renews, and how to stop it. */}
-        <Text variant="footnote" tone="faint" style={styles.legal}>
-          {chosen.price} per {PERIOD_WORD[chosen.key]}, renews automatically. Cancel anytime in your App Store or Google
-          Play settings, at least 24 hours before it renews.
-        </Text>
-        <View style={styles.links}>
-          <Tap onPress={() => openPage(LINKS.terms)} hitSlop={8}>
-            <Text variant="footnote" style={styles.link}>
-              Terms of Service
-            </Text>
-          </Tap>
-          <Text variant="footnote" tone="faint">
-            ·
-          </Text>
-          <Tap onPress={() => openPage(LINKS.privacy)} hitSlop={8}>
-            <Text variant="footnote" style={styles.link}>
-              Privacy Policy
-            </Text>
-          </Tap>
-          {purchases.available ? (
-            <>
-              <Text variant="footnote" tone="faint">
-                ·
-              </Text>
-              {/* Apple requires a visible way to restore a purchase: someone who
-                  paid and reinstalled has no other route back in. */}
-              <Tap
-                onPress={async () => {
-                  await purchases.restore();
-                  await refresh();
-                }}
-                hitSlop={8}>
-                <Text variant="footnote" style={styles.link}>
-                  Restore purchases
-                </Text>
-              </Tap>
-            </>
-          ) : null}
-        </View>
       </ScrollView>
 
+      {/* The button and everything Apple's guideline 3.1.2 asks to sit with it:
+          the price per period, that it renews and how to stop it, the terms,
+          the privacy policy, and a way to restore a purchase. */}
       <View
         style={[
           styles.footer,
-          { paddingBottom: insets.bottom + 12, borderTopColor: c.border, backgroundColor: c.background },
+          { paddingBottom: insets.bottom + 10, borderTopColor: c.border, backgroundColor: c.background },
         ]}>
         {purchases.error ? (
           <Text variant="caption" tone="loss" style={styles.center}>
@@ -229,40 +202,62 @@ export default function PaywallScreen() {
             void purchases.buy(period);
           }}
         />
-        {/* The way in for anyone who already pays on the website, and for a
-            store reviewer holding a test login. */}
-        <Tap onPress={() => router.push('/sign-in')} hitSlop={8} style={styles.secondary}>
-          <Text variant="callout" tone="muted">
-            Already subscribed?{' '}
-            <Text variant="callout" style={styles.bold}>
-              Sign in
-            </Text>
-          </Text>
-        </Tap>
-        {access.skipForDevelopment ? (
-          <Tap
-            onPress={() => {
-              access.skipForDevelopment?.();
-              router.replace('/');
-            }}
-            style={styles.secondary}>
-            <Text variant="footnote" tone="faint">
-              Skip (development builds only)
-            </Text>
-          </Tap>
-        ) : null}
+        <Text variant="caption" tone="faint" style={styles.legal}>
+          {chosen.price} a {PERIOD_WORD[chosen.key]}, renews automatically. Cancel in your {STORE} settings at least 24
+          hours before it renews.
+        </Text>
+        <View style={styles.links}>
+          {/* Apple requires a visible way to restore a purchase: someone who
+              paid and reinstalled has no other route back in. */}
+          {purchases.available ? (
+            <FinePrintLink
+              label="Restore purchases"
+              onPress={async () => {
+                await purchases.restore();
+                await refresh();
+              }}
+            />
+          ) : null}
+          <FinePrintLink label="Terms" onPress={() => openPage(LINKS.terms)} />
+          <FinePrintLink label="Privacy" onPress={() => openPage(LINKS.privacy)} />
+          {access.skipForDevelopment ? (
+            <FinePrintLink
+              label="Skip (dev)"
+              onPress={() => {
+                access.skipForDevelopment?.();
+                router.replace('/');
+              }}
+            />
+          ) : null}
+        </View>
       </View>
     </View>
   );
 }
 
+function FinePrintLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Tap onPress={onPress} hitSlop={8}>
+      <Text variant="caption" tone="muted" style={styles.semibold}>
+        {label}
+      </Text>
+    </Tap>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  top: { paddingHorizontal: 16, paddingBottom: STEP_TOP_BAR.paddingBottom },
-  topRow: { height: STEP_TOP_BAR.row, flexDirection: 'row', alignItems: 'center' },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: STEP_TOP_BAR.paddingBottom,
+  },
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 },
   flex: { flex: 1 },
   bold: { fontWeight: '700' },
+  semibold: { fontWeight: '600' },
   center: { textAlign: 'center' },
   benefits: { gap: 10, paddingTop: 22, paddingHorizontal: 4 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -279,9 +274,7 @@ const styles = StyleSheet.create({
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill },
-  legal: { paddingTop: 14, textAlign: 'center' },
-  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 8 },
-  link: { fontWeight: '700', textDecorationLine: 'underline' },
-  footer: { paddingHorizontal: 16, paddingTop: 12, gap: 4, borderTopWidth: StyleSheet.hairlineWidth },
-  secondary: { alignItems: 'center', paddingVertical: 8 },
+  footer: { paddingHorizontal: 16, paddingTop: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  legal: { textAlign: 'center', paddingHorizontal: 8 },
+  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', columnGap: 20, rowGap: 6 },
 });

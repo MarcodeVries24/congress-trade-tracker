@@ -19,13 +19,11 @@ import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { TickerLogo } from '@/ui/ticker-logo';
-import { TimingCard } from '@/ui/timing-card';
 import { TradeRow } from '@/ui/trade-row';
 
 /**
  * One member, as a profile: face, name and role, a follow button, the numbers
- * that matter, how their stocks moved before the public knew, what they
- * trade most, and every recent trade grouped by the
+ * that matter, what they trade most, and every recent trade grouped by the
  * month it was filed.
  *
  * The same data as the website's member page, from the same function, so the
@@ -167,12 +165,6 @@ export default function PoliticianScreen() {
         midpoints of the disclosed ranges.
       </Text>
 
-      {detail.timing && detail.timing.priced >= 3 ? (
-        <View style={styles.timing}>
-          <TimingCard timing={detail.timing} />
-        </View>
-      ) : null}
-
       {p.top_tickers.length ? (
         <View style={styles.block}>
           <Text variant="headline" style={styles.blockTitle}>
@@ -273,7 +265,6 @@ const styles = StyleSheet.create({
   },
   statCell: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 4 },
   note: { paddingHorizontal: 16, paddingTop: 10 },
-  timing: { marginHorizontal: 16, marginTop: 16 },
   block: { paddingTop: 26, gap: 12 },
   blockTitle: { paddingHorizontal: 16 },
   blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 16 },

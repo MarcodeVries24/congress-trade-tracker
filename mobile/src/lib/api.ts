@@ -320,8 +320,6 @@ export interface PoliticianDetail {
   trades: DetailTrade[];
   /** Set when the slug was an old spelling: ask again under this one. */
   redirectTo: string | null;
-  /** Over all of the member's trades; absent from an older server. */
-  timing?: TimingSummary | null;
 }
 
 export function fetchPolitician(slug: string, options: RequestOptions = {}): Promise<PoliticianDetail> {

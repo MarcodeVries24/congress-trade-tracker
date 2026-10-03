@@ -12,8 +12,6 @@ import { RowLink } from "@/components/RowLink";
 import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { TickerLogo } from "@/components/TickerLogo";
-import { TimingPanel } from "@/components/TimingPanel";
-import { getTimingSummary } from "@/lib/prices";
 
 /**
  * One page per member who has traded.
@@ -64,10 +62,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
   if (member.redirectTo) redirect(`/politicians/${member.redirectTo}`);
 
   const { profile, trades } = member;
-  const [flow, timing] = await Promise.all([
-    getMemberTradeFlow(profile.names),
-    getTimingSummary("t.member_name = ANY($1)", [profile.names]).catch(() => null),
-  ]);
+  const flow = await getMemberTradeFlow(profile.names);
   const tradesHref = `/trades?${profile.names.map((n) => `members=${encodeURIComponent(n)}`).join("&")}`;
 
   return (
@@ -116,7 +111,6 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
             </div>
           )}
 
-          {timing ? <TimingPanel summary={timing} subject="member" /> : null}
 
           <TradeFlowChart quarters={flow} subject={profile.display} />
         </div>

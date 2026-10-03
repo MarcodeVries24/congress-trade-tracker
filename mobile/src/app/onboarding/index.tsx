@@ -79,11 +79,21 @@ export default function WelcomeScreen() {
           <Brand size={24} />
         </Animated.View>
 
+        <Animated.View entering={FadeInDown.duration(450).delay(120)} style={styles.copy}>
+          <Text variant="display">See what Congress trades, the moment it&apos;s filed.</Text>
+          <Text variant="body" tone="muted">
+            CongTrade reads the disclosures the House and the Senate publish and turns them into a feed you can follow.
+          </Text>
+        </Animated.View>
+
+        <Text variant="label" tone="faint" style={styles.examples}>
+          RECENTLY FILED
+        </Text>
         <View style={styles.stack}>
           {(trades ?? [null, null, null]).map((t, i) => (
             <Animated.View
               key={t ? t.id : i}
-              entering={FadeInUp.duration(500).delay(120 + i * 110)}
+              entering={FadeInUp.duration(500).delay(300 + i * 110)}
               style={[
                 styles.tradeCard,
                 { backgroundColor: c.surface, borderColor: c.border, transform: [{ rotate: `${tilt[i] ?? 0}deg` }] },
@@ -118,14 +128,7 @@ export default function WelcomeScreen() {
           ))}
         </View>
 
-        <Animated.View entering={FadeInDown.duration(450).delay(300)} style={styles.copy}>
-          <Text variant="display">See what Congress trades, the moment it&apos;s filed.</Text>
-          <Text variant="body" tone="muted">
-            CongTrade reads the disclosures the House and the Senate publish and turns them into a feed you can follow.
-          </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(450).delay(420)} style={styles.points}>
+        <Animated.View entering={FadeInDown.duration(450).delay(640)} style={styles.points}>
           {POINTS.map((p) => (
             <View key={p.text} style={styles.point}>
               <View style={[styles.pointIcon, { backgroundColor: c.surfaceMuted }]}>
@@ -164,7 +167,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: 22, paddingBottom: 24 },
   logo: { alignItems: 'center' },
-  stack: { marginTop: 28, gap: 10 },
+  examples: { marginTop: 30 },
+  stack: { marginTop: 12, gap: 10 },
   tradeCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,8 +178,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   flex: { flex: 1, gap: 2 },
-  copy: { marginTop: 32, gap: 12 },
-  points: { marginTop: 24, gap: 14 },
+  copy: { marginTop: 28, gap: 12 },
+  points: { marginTop: 28, gap: 14 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   pointIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   footer: { paddingHorizontal: 20, paddingTop: 10, gap: 12 },

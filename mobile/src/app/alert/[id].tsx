@@ -22,7 +22,7 @@ import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
-import { FilterFields, parseTickers } from '@/ui/filter-fields';
+import { FilterFields } from '@/ui/filter-fields';
 import { Icon, type IconName } from '@/ui/icon';
 import { PushPrimer } from '@/ui/push-primer';
 import { Text } from '@/ui/text';
@@ -69,7 +69,8 @@ function Channel({
 }) {
   const { c } = useTheme();
   return (
-    <View style={[styles.channel, divider && { borderBottomColor: c.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+    <View
+      style={[styles.channel, divider && { borderBottomColor: c.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
       <View style={[styles.channelIcon, { backgroundColor: value ? c.accentSoft : c.surfaceMuted }]}>
         <Icon name={icon} size={18} color={value ? c.accent : c.textMuted} />
       </View>
@@ -144,7 +145,6 @@ export default function AlertEditorScreen() {
 
   const [name, setName] = useState(existing?.name ?? params.name ?? '');
   const [draft, setDraft] = useState<TradeFilters>(initial);
-  const [tickerText, setTickerText] = useState((initial.tickers ?? []).join(', '));
   const [frequency, setFrequency] = useState<AlertFrequency>(existing?.frequency ?? 'instant');
   const [byEmail, setByEmail] = useState(existing ? existing.email_enabled !== false : true);
   // A new alert notifies this phone when the phone already has notifications on.
@@ -157,11 +157,8 @@ export default function AlertEditorScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
-  const filters = useMemo<AlertFilters>(
-    () => toAlertFilters({ ...draft, tickers: parseTickers(tickerText) }),
-    [draft, tickerText]
-  );
-  const criteria = countActive({ ...draft, tickers: parseTickers(tickerText) }) + (draft.q ? 1 : 0);
+  const filters = useMemo<AlertFilters>(() => toAlertFilters(draft), [draft]);
+  const criteria = countActive(draft) + (draft.q ? 1 : 0);
 
   const settled = useDebounced(filters, 500);
   useEffect(() => {
@@ -303,7 +300,7 @@ export default function AlertEditorScreen() {
             What to watch
           </Heading>
           <View style={styles.fields}>
-            <FilterFields draft={draft} set={set} tickerText={tickerText} setTickerText={setTickerText} mode="alert" />
+            <FilterFields draft={draft} set={set} mode="alert" />
           </View>
 
           <View style={[styles.preview, { backgroundColor: c.surface, borderColor: c.border }]}>

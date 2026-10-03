@@ -22,6 +22,7 @@ import {
 import { radius, useTheme } from '@/theme';
 import { Icon } from '@/ui/icon';
 import { MemberPicker } from '@/ui/member-picker';
+import { TickerPicker } from '@/ui/ticker-picker';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { ToggleChips } from '@/ui/toggle-chips';
@@ -77,36 +78,22 @@ export function FilterSection({
   );
 }
 
-/** Ticker text as typed ("nvda, tsla") to the list the filters carry. */
-export function parseTickers(text: string): string[] | undefined {
-  const tickers = text
-    .split(/[\s,]+/)
-    .map((t) => t.trim().toUpperCase())
-    .filter(Boolean);
-  return tickers.length ? tickers : undefined;
-}
-
 /**
  * Every filter the website has, as sections: the Trades tab's filter sheet
  * and the alert editor both draw these, so an alert can be exactly any search.
  *
  * `mode` drops what has no meaning for an alert (sort, and the filed and
  * traded in-the-last-N-days windows: an alert only ever sees filings that
- * arrive after it is saved) and adds the keyword, which a search takes from its search bar.
- * Tickers are typed as text and kept by the caller, so a half-typed one is
- * not split up while typing.
+ * arrive after it is saved) and adds the keyword, which a search takes from
+ * its search bar. Members and tickers are picked from searchable lists.
  */
 export function FilterFields({
   draft,
   set,
-  tickerText,
-  setTickerText,
   mode,
 }: {
   draft: TradeFilters;
   set: (patch: Partial<TradeFilters>) => void;
-  tickerText: string;
-  setTickerText: (text: string) => void;
   mode: 'search' | 'alert';
 }) {
   const { c } = useTheme();
@@ -192,16 +179,8 @@ export function FilterFields({
         <MemberPicker value={draft.members ?? []} onChange={(v) => set({ members: list(v) })} />
       </FilterSection>
 
-      <FilterSection title="Tickers" hint="Separate with commas">
-        <TextInput
-          value={tickerText}
-          onChangeText={setTickerText}
-          placeholder="e.g. NVDA, TSLA"
-          placeholderTextColor={c.textFaint}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          style={input}
-        />
+      <FilterSection title="Tickers" count={draft.tickers?.length}>
+        <TickerPicker value={draft.tickers ?? []} onChange={(v) => set({ tickers: list(v) })} />
       </FilterSection>
 
       <FilterSection title="Minimum amount" hint="The lowest value of the disclosed range">

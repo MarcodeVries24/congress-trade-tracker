@@ -182,6 +182,18 @@ export function fetchTrades(query: TradeQuery = {}, options: RequestOptions = {}
   return get<Page<Trade>>("/api/trades", params, options);
 }
 
+export interface TickerOption {
+  ticker: string;
+  company_name: string | null;
+  trade_count: number;
+}
+
+/** Every ticker traded, most traded first, for the tickers filter. */
+export async function fetchTickerOptions(options: RequestOptions = {}): Promise<TickerOption[]> {
+  const res = await get<{ data: TickerOption[] }>("/api/tickers", undefined, options);
+  return res.data;
+}
+
 export interface MemberOption {
   member_name: string;
   /** Every filed spelling of this person, because the filter matches exactly. */

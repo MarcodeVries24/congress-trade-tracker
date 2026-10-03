@@ -31,7 +31,7 @@ import { useDebounced, usePaged } from '@/lib/use-paged';
 import { radius, shadow, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
-import { FilterFields, parseTickers } from '@/ui/filter-fields';
+import { FilterFields } from '@/ui/filter-fields';
 import { Icon } from '@/ui/icon';
 import { SearchBar } from '@/ui/search-bar';
 import { TabHeader } from '@/ui/tab-header';
@@ -64,17 +64,11 @@ function FilterSheet({
   const insets = useSafeAreaInsets();
   const authed = useAuthedRequest();
   const [draft, setDraft] = useState<TradeFilters>(initial);
-  const [tickerText, setTickerText] = useState((initial.tickers ?? []).join(', '));
   const [count, setCount] = useState<number | null>(null);
 
   const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
 
-  const withTickers = useMemo<TradeFilters>(
-    () => ({ ...draft, tickers: parseTickers(tickerText) }),
-    [draft, tickerText]
-  );
-
-  const settled = useDebounced(withTickers, 400);
+  const settled = useDebounced(draft, 400);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -106,7 +100,6 @@ function FilterSheet({
             onPress={() => {
               haptic.select();
               setDraft({ q: draft.q });
-              setTickerText('');
             }}
             hitSlop={8}>
             <Text variant="callout" style={styles.clear}>
@@ -116,7 +109,7 @@ function FilterSheet({
         </View>
 
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <FilterFields draft={draft} set={set} tickerText={tickerText} setTickerText={setTickerText} mode="search" />
+          <FilterFields draft={draft} set={set} mode="search" />
         </ScrollView>
 
         <View style={[styles.sheetFoot, { borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>
@@ -126,7 +119,7 @@ function FilterSheet({
             }
             onPress={() => {
               haptic.tap();
-              onApply(withTickers);
+              onApply(draft);
             }}
           />
         </View>

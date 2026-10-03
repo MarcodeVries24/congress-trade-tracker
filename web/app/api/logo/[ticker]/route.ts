@@ -44,6 +44,10 @@ function monogram(ticker: string): string {
  *
  * `?fallback=none` answers 404 instead of a tile, for a client (the app) that
  * draws its own.
+ *
+ * A ticker nobody has looked up a logo for yet (new to the table, or still in
+ * the queue) gets its tile cached for an hour instead, so the real logo shows
+ * up soon after the sync finds it rather than a day later.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
@@ -51,16 +55,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
   const cache = {
     "cache-control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
   };
+  let checked = false;
 
   if (/^[A-Z0-9.\-]{1,12}$/.test(symbol)) {
-    const rows = (await sql.query(`SELECT logo_url FROM company_market_caps WHERE ticker = $1`, [symbol])) as {
-      logo_url: string | null;
-    }[];
+    const rows = (await sql.query(
+      `SELECT logo_url, logo_checked_at IS NOT NULL AS checked FROM company_market_caps WHERE ticker = $1`,
+      [symbol]
+    )) as { logo_url: string | null; checked: boolean }[];
     const logo = rows[0]?.logo_url;
     if (logo && /^https:\/\//.test(logo)) {
       return NextResponse.redirect(logo, { status: 302, headers: cache });
     }
+    checked = rows[0]?.checked ?? false;
   }
+  if (!checked) cache["cache-control"] = "public, max-age=3600, s-maxage=3600";
 
   if (req.nextUrl.searchParams.get("fallback") === "none") {
     return new NextResponse(null, { status: 404, headers: cache });

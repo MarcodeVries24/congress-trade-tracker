@@ -2,7 +2,13 @@ import { Image } from 'expo-image';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptic } from '@/lib/haptics';
@@ -18,15 +24,17 @@ export const ONBOARDING_STEPS = 5;
  * Cong's pose on each screen he asks from (design "CongTrade avatar
  * onboarding"): waving hello, choosing a chamber, looking for someone to
  * follow, ringing the alert bell, reading a filing, and crowned for Pro. Each
- * image carries its own soft disc.
+ * is a looping animation with its own soft disc, as lossless animated WebP: a
+ * quarter of the size of the APNG exports, and played by expo-image on both
+ * platforms.
  */
 const POSES = {
-  goal: require('../../assets/images/cong/goal.png'),
-  chamber: require('../../assets/images/cong/chamber.png'),
-  members: require('../../assets/images/cong/members.png'),
-  notify: require('../../assets/images/cong/notify.png'),
-  filings: require('../../assets/images/cong/filings.png'),
-  pro: require('../../assets/images/cong/pro.png'),
+  goal: require('../../assets/images/cong/goal.webp'),
+  chamber: require('../../assets/images/cong/chamber.webp'),
+  members: require('../../assets/images/cong/members.webp'),
+  notify: require('../../assets/images/cong/notify.webp'),
+  filings: require('../../assets/images/cong/filings.webp'),
+  pro: require('../../assets/images/cong/pro.webp'),
 };
 export type CongPose = keyof typeof POSES;
 const STEP_POSES: CongPose[] = ['goal', 'chamber', 'members', 'notify', 'filings'];
@@ -156,10 +164,13 @@ export function OnboardingStep({
  */
 export function CongSays({ pose, title, subtitle }: { pose: CongPose; title: string; subtitle?: string }) {
   const { c } = useTheme();
+  const reduceMotion = useReducedMotion();
   return (
     <Animated.View entering={FadeInDown.duration(380)} style={styles.guide}>
+      {/* With reduce motion on, the first frame, standing still. */}
       <Image
         source={POSES[pose]}
+        autoplay={!reduceMotion}
         style={styles.cong}
         contentFit="contain"
         accessibilityLabel="Cong, the CongTrade monkey"

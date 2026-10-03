@@ -10,7 +10,7 @@ import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod } from '@/lib/products';
 import { usePurchases } from '@/lib/use-purchases';
-import { CongSays, STEP_TOP_BAR } from '@/components/onboarding-step';
+import { CongSays, ONBOARDING_STEPS, STEP_TOP_BAR, useStepBack } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { Icon } from '@/ui/icon';
@@ -53,6 +53,7 @@ export default function PaywallScreen() {
 
   const pricing = getProPricing('eur');
   const [period, setPeriod] = useState<BillingPeriod>('weekly');
+  const goBack = useStepBack(ONBOARDING_STEPS + 1);
   const access = useAccess();
   const { refresh } = access;
   const purchases = usePurchases(useCallback(() => void refresh(), [refresh]));
@@ -92,13 +93,11 @@ export default function PaywallScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       {/* A setup step's top bar, so Cong sits where he did and the way back is
-          where it was. Only with somewhere to go back to: opened at launch for
-          an account without Pro, this is the first screen. */}
+          where it was. Back always leads to the last step, also when this was
+          opened at launch for an account without Pro. */}
       <View style={[styles.top, { paddingTop: insets.top + STEP_TOP_BAR.paddingTop }]}>
         <View style={styles.topRow}>
-          {router.canGoBack() ? (
-            <IconButton name="chevron-back" label="Back" onPress={() => router.back()} size={STEP_TOP_BAR.row} />
-          ) : null}
+          <IconButton name="chevron-back" label="Back" onPress={goBack} size={STEP_TOP_BAR.row} />
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

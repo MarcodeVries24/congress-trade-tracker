@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -13,6 +13,37 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 export const ONBOARDING_STEPS = 5;
+
+// Where each step's back arrow leads, by step number: step 1 goes back to the
+// welcome screen.
+const STEP_ROUTES = [
+  '/onboarding',
+  '/onboarding/goal',
+  '/onboarding/chamber',
+  '/onboarding/members',
+  '/onboarding/notify',
+  '/onboarding/proof',
+] as const;
+
+/**
+ * Back to the step before `step`, even with no history to go back through:
+ * a step opened by a link or at launch still leads to the one before it.
+ * Pass `ONBOARDING_STEPS + 1` from the plans screen, which follows the last
+ * step.
+ */
+export function useStepBack(step: number) {
+  const router = useRouter();
+  const navigation = useNavigation();
+  return () => {
+    const state = navigation.getState();
+    const below = state?.routes[state.index - 1]?.name;
+    // Below the plans screen can be the app itself, which would send the
+    // paywall straight back here; only the steps count as somewhere to return.
+    const fromHistory = state?.routes[state.index].name === 'paywall' ? below === 'onboarding' : !!below;
+    if (fromHistory) router.back();
+    else router.replace(STEP_ROUTES[step - 1] as never);
+  };
+}
 
 /**
  * The frame every onboarding question sits in.
@@ -49,7 +80,7 @@ export function OnboardingStep({
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const goBack = useStepBack(step);
   const progress = useSharedValue(Math.max(0, step - 1) / ONBOARDING_STEPS);
 
   useEffect(() => {
@@ -61,8 +92,8 @@ export function OnboardingStep({
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        {back && router.canGoBack() ? (
-          <IconButton name="chevron-back" label="Back" onPress={() => router.back()} size={36} />
+        {back ? (
+          <IconButton name="chevron-back" label="Back" onPress={goBack} size={36} />
         ) : (
           <View style={styles.slot} />
         )}

@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   list: { paddingBottom: 40 },
   bold: { fontWeight: '700' },
   group: { gap: 12, paddingTop: 22 },
-  groupHead: { paddingHorizontal: 20, gap: 2 },
+  groupHead: { paddingHorizontal: 16, gap: 2 },
   policy: { gap: 12, paddingTop: 26 },
   policyRow: { paddingHorizontal: 16, gap: 10 },
   policyCard: { width: 230, padding: 14, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },

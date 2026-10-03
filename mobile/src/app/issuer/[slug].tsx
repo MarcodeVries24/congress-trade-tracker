@@ -308,12 +308,14 @@ const styles = StyleSheet.create({
   leanBlock: { gap: 6 },
   cards: { marginHorizontal: 16, marginTop: 12, gap: 12 },
   block: { paddingTop: 26, gap: 12 },
-  blockTitle: { paddingHorizontal: 20 },
-  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 20 },
+  blockTitle: { paddingHorizontal: 16 },
+  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 16 },
   seeAll: { fontWeight: '700', textDecorationLine: 'underline' },
-  traders: { paddingHorizontal: 16, gap: 8 },
+  // Each face is centred in a tile wider than it; this puts the first ring,
+  // not the tile, on the page margin.
+  traders: { paddingHorizontal: 12, gap: 8 },
   trader: { width: 76, alignItems: 'center', gap: 6 },
   traderName: { fontWeight: '600', maxWidth: 74 },
   traderCount: { marginTop: -4 },
-  month: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 },
+  month: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 2 },
 });

@@ -42,7 +42,7 @@ export function RowSkeleton({ count = 6 }: { count?: number }) {
 }
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: 20, gap: 22, paddingTop: 12 },
+  list: { paddingHorizontal: 16, gap: 22, paddingTop: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   text: { flex: 1, gap: 8 },
 });

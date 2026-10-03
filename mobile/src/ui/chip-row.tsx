@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { haptic } from '@/lib/haptics';
-import { radius, useTheme } from '@/theme';
+import { GUTTER, radius, useTheme } from '@/theme';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
@@ -10,7 +10,7 @@ export function ChipRow<K extends string>({
   options,
   value,
   onChange,
-  inset = 20,
+  inset = GUTTER,
 }: {
   options: readonly { key: K; label: string }[];
   value: K;

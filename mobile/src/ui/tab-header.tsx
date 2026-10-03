@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GUTTER } from '@/theme';
 import { Logo } from '@/ui/logo';
 import { Text } from '@/ui/text';
 
@@ -56,5 +57,5 @@ const styles = StyleSheet.create({
   },
   side: { width: 88, flexDirection: 'row', alignItems: 'center' },
   right: { justifyContent: 'flex-end' },
-  titles: { paddingHorizontal: 20, paddingTop: 14, gap: 4 },
+  titles: { paddingHorizontal: GUTTER, paddingTop: 14, gap: 4 },
 });

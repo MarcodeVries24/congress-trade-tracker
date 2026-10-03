@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { GUTTER, useTheme } from '@/theme';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
@@ -11,7 +11,7 @@ export function SectionHeader({
   subtitle,
   action,
   onAction,
-  inset = 20,
+  inset = GUTTER,
 }: {
   title: string;
   subtitle?: string;

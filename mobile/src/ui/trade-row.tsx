@@ -90,8 +90,8 @@ export function TradeRow({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 20 },
-  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingRight: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 16 },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingRight: 16 },
   text: { flex: 1, gap: 3 },
   verb: { fontWeight: '700' },
   move: { fontWeight: '600' },

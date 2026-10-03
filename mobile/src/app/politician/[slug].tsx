@@ -272,11 +272,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   statCell: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 4 },
-  note: { paddingHorizontal: 22, paddingTop: 10 },
+  note: { paddingHorizontal: 16, paddingTop: 10 },
   timing: { marginHorizontal: 16, marginTop: 16 },
   block: { paddingTop: 26, gap: 12 },
-  blockTitle: { paddingHorizontal: 20 },
-  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 20 },
+  blockTitle: { paddingHorizontal: 16 },
+  blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 16 },
   seeAll: { fontWeight: '700', textDecorationLine: 'underline' },
   tickers: { paddingHorizontal: 16, gap: 10 },
   tickerCard: {
@@ -289,5 +289,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  month: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2 },
+  month: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 2 },
 });

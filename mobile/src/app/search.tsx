@@ -195,11 +195,11 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
   flex: { flex: 1 },
   scopes: { paddingTop: 14, paddingBottom: 6 },
-  popular: { paddingHorizontal: 20, paddingTop: 24, gap: 12 },
+  popular: { paddingHorizontal: 16, paddingTop: 24, gap: 12 },
   popularRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   popularChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   popularLabel: { fontWeight: '600' },
   list: { paddingBottom: 40, paddingTop: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
   text: { flex: 1, gap: 2 },
 });

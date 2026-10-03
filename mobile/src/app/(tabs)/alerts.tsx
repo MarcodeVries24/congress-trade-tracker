@@ -223,11 +223,11 @@ const styles = StyleSheet.create({
   },
   emailIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   emailText: { flex: 1, gap: 2 },
-  followRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 18 },
+  followRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 18 },
   faces: { flexDirection: 'row' },
   face: { borderWidth: 2, borderRadius: 18 },
   followText: { flex: 1 },
   manage: { fontWeight: '700', textDecorationLine: 'underline' },
-  sectionHead: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 4 },
+  sectionHead: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 4 },
   ctas: { paddingHorizontal: 24, gap: 10 },
 });

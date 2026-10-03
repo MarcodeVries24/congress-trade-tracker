@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
   },
-  count: { paddingHorizontal: 20 },
+  count: { paddingHorizontal: 16 },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   clear: { fontWeight: '700', textDecorationLine: 'underline', paddingHorizontal: 8 },
-  sheetBody: { paddingHorizontal: 20, paddingBottom: 24 },
+  sheetBody: { paddingHorizontal: 16, paddingBottom: 24 },
   section: { paddingVertical: 20, borderBottomWidth: StyleSheet.hairlineWidth, gap: 14 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sectionBody: { gap: 10 },
@@ -520,5 +520,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
   },
-  sheetFoot: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  sheetFoot: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

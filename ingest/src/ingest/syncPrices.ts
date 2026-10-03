@@ -20,6 +20,10 @@ import { yahoo } from "../prices/yahoo.js";
  *   --full          refetch every ticker's whole range (after changing source)
  *   --ticker=NVDA   one ticker, for checking a result by hand
  *   --limit=N       stop after N tickers
+ *   --new-only      only tickers with a trade or filing date not yet priced
+ *                   (or never fetched): what the ingest runs after each
+ *                   cycle, so new trades get their closes within hours; the
+ *                   nightly run moves every latest close on
  */
 
 const SOURCE: PriceSource = yahoo;
@@ -96,6 +100,7 @@ async function main() {
   const full = args.includes("--full");
   const only = args.find((a) => a.startsWith("--ticker="))?.slice(9).toUpperCase();
   const limit = Number(args.find((a) => a.startsWith("--limit="))?.slice(8)) || Infinity;
+  const newOnly = args.includes("--new-only");
 
   await ensureSchema();
 
@@ -155,7 +160,7 @@ async function main() {
       (!known?.close_day || d <= known.close_day) && (!known?.first_day || d >= known.first_day);
     const missing = days.filter((d) => !have.has(d) && answerable(d));
     const whole = full || !known || known.status !== "ok" || missing.length > 0;
-    if (!whole && Date.now() - new Date(known!.synced_at).getTime() < FRESH_HOURS * 3_600_000) {
+    if (!whole && (newOnly || Date.now() - new Date(known!.synced_at).getTime() < FRESH_HOURS * 3_600_000)) {
       skipped++;
       continue;
     }

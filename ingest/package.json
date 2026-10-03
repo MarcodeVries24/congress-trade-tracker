@@ -11,6 +11,7 @@
     "sync-market-caps:missing": "tsx src/ingest/syncMarketCaps.ts --missing-only",
     "sync-market-caps:logos": "tsx src/ingest/syncMarketCaps.ts --logos",
     "sync-prices": "tsx src/ingest/syncPrices.ts",
+    "sync-prices:new": "tsx src/ingest/syncPrices.ts --new-only",
     "send-daily-report": "tsx src/ingest/sendDailyReport.ts",
     "alerts:send": "tsx src/alerts/sendAlerts.ts",
     "review:queue": "tsx src/ingest/reviewQueue.ts",

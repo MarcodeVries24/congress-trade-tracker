@@ -7,7 +7,12 @@ on:
   # against a source that rate-limits.
   schedule:
     - cron: "45 22 * * 1-5" # 22:45 UTC, after the 20:00/21:00 UTC close
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "Flags for syncPrices.ts, e.g. --ticker=NVDA --full (empty: the normal nightly run)"
+        required: false
+        default: ""
 
 jobs:
   sync-prices:
@@ -25,6 +30,9 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run sync-prices --workspace ingest
+      - run: npm run sync-prices --workspace ingest -- $ARGS
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Through the environment rather than spliced into the command, so
+          # the input is only ever an argument list.
+          ARGS: ${{ inputs.args }}

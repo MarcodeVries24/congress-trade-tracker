@@ -17,7 +17,7 @@ import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
 
 export type TradeDetail = Trade & { member_slug: string | null };
 
-const COLUMNS = `t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
+export const TRADE_COLUMNS_SQL = `t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
   COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
   COALESCE(mh.party, mr.party) AS party,
   COALESCE(mh.state, mr.state) AS member_state,
@@ -28,7 +28,7 @@ const COLUMNS = `t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.pars
 export async function getTrade(id: number): Promise<{ trade: TradeDetail; siblings: TradeDetail[] } | null> {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   const rows = (await sql.query(
-    `SELECT ${COLUMNS} ${ALERT_FROM_SQL} ${PRICE_JOINS_SQL}
+    `SELECT ${TRADE_COLUMNS_SQL} ${ALERT_FROM_SQL} ${PRICE_JOINS_SQL}
      WHERE t.id = $1 AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}`,
     [id]
   )) as Trade[];
@@ -36,7 +36,7 @@ export async function getTrade(id: number): Promise<{ trade: TradeDetail; siblin
   if (!row) return null;
 
   const siblingRows = (await sql.query(
-    `SELECT ${COLUMNS} ${ALERT_FROM_SQL} ${PRICE_JOINS_SQL}
+    `SELECT ${TRADE_COLUMNS_SQL} ${ALERT_FROM_SQL} ${PRICE_JOINS_SQL}
      WHERE t.doc_id = $1 AND t.id <> $2 AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
      ORDER BY t.transaction_date DESC NULLS LAST, t.id
      LIMIT 50`,

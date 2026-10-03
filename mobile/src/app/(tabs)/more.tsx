@@ -119,7 +119,7 @@ export default function MoreScreen() {
             CongTrade {version} · a service of MV Digital
           </Text>
           <Text variant="footnote" tone="faint" style={styles.center}>
-            Data from the House Clerk and the Senate eFD system. Not investment advice.
+            Data from the House Clerk and the Senate eFD system. For information only, not financial advice.
           </Text>
         </View>
       </View>

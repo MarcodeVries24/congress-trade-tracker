@@ -23,6 +23,7 @@ import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
+import { HomeTiming } from "@/components/HomeTiming";
 import { TickerLogo } from "@/components/TickerLogo";
 import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
 
@@ -105,6 +106,7 @@ export default function Home() {
           </div>
         )}
 
+        <HomeTiming />
 
         {error && (
           <div className="mb-6 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">

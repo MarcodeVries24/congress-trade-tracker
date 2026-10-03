@@ -516,6 +516,31 @@ export function previewAlert(
   return send<{ total: number; recent: number }>("POST", "/api/alerts/preview", { filters }, options);
 }
 
+/** A trade in the "before the public knew" ranking: `edge` is the move, positive when it went the trader's way. */
+export type TimedTrade = Trade & { edge: number };
+
+export interface TimingLeader {
+  slug: string;
+  display: string;
+  photo_url: string | null;
+  party: string | null;
+  trades: number;
+  theirWay: number;
+  averageEdge: number;
+}
+
+export interface TimingOverview {
+  days: number;
+  summary: TimingSummary | null;
+  trades: TimedTrade[];
+  leaders: TimingLeader[];
+}
+
+/** The best-timed trades disclosed in the last `days` (30, 90 or 365), and the members who time best. */
+export function fetchTiming(days: 30 | 90 | 365 = 90, options: RequestOptions = {}): Promise<TimingOverview> {
+  return get<TimingOverview>("/api/timing", new URLSearchParams({ days: String(days) }), options);
+}
+
 /** Announcements from the SEC, the Federal Reserve and the statistics agencies. */
 export async function fetchPolicy(options: RequestOptions = {}): Promise<NewsItem[]> {
   const raw = await get<{ items: NewsItem[] }>("/api/policy", undefined, options);

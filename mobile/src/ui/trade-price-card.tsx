@@ -20,6 +20,7 @@ import { Pill } from '@/ui/pill';
 import { PriceChart } from '@/ui/price-chart';
 import { Segmented } from '@/ui/segmented';
 import { Skeleton } from '@/ui/skeleton';
+import { NotAdvice } from '@/ui/not-advice';
 import { Text } from '@/ui/text';
 
 const DEADLINE_DAYS = 45;
@@ -172,6 +173,7 @@ export function TradePriceCard({ trade }: { trade: Trade }) {
         Daily closing prices, split-adjusted. A move in the trader&apos;s favour is not proof of anything, and the
         filing gives a range, not the trade&apos;s price.
       </Text>
+      <NotAdvice />
     </View>
   );
 }

@@ -8,6 +8,7 @@ import { radius, useTheme } from '@/theme';
 import { PriceChart, type ChartMarker } from '@/ui/price-chart';
 import { Segmented } from '@/ui/segmented';
 import { Skeleton } from '@/ui/skeleton';
+import { NotAdvice } from '@/ui/not-advice';
 import { Text } from '@/ui/text';
 
 const RANGES = [
@@ -126,6 +127,7 @@ export function IssuerPriceCard({ ticker, trades }: { ticker: string; trades: Tr
         Dots are the latest {trades.length} trades, at each day&apos;s close. Drag along the chart to see who traded
         when.
       </Text>
+      <NotAdvice />
     </View>
   );
 }

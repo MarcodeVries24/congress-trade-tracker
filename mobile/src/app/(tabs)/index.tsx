@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { fetchTrades, type Trade } from '@/lib/api';
+import { fetchTiming, fetchTrades, type TimingOverview, type Trade } from '@/lib/api';
 import { memberName, surname } from '@/lib/format';
 import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
@@ -22,7 +22,9 @@ import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
+import { NotAdvice } from '@/ui/not-advice';
 import { TickerLogo } from '@/ui/ticker-logo';
+import { FeaturedTiming, TimedTradeCard, TimingFacts } from '@/ui/timing-feature';
 import { TradeRow } from '@/ui/trade-row';
 
 const CHAMBERS = [
@@ -103,6 +105,7 @@ export default function DiscoverScreen() {
 
   const [chamber, setChamber] = useState<ChamberKey>(answers.chamber === 'both' ? 'both' : answers.chamber);
   const [recent, setRecent] = useState<Trade[] | null>(null);
+  const [timing, setTiming] = useState<TimingOverview | null | 'failed'>(null);
   const [feed, setFeed] = useState<Trade[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -119,6 +122,18 @@ export default function DiscoverScreen() {
       setRecent(res.data);
     } catch {
       setRecent((prev) => prev ?? []);
+    }
+  }, [authed]);
+
+  // The best-timed trades of the last 90 days, for the featured section.
+  // Optional: on failure the section simply does not show.
+  const loadTiming = useCallback(async () => {
+    try {
+      const overview = await fetchTiming(90, await authed());
+      rememberTrades(overview.trades);
+      setTiming(overview);
+    } catch {
+      setTiming((prev) => (prev && prev !== 'failed' ? prev : 'failed'));
     }
   }, [authed]);
 
@@ -162,7 +177,8 @@ export default function DiscoverScreen() {
     // Every state update in these is behind an await; the rule cannot see that.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRecent();
-  }, [loadRecent]);
+    void loadTiming();
+  }, [loadRecent, loadTiming]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -174,6 +190,7 @@ export default function DiscoverScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     void loadRecent();
+    void loadTiming();
     void loadFeed(1, true);
   };
 
@@ -213,6 +230,37 @@ export default function DiscoverScreen() {
       <View style={styles.search}>
         <SearchBar onPress={() => router.push('/search')} />
       </View>
+
+      {timing !== 'failed' ? (
+        <View style={styles.block}>
+          <SectionHeader
+            title="Before the public knew"
+            subtitle="What the stock did before a trade was disclosed"
+            action="See all"
+            onAction={() => router.push('/timing')}
+          />
+          <View style={styles.timing}>
+            {timing === null ? (
+              <Skeleton width="100%" height={330} round={20} />
+            ) : timing.trades[0] ? (
+              <FeaturedTiming trade={timing.trades[0]} />
+            ) : null}
+          </View>
+          {timing && timing.trades.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timingRow}>
+              {timing.trades.slice(1, 8).map((t, i) => (
+                <TimedTradeCard key={t.id} trade={t} rank={i + 2} />
+              ))}
+            </ScrollView>
+          ) : null}
+          {timing ? (
+            <View style={styles.timingFoot}>
+              {timing.summary ? <TimingFacts summary={timing.summary} days={timing.days} /> : null}
+              <NotAdvice />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.block}>
         <SectionHeader title="Just filed" subtitle="Members with new disclosures" />
@@ -371,6 +419,9 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  timing: { paddingHorizontal: 16 },
+  timingRow: { paddingHorizontal: 16, gap: 10 },
+  timingFoot: { paddingHorizontal: 20, gap: 8 },
   screen: { flex: 1 },
   list: { paddingBottom: 32 },
   hello: { paddingHorizontal: 20, paddingTop: 6, gap: 2 },

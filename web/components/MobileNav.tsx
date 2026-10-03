@@ -9,6 +9,7 @@ import { useProMirror } from "@/lib/useProMirror";
 
 const LINKS = [
   { href: "/trades", label: "All Trades" },
+  { href: "/before-disclosure", label: "Before Disclosure" },
   { href: "/politicians", label: "Politicians" },
   { href: "/issuers", label: "Issuers" },
   { href: "/news", label: "News" },

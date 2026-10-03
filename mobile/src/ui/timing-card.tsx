@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { formatMove, type TimingSummary } from '@/lib/prices';
 import { radius, useTheme } from '@/theme';
+import { NotAdvice } from '@/ui/not-advice';
 import { Text } from '@/ui/text';
 
 /**
@@ -56,6 +57,7 @@ export function TimingCard({ timing, who = 'their' }: { timing: TimingSummary | 
         {timing.sameDay ? `; ${timing.sameDay} trades disclosed the same day are left out` : ''}. Not a measure of
         profit or of intent.
       </Text>
+      <NotAdvice />
     </View>
   );
 }

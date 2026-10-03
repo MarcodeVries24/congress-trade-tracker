@@ -8,6 +8,7 @@ import { Button } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
+import { NOT_ADVICE_LONG } from '@/ui/not-advice';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -39,8 +40,12 @@ const FAQ: { q: string; a: string }[] = [
     a: 'A subscription bought in the app is managed by Apple or Google. On iPhone: Settings, your name, Subscriptions. On Android: the Play Store, Payments & subscriptions. A subscription bought on the website is cancelled from your account page there.',
   },
   {
-    q: 'Is this investment advice?',
-    a: 'No. CongTrade reports what members of Congress disclosed. It does not recommend buying or selling anything.',
+    q: 'What does "Before the public knew" show?',
+    a: "For every trade in a listed stock, how the price moved between the day the member traded and the day the trade was disclosed: the stretch when only they knew about it. \"Their way\" means it rose after a purchase or fell after a sale. Prices are daily closes, updated every weekday evening, and new trades are priced within a few hours of being filed. It shows timing, not profit: filings give a value range, never the price paid.",
+  },
+  {
+    q: 'Is this financial advice?',
+    a: NOT_ADVICE_LONG,
   },
 ];
 

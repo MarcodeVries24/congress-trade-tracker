@@ -104,7 +104,7 @@ export const FILED = [
   { key: 'onTime', label: 'On time' },
 ] as const;
 
-/** Filing-date windows. Presets rather than a calendar: they are what people pick. */
+/** Date windows, for both filing and trade dates. Presets rather than a calendar: they are what people pick. */
 export const WINDOWS = [
   { key: 'any', label: 'Any time', days: 0 },
   { key: '7', label: 'Past week', days: 7 },
@@ -178,7 +178,7 @@ export function daysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Which window preset a dateFrom corresponds to, if any. */
+/** Which window preset a dateFrom (or tradedFrom) corresponds to, if any. */
 export function windowFor(dateFrom: string | undefined): string {
   if (!dateFrom) return 'any';
   const days = Math.round((Date.now() - new Date(`${dateFrom}T00:00:00Z`).getTime()) / 86_400_000);
@@ -205,6 +205,7 @@ export function countActive(f: TradeFilters): number {
   if (f.minAmount) n += 1;
   if (f.filedStatus) n += 1;
   if (f.dateFrom || f.dateTo) n += 1;
+  if (f.tradedFrom || f.tradedTo) n += 1;
   return n;
 }
 
@@ -281,6 +282,18 @@ export function activeChips(f: TradeFilters): ActiveChip[] {
       },
     });
   }
+  if (f.tradedFrom) {
+    chips.push({
+      key: 'tradedFrom',
+      label: `Traded ${labelOf(WINDOWS, windowFor(f.tradedFrom)).toLowerCase()}`,
+      clear: (x) => {
+        const next = { ...x };
+        delete next.tradedFrom;
+        delete next.tradedTo;
+        return next;
+      },
+    });
+  }
   return chips;
 }
 
@@ -328,7 +341,7 @@ export function fromAlertFilters(a: AlertFilters): TradeFilters {
 
 /** A name for the alert these filters would make, for the editor to start from. */
 export function suggestAlertName(f: TradeFilters): string {
-  const chips = activeChips(f).filter((c) => c.key !== 'dateFrom');
+  const chips = activeChips(f).filter((c) => c.key !== 'dateFrom' && c.key !== 'tradedFrom');
   if (!chips.length) return f.q ? `Trades matching "${f.q}"` : 'Every new trade';
   return chips
     .slice(0, 3)

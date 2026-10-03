@@ -20,6 +20,8 @@ import {
   SORTS,
   activeChips,
   countActive,
+  daysAgo,
+  windowFor,
   suggestAlertName,
   toAlertFilters,
   type TradeFilters,
@@ -114,13 +116,7 @@ function FilterSheet({
         </View>
 
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <FilterFields
-            draft={draft}
-            set={set}
-            tickerText={tickerText}
-            setTickerText={setTickerText}
-            mode="search"
-          />
+          <FilterFields draft={draft} set={set} tickerText={tickerText} setTickerText={setTickerText} mode="search" />
         </ScrollView>
 
         <View style={[styles.sheetFoot, { borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>
@@ -211,6 +207,17 @@ export default function TradesScreen() {
     { key: 'P', label: 'Purchases', on: Boolean(filters.types?.includes('P')), toggle: () => toggleIn('types', 'P') },
     { key: 'S', label: 'Sales', on: Boolean(filters.types?.includes('S')), toggle: () => toggleIn('types', 'S') },
     {
+      key: 'recent',
+      label: 'Traded past 30 days',
+      on: windowFor(filters.tradedFrom) === '30',
+      toggle: () =>
+        setFilters((f) => {
+          const next = { ...f, tradedTo: undefined };
+          next.tradedFrom = windowFor(f.tradedFrom) === '30' ? undefined : daysAgo(30);
+          return next;
+        }),
+    },
+    {
       key: 'house',
       label: 'House',
       on: Boolean(filters.chamber?.includes('house')),
@@ -241,6 +248,7 @@ export default function TradesScreen() {
     (chip) =>
       !quickKeys.has(chip.key) &&
       !(chip.key === 'minAmount' && filters.minAmount === 50001) &&
+      !(chip.key === 'tradedFrom' && windowFor(filters.tradedFrom) === '30') &&
       !(chip.key === 'filedStatus' && filters.filedStatus === 'late')
   );
   const active = countActive(filters);

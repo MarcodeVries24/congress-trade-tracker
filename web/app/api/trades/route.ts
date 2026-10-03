@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
   const filedStatus = canUseFilters ? (sp.get("filedStatus") ?? undefined) : undefined; // "late" | "onTime" | undefined
   const dateFrom = canUseFilters ? (sp.get("dateFrom") ?? undefined) : undefined;
   const dateTo = canUseFilters ? (sp.get("dateTo") ?? undefined) : undefined;
+  // The same window over the date the trade was made rather than filed.
+  const tradedFrom = canUseFilters ? (sp.get("tradedFrom") ?? undefined) : undefined;
+  const tradedTo = canUseFilters ? (sp.get("tradedTo") ?? undefined) : undefined;
   const sortKey = sp.get("sort") ?? "";
   const sortExpr = SORT_EXPRESSIONS[sortKey] ?? SORT_EXPRESSIONS.filing_date;
   const order = sp.get("order")?.toLowerCase() === "asc" ? "ASC" : "DESC";
@@ -104,10 +107,13 @@ export async function GET(req: NextRequest) {
     )
   );
 
-  // The one filter an alert has no use for: an alert is about what arrives
+  // The filters an alert has no use for: an alert is about what arrives
   // next, so a window over past filing dates would match nothing forever.
   if (dateFrom) conditions.push(`f.filing_date >= ${addParam(dateFrom)}`);
   if (dateTo) conditions.push(`f.filing_date <= ${addParam(dateTo)}`);
+  // Both dates are stored as YYYY-MM-DD text, so they compare as strings.
+  if (tradedFrom) conditions.push(`t.transaction_date >= ${addParam(tradedFrom)}`);
+  if (tradedTo) conditions.push(`t.transaction_date <= ${addParam(tradedTo)}`);
 
   const where = `WHERE ${conditions.join(" AND ")}`;
 

@@ -90,9 +90,9 @@ export function parseTickers(text: string): string[] | undefined {
  * Every filter the website has, as sections: the Trades tab's filter sheet
  * and the alert editor both draw these, so an alert can be exactly any search.
  *
- * `mode` drops what has no meaning for an alert (sort, and the filed-in-the-
- * last-N-days window: an alert only ever sees filings that arrive after it is
- * saved) and adds the keyword, which a search takes from its search bar.
+ * `mode` drops what has no meaning for an alert (sort, and the filed and
+ * traded in-the-last-N-days windows: an alert only ever sees filings that
+ * arrive after it is saved) and adds the keyword, which a search takes from its search bar.
  * Tickers are typed as text and kept by the caller, so a half-typed one is
  * not split up while typing.
  */
@@ -114,6 +114,7 @@ export function FilterFields({
   const input = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
   const sort = SORTS.find((s) => s.key === draft.sort) ?? SORTS[0];
   const window = windowFor(draft.dateFrom);
+  const tradedWindow = windowFor(draft.tradedFrom);
 
   return (
     <>
@@ -142,6 +143,34 @@ export function FilterFields({
           />
         </FilterSection>
       )}
+
+      {mode === 'search' ? (
+        <FilterSection title="Traded" hint="By the date the trade was made">
+          <ToggleChips
+            single
+            options={WINDOWS.filter((w) => w.key !== 'any')}
+            selected={tradedWindow === 'any' ? [] : [tradedWindow]}
+            onChange={([v]) => {
+              const w = WINDOWS.find((x) => x.key === v);
+              set({ tradedFrom: w && w.days ? daysAgo(w.days) : undefined, tradedTo: undefined });
+            }}
+          />
+        </FilterSection>
+      ) : null}
+
+      {mode === 'search' ? (
+        <FilterSection title="Filed" hint="By the date the disclosure was published">
+          <ToggleChips
+            single
+            options={WINDOWS.filter((w) => w.key !== 'any')}
+            selected={window === 'any' ? [] : [window]}
+            onChange={([v]) => {
+              const w = WINDOWS.find((x) => x.key === v);
+              set({ dateFrom: w && w.days ? daysAgo(w.days) : undefined, dateTo: undefined });
+            }}
+          />
+        </FilterSection>
+      ) : null}
 
       <FilterSection title="Transaction" hint="Sales include partial sales, marked Sold (P)">
         <ToggleChips options={TYPES} selected={draft.types ?? []} onChange={(v) => set({ types: list(v) })} />
@@ -183,20 +212,6 @@ export function FilterFields({
           onChange={([v]) => set({ minAmount: v ? Number(v) : undefined })}
         />
       </FilterSection>
-
-      {mode === 'search' ? (
-        <FilterSection title="Filed" hint="By the date the disclosure was published">
-          <ToggleChips
-            single
-            options={WINDOWS.filter((w) => w.key !== 'any')}
-            selected={window === 'any' ? [] : [window]}
-            onChange={([v]) => {
-              const w = WINDOWS.find((x) => x.key === v);
-              set({ dateFrom: w && w.days ? daysAgo(w.days) : undefined, dateTo: undefined });
-            }}
-          />
-        </FilterSection>
-      ) : null}
 
       <FilterSection title="Timeliness" hint="The law allows 45 days">
         <ToggleChips

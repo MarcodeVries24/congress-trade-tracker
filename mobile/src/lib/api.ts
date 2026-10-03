@@ -96,6 +96,9 @@ export interface TradeQuery {
   /** Filing dates, inclusive, as YYYY-MM-DD. */
   dateFrom?: string;
   dateTo?: string;
+  /** Trade dates, inclusive, as YYYY-MM-DD. */
+  tradedFrom?: string;
+  tradedTo?: string;
   sort?: string;
   order?: "asc" | "desc";
 }
@@ -172,6 +175,8 @@ export function fetchTrades(query: TradeQuery = {}, options: RequestOptions = {}
   if (query.filedStatus) params.set("filedStatus", query.filedStatus);
   if (query.dateFrom) params.set("dateFrom", query.dateFrom);
   if (query.dateTo) params.set("dateTo", query.dateTo);
+  if (query.tradedFrom) params.set("tradedFrom", query.tradedFrom);
+  if (query.tradedTo) params.set("tradedTo", query.tradedTo);
   if (query.sort) params.set("sort", query.sort);
   if (query.order) params.set("order", query.order);
   return get<Page<Trade>>("/api/trades", params, options);

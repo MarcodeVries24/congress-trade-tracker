@@ -9,7 +9,7 @@ import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useRefresh } from '@/lib/use-refresh';
 import { radius, useTheme } from '@/theme';
-import { Avatar } from '@/ui/avatar';
+import { Avatar, UserAvatar } from '@/ui/avatar';
 import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
@@ -167,7 +167,10 @@ export default function DiscoverScreen() {
   const loading = recent === null;
 
   const { refreshing, onRefresh } = useRefresh(
-    useCallback(() => [loadRecent(), loadNews(), loadTiming(timingDays)], [loadRecent, loadNews, loadTiming, timingDays])
+    useCallback(
+      () => [loadRecent(), loadNews(), loadTiming(timingDays)],
+      [loadRecent, loadNews, loadTiming, timingDays]
+    )
   );
 
   const firstName = user?.firstName;
@@ -184,11 +187,7 @@ export default function DiscoverScreen() {
         right={
           user ? (
             <Tap onPress={() => router.push('/sign-in')} scaleTo={0.9} accessibilityLabel="Account" hitSlop={8}>
-              <Avatar
-                uri={user.imageUrl}
-                name={user.fullName ?? user.primaryEmailAddress?.emailAddress ?? 'You'}
-                size={34}
-              />
+              <UserAvatar user={user} size={34} />
             </Tap>
           ) : (
             <IconButton name="person-circle-outline" label="Sign in" onPress={() => router.push('/sign-in')} />
@@ -311,7 +310,9 @@ export default function DiscoverScreen() {
                   <SentimentBar buys={t.buys} sells={t.sells} showLabels={false} />
                 </Card>
               ))}
-          {!loading && trending.length ? <SeeAllCard label="All companies" onPress={() => router.push('/issuers')} /> : null}
+          {!loading && trending.length ? (
+            <SeeAllCard label="All companies" onPress={() => router.push('/issuers')} />
+          ) : null}
         </ScrollView>
       </View>
 
@@ -348,7 +349,12 @@ export default function DiscoverScreen() {
 
       {news !== 'failed' && (news === null || news.length) ? (
         <View style={styles.block}>
-          <SectionHeader title="News" subtitle="Markets and investing, from CNBC" action="See all" onAction={() => router.push('/news')} />
+          <SectionHeader
+            title="News"
+            subtitle="Markets and investing, from CNBC"
+            action="See all"
+            onAction={() => router.push('/news')}
+          />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
             {news === null
               ? Array.from({ length: 2 }, (_, i) => <Skeleton key={i} width={248} height={230} round={20} />)

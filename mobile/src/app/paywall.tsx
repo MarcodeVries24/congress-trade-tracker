@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
 import { fetchTrades, type Trade } from '@/lib/api';
-import { assetLabel, compactAmount, filedAgo, memberName, tradeVerb } from '@/lib/format';
+import { assetLabel, compactAmount, memberName, tradeVerb } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod } from '@/lib/products';
@@ -168,7 +168,7 @@ export default function PaywallScreen() {
             <View style={styles.latestHead}>
               <View style={[styles.liveDot, { backgroundColor: c.gain }]} />
               <Text variant="caption" tone="muted" style={styles.semibold}>
-                Latest filing · {filedAgo(latest.filing_date)}
+                Latest filing
               </Text>
             </View>
             <View style={styles.latestRow}>

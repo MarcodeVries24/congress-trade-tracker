@@ -2,10 +2,10 @@ import { Choice, OnboardingStep, useOnboardingNav } from '@/components/onboardin
 import { useOnboarding, type Chamber } from '@/lib/onboarding';
 import type { IconName } from '@/ui/icon';
 
-const CHAMBERS: { value: Chamber; label: string; hint: string; icon: IconName }[] = [
-  { value: 'both', label: 'Both chambers', hint: 'Everything that gets filed', icon: 'layers' },
-  { value: 'house', label: 'The House', hint: '435 members, the bulk of the filings', icon: 'home' },
-  { value: 'senate', label: 'The Senate', hint: '100 members, larger positions', icon: 'library' },
+const CHAMBERS: { value: Chamber; label: string; icon: IconName }[] = [
+  { value: 'both', label: 'Both chambers', icon: 'layers' },
+  { value: 'house', label: 'The House', icon: 'home' },
+  { value: 'senate', label: 'The Senate', icon: 'library' },
 ];
 
 export default function ChamberScreen() {
@@ -14,14 +14,13 @@ export default function ChamberScreen() {
   return (
     <OnboardingStep
       step={2}
-      title="Which chamber?"
-      subtitle="This becomes the first filter on your feed. You can change it whenever you like."
+      title="Which chamber should I watch for you?"
+      subtitle="You can change this anytime."
       onContinue={() => nav.go('/onboarding/members')}>
       {CHAMBERS.map((c) => (
         <Choice
           key={c.value}
           label={c.label}
-          hint={c.hint}
           icon={c.icon}
           selected={answers.chamber === c.value}
           onPress={() => set({ chamber: c.value })}

@@ -58,8 +58,8 @@ export default function MembersScreen() {
   return (
     <OnboardingStep
       step={3}
-      title="Anyone in particular?"
-      subtitle="Pick as many as you like, or none. This becomes your first alert."
+      title="Anyone you want to follow?"
+      subtitle="Pick any, or skip."
       continueLabel={picked ? `Continue with ${picked}` : 'Continue'}
       onContinue={() => nav.go('/onboarding/notify')}
       skip={() => {

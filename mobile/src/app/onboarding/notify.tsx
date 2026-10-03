@@ -2,15 +2,10 @@ import { Choice, OnboardingStep, useOnboardingNav } from '@/components/onboardin
 import { useOnboarding, type Notify } from '@/lib/onboarding';
 import type { IconName } from '@/ui/icon';
 
-const OPTIONS: { value: Notify; label: string; hint: string; icon: IconName }[] = [
-  {
-    value: 'push',
-    label: 'Push notification',
-    hint: 'On this phone, the moment a filing matches',
-    icon: 'phone-portrait',
-  },
-  { value: 'email', label: 'Email', hint: 'The same alert the website sends', icon: 'mail' },
-  { value: 'both', label: 'Both', hint: 'A notification and an email', icon: 'notifications' },
+const OPTIONS: { value: Notify; label: string; icon: IconName }[] = [
+  { value: 'push', label: 'Push notification', icon: 'phone-portrait' },
+  { value: 'email', label: 'Email', icon: 'mail' },
+  { value: 'both', label: 'Both', icon: 'notifications' },
 ];
 
 export default function NotifyScreen() {
@@ -19,14 +14,13 @@ export default function NotifyScreen() {
   return (
     <OnboardingStep
       step={4}
-      title="How should we tell you?"
-      subtitle="Only when a filing matches what you picked. Never marketing."
+      title="How should I tell you about new trades?"
+      subtitle="Only when something matches. Never marketing."
       onContinue={() => nav.go('/onboarding/proof')}>
       {OPTIONS.map((o) => (
         <Choice
           key={o.value}
           label={o.label}
-          hint={o.hint}
           icon={o.icon}
           selected={answers.notify === o.value}
           onPress={() => set({ notify: o.value })}

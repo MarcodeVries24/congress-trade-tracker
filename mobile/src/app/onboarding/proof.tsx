@@ -41,8 +41,7 @@ export default function ProofScreen() {
   return (
     <OnboardingStep
       step={5}
-      title="Built from the filings, not from a feed"
-      subtitle="Every figure below comes from documents the House Clerk and the Senate published. Where we can, we link you to the original."
+      title="I read every official filing, so you don't have to."
       continueLabel="See the plans"
       onContinue={async () => {
         await finish();

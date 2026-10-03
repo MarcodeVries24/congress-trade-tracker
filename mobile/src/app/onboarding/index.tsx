@@ -1,42 +1,32 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useCallback } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
-import { fetchTrades, type Trade } from '@/lib/api';
-import { amountLabel, assetLabel, memberName, tradePill, tradeTone, tradeVerb } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { useOnboarding } from '@/lib/onboarding';
-import { radius, shadow, useTheme } from '@/theme';
-import { Avatar } from '@/ui/avatar';
+import { useTheme } from '@/theme';
 import { Button } from '@/ui/button';
-import { Icon, type IconName } from '@/ui/icon';
-import { Pill } from '@/ui/pill';
-import { Skeleton } from '@/ui/skeleton';
+import { CongBadge } from '@/ui/cong-mascot';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
-const POINTS: { icon: IconName; text: string }[] = [
-  { icon: 'document-text', text: 'Every disclosed trade, straight from the filings' },
-  { icon: 'flash', text: 'On your phone within hours of being published' },
-  { icon: 'star', text: 'Follow politicians, see every trade they make' },
-];
+// Room the text and buttons below Cong need, so he can take the rest.
+const BELOW = 300;
 
 /**
- * The first screen anyone sees.
- *
- * Shows the product rather than describing it: three real trades from the
- * latest filings, fanned like cards, above one line of promise. The trades
- * are fetched, not illustrated, because a made-up "Senator bought NVIDIA"
- * would be the one lie on a screen whose job is to earn trust.
+ * The first screen anyone sees: Cong, the mascot, waving hello, one line of
+ * promise and the way in. Everything fits on one screen with no scrolling;
+ * Cong grows or shrinks to the space the phone leaves him, and from here he
+ * asks the setup questions himself.
  */
 export default function WelcomeScreen() {
-  const { c, scheme } = useTheme();
+  const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const router = useRouter();
-  const [trades, setTrades] = useState<Trade[] | null>(null);
   const { status } = useAccess();
   const { finish } = useOnboarding();
 
@@ -49,97 +39,33 @@ export default function WelcomeScreen() {
     }, [status, finish, router])
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchTrades({ limit: 200, assetTypes: ['ST'] }, { signal: controller.signal })
-      .then((res) => {
-        // Three different people: one busy filer would otherwise fill the stack.
-        const seen = new Set<string>();
-        const picks = res.data.filter((t) => {
-          const who = t.member_slug ?? t.member_name;
-          if (!t.photo_url || !t.ticker || seen.has(who)) return false;
-          seen.add(who);
-          return true;
-        });
-        setTrades(picks.slice(0, 3));
-      })
-      .catch(() => setTrades([]));
-    return () => controller.abort();
-  }, []);
-
-  const tilt = [-3, 2, -1];
+  // The disc is 1.55 times Cong's width; keep it inside what is left.
+  const stage = height - insets.top - insets.bottom - BELOW;
+  const mascot = Math.max(96, Math.min(200, (stage - 24) / 1.55));
 
   return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
-        showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.duration(450).delay(120)} style={styles.copy}>
-          <Text variant="display">See what Congress trades, the moment it&apos;s filed.</Text>
-          <Text variant="body" tone="muted">
-            CongTrade reads the disclosures the House and the Senate publish and turns them into a feed you can follow.
-          </Text>
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: c.background, paddingTop: insets.top, paddingBottom: insets.bottom + 14 },
+      ]}>
+      <View style={styles.stage}>
+        <Animated.View entering={ZoomIn.duration(500)}>
+          <CongBadge width={mascot} wave halo={c.accentSoft} />
         </Animated.View>
+      </View>
 
-        <Text variant="label" tone="faint" style={styles.examples}>
-          RECENTLY FILED
+      <Animated.View entering={FadeInDown.duration(450).delay(150)} style={styles.copy}>
+        <Text variant="display">Every trade Congress makes, in one place.</Text>
+        <Text variant="body" tone="muted">
+          Follow the stock trades of House and Senate members as they&apos;re filed.
         </Text>
-        <View style={styles.stack}>
-          {(trades ?? [null, null, null]).map((t, i) => (
-            <Animated.View
-              key={t ? t.id : i}
-              entering={FadeInUp.duration(500).delay(300 + i * 110)}
-              style={[
-                styles.tradeCard,
-                { backgroundColor: c.surface, borderColor: c.border, transform: [{ rotate: `${tilt[i] ?? 0}deg` }] },
-                scheme === 'light' ? shadow.raised : null,
-              ]}>
-              {t ? (
-                <>
-                  <Avatar uri={t.photo_url} name={memberName(t)} party={t.party} size={44} />
-                  <View style={styles.flex}>
-                    <Text variant="bodyStrong" numberOfLines={1}>
-                      {memberName(t)}
-                    </Text>
-                    <Text variant="caption" tone="muted" numberOfLines={1}>
-                      {tradeVerb(t.transaction_type)} {assetLabel(t)} ({t.ticker})
-                    </Text>
-                    <Text variant="footnote" tone="faint">
-                      {amountLabel(t.amount_range)}
-                    </Text>
-                  </View>
-                  <Pill label={tradePill(t.transaction_type)} tone={tradeTone(t.transaction_type)} />
-                </>
-              ) : (
-                <>
-                  <Skeleton width={44} height={44} round={22} />
-                  <View style={[styles.flex, { gap: 8 }]}>
-                    <Skeleton width="60%" height={13} />
-                    <Skeleton width="85%" height={11} />
-                  </View>
-                </>
-              )}
-            </Animated.View>
-          ))}
-        </View>
+      </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(450).delay(640)} style={styles.points}>
-          {POINTS.map((p) => (
-            <View key={p.text} style={styles.point}>
-              <View style={[styles.pointIcon, { backgroundColor: c.surfaceMuted }]}>
-                <Icon name={p.icon} size={18} color={c.primary} />
-              </View>
-              <Text variant="callout" style={styles.flex}>
-                {p.text}
-              </Text>
-            </View>
-          ))}
-        </Animated.View>
-      </ScrollView>
-
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+      <View style={styles.footer}>
         <Button
           label="Get started"
+          kind="accent"
           onPress={() => {
             haptic.tap();
             router.push('/onboarding/goal');
@@ -160,23 +86,9 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: 22, paddingBottom: 24 },
-  examples: { marginTop: 30 },
-  stack: { marginTop: 12, gap: 10 },
-  tradeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  flex: { flex: 1, gap: 2 },
-  copy: { marginTop: 18, gap: 12 },
-  points: { marginTop: 28, gap: 14 },
-  point: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  pointIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  footer: { paddingHorizontal: 20, paddingTop: 10, gap: 12 },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  copy: { paddingHorizontal: 24, gap: 10 },
+  footer: { paddingHorizontal: 20, paddingTop: 22, gap: 12 },
   signIn: { alignItems: 'center', paddingVertical: 4 },
   bold: { fontWeight: '700' },
 });

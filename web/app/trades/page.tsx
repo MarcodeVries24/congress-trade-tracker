@@ -28,10 +28,8 @@ import {
 } from "@/lib/api";
 import Link from "next/link";
 import { issuerSlug } from "@/lib/issuerSlug";
-import { DisclosureMove, DisclosureMoveHeader } from "@/components/DisclosureMove";
 import { RowLink } from "@/components/RowLink";
 import { TickerLogo } from "@/components/TickerLogo";
-import { change } from "@/lib/priceMath";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters, ALERT_PARTIES, MIN_AMOUNT_OPTIONS, US_STATES } from "@/lib/alertFilters";
 import { alertDraftHref, alertUpgradeHref } from "@/lib/alertsClient";
@@ -871,23 +869,20 @@ export default function Home() {
                 <SortHeader label="Traded" sortKey="transaction_date" />
                 <SortHeader label="Filed" sortKey="filing_date" />
                 <SortHeader label="Days to file" sortKey="days_to_file" />
-                <th className="px-4 py-3">
-                  <DisclosureMoveHeader />
-                </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && result?.data.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
                     No trades match these filters.
                   </td>
                 </tr>
@@ -972,13 +967,6 @@ export default function Home() {
                         ) : (
                           <span className="text-ink-faint">—</span>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <DisclosureMove
-                          move={change(trade.price_at_trade, trade.price_at_filing)}
-                          transactionType={trade.transaction_type}
-                          days={trade.days_to_file}
-                        />
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1">
@@ -1081,16 +1069,6 @@ export default function Home() {
                         {trade.days_to_file !== null ? `${trade.days_to_file}d${late ? " · late" : ""}` : "—"}
                       </div>
                     </div>
-                    {change(trade.price_at_trade, trade.price_at_filing) !== null && (
-                      <div className="col-span-2 text-ink-muted">
-                        <DisclosureMove
-                          move={change(trade.price_at_trade, trade.price_at_filing)}
-                          transactionType={trade.transaction_type}
-                          days={trade.days_to_file}
-                          inline
-                        />
-                      </div>
-                    )}
                   </div>
 
                   <span className="mt-3 inline-flex items-center gap-1">

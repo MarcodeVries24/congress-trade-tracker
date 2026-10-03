@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Trade } from '@/lib/api';
 import { amountLabel, assetLabel, filedAgo, memberName, tradePill, tradeTone, tradeVerb } from '@/lib/format';
-import { formatMove, moveBeforeDisclosure } from '@/lib/prices';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
@@ -19,9 +18,6 @@ import { TickerLogo } from '@/ui/ticker-logo';
  * glance, which a row of labelled columns does not. `lead` picks the face at
  * the left: the member in a feed, the company on a member's own page, where
  * her photo a hundred times over would say nothing.
- *
- * Next to the amount, when the stock is priced, is how it moved between the
- * trade and its filing: the number the trade detail opens with.
  */
 export function TradeRow({
   trade,
@@ -36,7 +32,6 @@ export function TradeRow({
   const router = useRouter();
   const asset = assetLabel(trade);
   const ticker = trade.ticker ? ` (${trade.ticker})` : '';
-  const before = trade.filing_date !== trade.transaction_date ? moveBeforeDisclosure(trade) : null;
 
   return (
     <Tap
@@ -70,12 +65,6 @@ export function TradeRow({
           </Text>
           <Text variant="caption" tone="muted" numberOfLines={1}>
             {amountLabel(trade.amount_range)}
-            {before !== null ? (
-              <Text variant="caption" tone={before >= 0 ? 'gain' : 'loss'} style={styles.move}>
-                {'  '}
-                {formatMove(before)} before filing
-              </Text>
-            ) : null}
           </Text>
         </View>
         <View style={styles.side}>
@@ -94,6 +83,5 @@ const styles = StyleSheet.create({
   body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingRight: 16 },
   text: { flex: 1, gap: 3 },
   verb: { fontWeight: '700' },
-  move: { fontWeight: '600' },
   side: { alignItems: 'flex-end', gap: 6 },
 });

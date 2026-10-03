@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, Redirect, Stack, ThemeProvider, useSegments } 
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AccessProvider, useAccess } from '@/lib/access';
@@ -11,7 +11,7 @@ import { FollowsProvider } from '@/lib/follows';
 import { OnboardingProvider, useOnboarding } from '@/lib/onboarding';
 import { PushProvider } from '@/lib/push';
 import { tokenCache } from '@/lib/token-cache';
-import { useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 import { SplashOverlay } from '@/ui/splash-overlay';
 
 SplashScreen.preventAutoHideAsync();
@@ -118,7 +118,12 @@ export default function RootLayout() {
               <PushProvider>
                 <ThemeProvider value={navTheme}>
                   <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                  <Navigation />
+                  {/* One centred column on an iPad; the full width on a phone. */}
+                  <View style={[styles.fill, { backgroundColor: c.background }]}>
+                    <View style={styles.column}>
+                      <Navigation />
+                    </View>
+                  </View>
                   <SplashOverlay />
                 </ThemeProvider>
               </PushProvider>
@@ -130,4 +135,7 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({ fill: { flex: 1 } });
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  column: { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
+});

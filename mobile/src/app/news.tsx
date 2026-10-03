@@ -6,7 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } fro
 import { fetchNews, fetchPolicy, type NewsItem, type NewsSection } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
 import { openPage } from '@/lib/links';
-import { radius, useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, radius, useTheme } from '@/theme';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
 import { RowSkeleton } from '@/ui/skeleton';
@@ -51,7 +51,8 @@ function NewsImage({
  */
 export default function NewsScreen() {
   const { c } = useTheme();
-  const { width } = useWindowDimensions();
+  // The app's column, not the window: on an iPad the two differ.
+  const width = Math.min(useWindowDimensions().width, MAX_CONTENT_WIDTH);
   const [sections, setSections] = useState<NewsSection[] | null>(null);
   const [policy, setPolicy] = useState<NewsItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +97,10 @@ export default function NewsScreen() {
 
   // Markets first, as on the website: it is the half people come back for.
   const ordered = [...sections].sort((a, b) => Number(b.key === 'cnbc-markets') - Number(a.key === 'cnbc-markets'));
-  const cardWidth = (width - 16 * 2 - GRID_GAP) / 2;
+  // Three across on a tablet's wider column, two on a phone.
+  const columns = width >= 600 ? 3 : 2;
+  const cardWidth = (width - 16 * 2 - GRID_GAP * (columns - 1)) / columns;
+  const leadAspect = width >= 600 ? 2 : 4 / 3;
 
   const agencies = policy.length ? (
     <View style={styles.policy}>
@@ -154,7 +158,7 @@ export default function NewsScreen() {
           onPress={() => openPage(lead.url)}
           style={[styles.lead, { backgroundColor: c.surface, borderColor: c.border }]}>
           <View>
-            <NewsImage uri={lead.image} source={lead.source} style={styles.leadImage} />
+            <NewsImage uri={lead.image} source={lead.source} style={[styles.leadImage, { aspectRatio: leadAspect }]} />
             <LinearGradient
               colors={['transparent', 'rgba(8,12,22,0.86)']}
               style={styles.leadShade}

@@ -52,11 +52,6 @@ export function formatMove(move: number | null, digits = 1): string {
   return `${sign}${Math.abs(pct).toFixed(digits)}%`;
 }
 
-/** The explanation behind every "before disclosure" figure, for its ⓘ. */
-export const DISCLOSURE_MOVE_NOTE =
-  "How the stock's price moved between the day of the trade and the day it was publicly disclosed: the stretch when only the member knew about it. " +
-  "“Their way” means the price rose after a purchase or fell after a sale. Daily closing prices, split-adjusted. It describes timing, not profit or intent.";
-
 /** The explanation behind "since the trade", for its ⓘ. */
 export const SINCE_TRADE_NOTE =
   "How the stock has moved from its close on the day of the trade to the latest close, counted in the member's favour: the rise since a purchase, or the fall since a sale. " +

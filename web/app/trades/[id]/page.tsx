@@ -7,7 +7,6 @@ import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { TickerLogo } from "@/components/TickerLogo";
 import { TradeWindowChart } from "@/components/TradeWindowChart";
-import { DisclosureMove } from "@/components/DisclosureMove";
 import { alertDraftHref } from "@/lib/alertsClient";
 import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel } from "@/lib/api";
 import { formatDate, isPartialSale, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
@@ -398,9 +397,6 @@ function Siblings({ rows }: { rows: TradeDetail[] }) {
                   <div className="text-xs text-ink-faint">
                     {amountLabel(r.amount_range)} · traded {formatDate(r.transaction_date)}
                   </div>
-                </div>
-                <div className="hidden text-right text-sm sm:block">
-                  <DisclosureMove move={moveBeforeDisclosure(r)} transactionType={r.transaction_type} days={r.days_to_file} />
                 </div>
                 <span title={b.title} className={`shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium ${b.className}`}>
                   {b.label}

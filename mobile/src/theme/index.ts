@@ -87,6 +87,14 @@ export const space = { xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xx
  * exactly over the first card under it.
  */
 export const GUTTER = 16;
+
+/**
+ * The widest the app's column gets. On a phone the screen is narrower than
+ * this and nothing changes; on an iPad the app sits in a centred column of
+ * this width, which keeps lines, rows and charts at a readable length rather
+ * than stretching a phone layout across a tablet.
+ */
+export const MAX_CONTENT_WIDTH = 800;
 export const radius = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, pill: 999 } as const;
 
 /** Party colours, the same in both schemes because they are identity, not chrome. */

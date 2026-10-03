@@ -11,10 +11,9 @@ import { compactUSD, formatDate, isPartialSale, PARTIAL_SALE_NOTE, typeBadge } f
 import { RowLink } from "@/components/RowLink";
 import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 import { TradeFlowChart } from "@/components/TradeFlowChart";
-import { DisclosureMove, DisclosureMoveHeader } from "@/components/DisclosureMove";
 import { TickerLogo } from "@/components/TickerLogo";
 import { TimingPanel } from "@/components/TimingPanel";
-import { getTimingSummary, moveBeforeDisclosure } from "@/lib/prices";
+import { getTimingSummary } from "@/lib/prices";
 
 /**
  * One page per member who has traded.
@@ -147,9 +146,6 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Traded</th>
                 <th className="px-4 py-3">Filed</th>
-                <th className="px-4 py-3">
-                  <DisclosureMoveHeader />
-                </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
@@ -186,9 +182,6 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                       {t.days_to_file !== null && t.days_to_file > 45 && (
                         <span className="ml-1.5 text-xs text-amber-500" title="Filed more than 45 days after the trade">late</span>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <DisclosureMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} days={t.days_to_file} />
                     </td>
                     <td className="px-4 py-3">
                       <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline decoration-line-strong hover:decoration-current">
@@ -233,11 +226,6 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                     filed {formatDate(t.filing_date)}
                     {t.days_to_file !== null && t.days_to_file > 45 && <span className="ml-1 text-amber-500">late</span>}
                   </span>
-                  {moveBeforeDisclosure(t) !== null && (
-                    <span className="basis-full">
-                      <DisclosureMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} days={t.days_to_file} inline />
-                    </span>
-                  )}
                   <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-accent underline decoration-line-strong">
                     PTR PDF
                   </a>

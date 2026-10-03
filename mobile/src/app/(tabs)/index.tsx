@@ -35,7 +35,7 @@ type TimingKey = (typeof TIMING_WINDOWS)[number]['key'];
 // How many cards each sideways row shows before "See all".
 const ROW = 5;
 // How many of the latest trades Discover lists before "See all trades".
-const LATEST = 10;
+const LATEST = 5;
 
 type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
 type Trending = { ticker: string; company: string | null; count: number; buys: number; sells: number; members: number };
@@ -94,7 +94,7 @@ function greeting(): string {
  * Discover: the home tab.
  *
  * Built like the apps people open without thinking: a search pill at the top,
- * a row of faces who just did something, the ten latest trades as a list,
+ * a row of faces who just did something, the five latest trades as a list,
  * and then rows of cards to scroll sideways, each five long with a "See all"
  * to the full list: the stocks Congress keeps trading, its best recent
  * trades, and the markets news. Nothing here scrolls forever; the Trades tab

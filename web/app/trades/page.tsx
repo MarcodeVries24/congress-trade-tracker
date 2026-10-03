@@ -565,7 +565,7 @@ export default function Home() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="relative mb-4 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 sm:mb-8 sm:px-8 sm:py-8">
           <BannerFlag
-            className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 opacity-[0.14] sm:w-1/2 sm:max-w-[480px]"
+            className="pointer-events-none absolute inset-y-0 -right-[16%] h-full w-[82%] opacity-[0.14] sm:w-[62%] sm:max-w-[580px]"
             style={{ maskImage: "linear-gradient(to right, transparent, black 45%)", WebkitMaskImage: "linear-gradient(to right, transparent, black 45%)" }}
           />
           <div className="relative">

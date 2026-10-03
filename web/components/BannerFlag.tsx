@@ -9,6 +9,10 @@ import { AmericanFlag } from "./AmericanFlag";
  * with. Change the constant below and both pages follow — the point being
  * that this is a taste decision someone may want to take back without
  * unpicking a commit.
+ *
+ * The photo's top-right corner is empty (the cloth curls away there, about
+ * the last 12% of its width), so the callers hang it 16% past the banner's
+ * right edge and the banner's overflow-hidden cuts that strip off.
  */
 const FLAG_STYLE: "photo" | "illustration" = "photo";
 

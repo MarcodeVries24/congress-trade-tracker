@@ -105,13 +105,15 @@ export default function PaywallScreen() {
   const followed = [...new Set(answers.members.map(memberDisplayNameFromFiledName))];
   const who = followed.length === 1 ? followed[0] : `${followed[0]} and ${followed.length - 1} more`;
 
+  // Naming who was picked, without suggesting Pro is limited to them: it
+  // covers every member, and anyone can be followed later.
   const benefits = [
-    'Every trade, the day it is filed',
+    "Every member's trades, the day they're filed",
     followed.length === 1
-      ? `An alert when ${followed[0]} trades`
+      ? `Alerts for ${followed[0]}, and anyone else you follow`
       : followed.length > 1
-        ? 'An alert when any of them trades'
-        : 'Alerts by push or email, on any filter',
+        ? 'Alerts for them, and anyone else you follow'
+        : 'Alerts for anyone you follow, by push or email',
     'The best-timed trades, and how they did since',
   ];
 

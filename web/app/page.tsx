@@ -23,6 +23,7 @@ import { Header } from "@/components/Header";
 import { InfoTip } from "@/components/InfoTip";
 import { Footer } from "@/components/Footer";
 import { MemberPhoto } from "@/components/MemberPhoto";
+import { TickerLogo } from "@/components/TickerLogo";
 import { compactAmountRange, compactUSD, formatDateFromTimestamp, formatTimeWithZone, typeBadge } from "@/lib/format";
 
 // Same free, ungated search param /trades already supports (ILIKE across
@@ -259,7 +260,10 @@ export default function Home() {
                 {dashboard.topStocks.map((s) => (
                   <li key={s.ticker}>
                     <Link href={`/issuers/${issuerSlug(s.ticker)}`} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
-                      <span className="text-sm font-medium text-ink">{s.ticker}</span>
+                      <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                        <TickerLogo ticker={s.ticker} size={26} />
+                        {s.ticker}
+                      </span>
                       <span className="text-sm text-ink-muted">
                         {s.trade_count.toLocaleString()} trade{s.trade_count === 1 ? "" : "s"}
                       </span>

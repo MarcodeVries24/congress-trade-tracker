@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { TickerLogo } from "@/components/TickerLogo";
 import {
   fetchIssuers,
   formatMarketCap,
@@ -187,9 +188,12 @@ export default function Issuers() {
                   <tr key={r.ticker} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                     <td className="px-4 py-3 text-ink-faint">{(page - 1) * pageSize + i + 1}</td>
                     <td className="px-4 py-3">
-                      <Link href={`/issuers/${r.slug}`} className="block hover:underline">
-                        <div className="text-ink">{r.company_name ?? r.ticker}</div>
-                        <div className="font-mono text-xs text-ink-faint">{r.ticker}</div>
+                      <Link href={`/issuers/${r.slug}`} className="group flex items-center gap-3">
+                        <TickerLogo ticker={r.ticker} size={32} />
+                        <div className="min-w-0">
+                          <div className="text-ink group-hover:underline">{r.company_name ?? r.ticker}</div>
+                          <div className="font-mono text-xs text-ink-faint">{r.ticker}</div>
+                        </div>
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-ink">{r.trade_count.toLocaleString()}</td>
@@ -218,6 +222,7 @@ export default function Issuers() {
                 href={`/issuers/${r.slug}`}
                 className="flex items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3"
               >
+                <TickerLogo ticker={r.ticker} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-ink">{r.company_name ?? r.ticker}</div>
                   <div className="truncate font-mono text-xs text-ink-faint">

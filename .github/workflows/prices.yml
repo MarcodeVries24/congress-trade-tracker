@@ -1,0 +1,30 @@
+name: Sync prices
+
+on:
+  # Once a day after the US close, Monday to Friday. The closes this keeps
+  # (on each trade's date, each disclosure's date, and the latest) only
+  # change when a market has closed, so more often would be wasted requests
+  # against a source that rate-limits.
+  schedule:
+    - cron: "45 22 * * 1-5" # 22:45 UTC, after the 20:00/21:00 UTC close
+  workflow_dispatch: {}
+
+jobs:
+  sync-prices:
+    runs-on: ubuntu-latest
+    # A normal day is a few minutes: one short request per ticker. The first
+    # run, or one after a long gap, fetches every ticker's full range at about
+    # a request a second, with waits for rate limits.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run sync-prices --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

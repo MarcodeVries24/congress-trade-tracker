@@ -28,6 +28,9 @@ import {
 } from "@/lib/api";
 import Link from "next/link";
 import { issuerSlug } from "@/lib/issuerSlug";
+import { PriceMove } from "@/components/PriceMove";
+import { TickerLogo } from "@/components/TickerLogo";
+import { change } from "@/lib/priceMath";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { AlertFilters, ALERT_PARTIES, MIN_AMOUNT_OPTIONS, US_STATES } from "@/lib/alertFilters";
 import { alertDraftHref, alertUpgradeHref } from "@/lib/alertsClient";
@@ -867,20 +870,26 @@ export default function Home() {
                 <SortHeader label="Traded" sortKey="transaction_date" />
                 <SortHeader label="Filed" sortKey="filing_date" />
                 <SortHeader label="Days to file" sortKey="days_to_file" />
+                <th
+                  className="px-4 py-3"
+                  title="How the stock moved between the trade and the day it was disclosed: the stretch only the member knew about"
+                >
+                  Before disclosure
+                </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={10} className="px-4 py-8 text-center text-ink-faint">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && result?.data.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
+                  <td colSpan={10} className="px-4 py-8 text-center text-ink-faint">
                     No trades match these filters.
                   </td>
                 </tr>
@@ -916,24 +925,29 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5" title={trade.asset_name}>
-                          {displayAssetName(trade)}
-                          {trade.parse_status === "ocr" && <OcrBadge />}
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
-                          {trade.ticker && (
-                            <Link
-                              href={`/issuers/${issuerSlug(trade.ticker)}`}
-                              className="font-mono hover:text-ink hover:underline"
-                              title={`${trade.company_name ?? trade.ticker}: all disclosed trades`}
-                            >
-                              {trade.ticker}
-                            </Link>
-                          )}
-                          {assetTypeLabel && <span>{assetTypeLabel}</span>}
-                          {trade.market_cap !== null && (
-                            <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
-                          )}
+                        <div className="flex items-center gap-2.5">
+                          {trade.ticker ? <TickerLogo ticker={trade.ticker} size={30} /> : null}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5" title={trade.asset_name}>
+                              {displayAssetName(trade)}
+                              {trade.parse_status === "ocr" && <OcrBadge />}
+                            </div>
+                            <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                              {trade.ticker && (
+                                <Link
+                                  href={`/issuers/${issuerSlug(trade.ticker)}`}
+                                  className="font-mono hover:text-ink hover:underline"
+                                  title={`${trade.company_name ?? trade.ticker}: all disclosed trades`}
+                                >
+                                  {trade.ticker}
+                                </Link>
+                              )}
+                              {assetTypeLabel && <span>{assetTypeLabel}</span>}
+                              {trade.market_cap !== null && (
+                                <span title={marketCapTierLabel(trade.market_cap)}>{formatMarketCap(trade.market_cap)} cap</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -958,6 +972,12 @@ export default function Home() {
                         ) : (
                           <span className="text-ink-faint">—</span>
                         )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <PriceMove
+                          move={change(trade.price_at_trade, trade.price_at_filing)}
+                          transactionType={trade.transaction_type}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1">
@@ -1021,7 +1041,8 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-1.5 text-sm" title={trade.asset_name}>
+                  <div className="mt-3 flex items-center gap-2 text-sm" title={trade.asset_name}>
+                    {trade.ticker ? <TickerLogo ticker={trade.ticker} size={24} /> : null}
                     {displayAssetName(trade)}
                     {trade.parse_status === "ocr" && <OcrBadge />}
                   </div>
@@ -1059,6 +1080,17 @@ export default function Home() {
                         {trade.days_to_file !== null ? `${trade.days_to_file}d${late ? " · late" : ""}` : "—"}
                       </div>
                     </div>
+                    {change(trade.price_at_trade, trade.price_at_filing) !== null && (
+                      <div className="col-span-2">
+                        <div className="text-ink-faint">Stock move before disclosure</div>
+                        <div className="mt-0.5">
+                          <PriceMove
+                            move={change(trade.price_at_trade, trade.price_at_filing)}
+                            transactionType={trade.transaction_type}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <span className="mt-3 inline-flex items-center gap-1">

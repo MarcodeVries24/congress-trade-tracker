@@ -10,6 +10,10 @@ import { issuerSlug } from "@/lib/issuerSlug";
 import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/lib/members";
 import { TradeFlowChart } from "@/components/TradeFlowChart";
+import { PriceMove } from "@/components/PriceMove";
+import { TickerLogo } from "@/components/TickerLogo";
+import { TimingPanel } from "@/components/TimingPanel";
+import { getTimingSummary, moveBeforeDisclosure } from "@/lib/prices";
 
 /**
  * One page per member who has traded.
@@ -60,7 +64,10 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
   if (member.redirectTo) redirect(`/politicians/${member.redirectTo}`);
 
   const { profile, trades } = member;
-  const flow = await getMemberTradeFlow(profile.names);
+  const [flow, timing] = await Promise.all([
+    getMemberTradeFlow(profile.names),
+    getTimingSummary("t.member_name = ANY($1)", [profile.names]).catch(() => null),
+  ]);
   const tradesHref = `/trades?${profile.names.map((n) => `members=${encodeURIComponent(n)}`).join("&")}`;
 
   return (
@@ -99,14 +106,17 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                   <Link
                     key={t.ticker}
                     href={`/issuers/${issuerSlug(t.ticker)}`}
-                    className="rounded-full border border-line bg-panel-muted px-2.5 py-1 text-xs text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel-muted py-1 pl-1 pr-2.5 text-xs text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
                   >
+                    <TickerLogo ticker={t.ticker} size={20} />
                     <span className="text-ink">{t.ticker}</span> {t.count}
                   </Link>
                 ))}
               </div>
             </div>
           )}
+
+          {timing ? <TimingPanel summary={timing} subject="member" /> : null}
 
           <TradeFlowChart quarters={flow} subject={profile.display} />
         </div>
@@ -136,6 +146,9 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Traded</th>
                 <th className="px-4 py-3">Filed</th>
+                <th className="px-4 py-3" title="The stock's close on the trade date against its close on the disclosure date">
+                  Before disclosure
+                </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
@@ -145,15 +158,20 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                 return (
                   <tr key={t.id} className="border-b border-line/50">
                     <td className="px-4 py-3">
-                      <div className="text-ink">{displayAssetName(t)}</div>
-                      <div className="mt-0.5 text-xs text-ink-faint">
-                        {t.ticker && (
-                          <Link href={`/issuers/${issuerSlug(t.ticker)}`} className="text-ink-muted hover:text-ink hover:underline">
-                            {t.ticker}
-                          </Link>
-                        )}
-                        {t.ticker && t.asset_type_code && " · "}
-                        {t.asset_type_code && (ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code)}
+                      <div className="flex items-center gap-2.5">
+                        {t.ticker ? <TickerLogo ticker={t.ticker} size={28} /> : null}
+                        <div className="min-w-0">
+                          <div className="text-ink">{displayAssetName(t)}</div>
+                          <div className="mt-0.5 text-xs text-ink-faint">
+                            {t.ticker && (
+                              <Link href={`/issuers/${issuerSlug(t.ticker)}`} className="text-ink-muted hover:text-ink hover:underline">
+                                {t.ticker}
+                              </Link>
+                            )}
+                            {t.ticker && t.asset_type_code && " · "}
+                            {t.asset_type_code && (ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code)}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -167,6 +185,9 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                       {t.days_to_file !== null && t.days_to_file > 45 && (
                         <span className="ml-1.5 text-xs text-amber-500" title="Filed more than 45 days after the trade">late</span>
                       )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <PriceMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} />
                     </td>
                     <td className="px-4 py-3">
                       <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline decoration-line-strong hover:decoration-current">
@@ -186,7 +207,8 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
             return (
               <div key={t.id} className={`rounded-lg border border-line border-l-2 bg-panel p-3 ${badge.accent}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  {t.ticker ? <TickerLogo ticker={t.ticker} size={32} /> : null}
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-ink">{displayAssetName(t)}</div>
                     <div className="mt-0.5 text-xs text-ink-faint">
                       {t.ticker && (
@@ -210,6 +232,11 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                     filed {formatDate(t.filing_date)}
                     {t.days_to_file !== null && t.days_to_file > 45 && <span className="ml-1 text-amber-500">late</span>}
                   </span>
+                  {moveBeforeDisclosure(t) !== null && (
+                    <span>
+                      <PriceMove move={moveBeforeDisclosure(t)} /> before disclosure
+                    </span>
+                  )}
                   <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-accent underline decoration-line-strong">
                     PTR PDF
                   </a>

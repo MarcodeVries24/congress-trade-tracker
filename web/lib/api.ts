@@ -27,6 +27,11 @@ export interface Trade {
   market_cap: number | null;
   /** Canonical company name for this ticker, when we have one. See displayAssetName. */
   company_name: string | null;
+  /** Closes on the trade date, the disclosure date and the latest; see lib/prices.ts. */
+  price_at_trade?: number | null;
+  price_at_filing?: number | null;
+  price_now?: number | null;
+  price_now_day?: string | null;
 }
 
 export interface TradesResponse {

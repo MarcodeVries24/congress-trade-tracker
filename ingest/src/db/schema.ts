@@ -370,4 +370,56 @@ export const SCHEMA_STATEMENTS = [
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (provider, id)
   )`,
+  // ---------------------------------------------------------------------
+  // Company logos. Finnhub's profile already carries one, and the monthly
+  // market-cap sync was fetching that profile and throwing the logo away.
+  // NULL means none on file (most funds and many foreign listings), which
+  // the site and the app turn into a lettered tile rather than a gap.
+  // ---------------------------------------------------------------------
+  `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS logo_url TEXT`,
+  // When the profile was last read for a logo, found or not, so a ticker with
+  // none on file is not asked about again on every gap-fill run.
+  `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS logo_checked_at TIMESTAMPTZ`,
+  // ---------------------------------------------------------------------
+  // What a stock did around a trade: the close on the day it was traded,
+  // on the day it was disclosed, and now. That gap between trade and
+  // disclosure is what the STOCK Act exists to keep short, and the move
+  // inside it is the number the public never sees.
+  //
+  // Only the closes the trades actually need are kept, one row per ticker
+  // per date some trade was made or filed on, rather than full daily
+  // history: about 60,000 rows instead of three million, and every one of
+  // them used. `day` is the date asked about; `close_day` the trading day
+  // whose close answers it (the last one on or before `day`, since a
+  // filing can land on a weekend). Both are YYYY-MM-DD text, the same
+  // shape transactions and filings store their dates in, so the join
+  // needs no casts.
+  //
+  // Closes are split-adjusted as of the fetch. A split after the fact
+  // would leave old rows on the old basis, so the sync rewrites a ticker's
+  // rows whenever its source reports a split.
+  // ---------------------------------------------------------------------
+  `CREATE TABLE IF NOT EXISTS price_points (
+    ticker TEXT NOT NULL,
+    day TEXT NOT NULL,
+    close DOUBLE PRECISION NOT NULL,
+    close_day TEXT NOT NULL,
+    PRIMARY KEY (ticker, day)
+  )`,
+  // One row per ticker: its latest close, and how the last sync of it went.
+  // status: 'ok' | 'not_found' (the source has no such symbol: delisted,
+  // foreign, or not a listed security) | 'error' (try again next run).
+  `CREATE TABLE IF NOT EXISTS price_latest (
+    ticker TEXT PRIMARY KEY,
+    close DOUBLE PRECISION,
+    close_day TEXT,
+    status TEXT NOT NULL,
+    source TEXT NOT NULL,
+    note TEXT,
+    synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  // The first close the source has, so a trade from before the listing (or
+  // before the source's history starts) is known to be unanswerable rather
+  // than retried on every run.
+  `ALTER TABLE price_latest ADD COLUMN IF NOT EXISTS first_day TEXT`,
 ];

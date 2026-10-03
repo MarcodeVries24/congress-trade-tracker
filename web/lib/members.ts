@@ -5,6 +5,7 @@ import { memberSlug } from "./memberSlug";
 import { cleanName, NAME_NOISE, titleCaseIfShouted } from "./memberDisplay";
 import { getTradeFlow, type TradeFlowQuarter } from "./tradeFlow";
 import { MEMBER_DISPLAY_NAMES } from "./memberNames";
+import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL, type TradePrices } from "./prices";
 
 // Re-exported so server code has one import for everything member-related.
 export { memberSlug };
@@ -236,7 +237,7 @@ export interface MemberProfile {
   top_tickers: { ticker: string; count: number }[];
 }
 
-export interface MemberTrade {
+export interface MemberTrade extends TradePrices {
   id: number;
   asset_name: string;
   ticker: string | null;
@@ -308,9 +309,11 @@ export async function getMemberBySlug(
       `SELECT t.id, t.asset_name, t.ticker, t.asset_type_code, t.owner, t.transaction_type,
               t.transaction_date, t.amount_range, t.amount_low, t.amount_high,
               f.filing_date, f.pdf_url, cmc.company_name,
-              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
+              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
+              ${PRICE_COLUMNS_SQL}
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
+       ${PRICE_JOINS_SQL}
        WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
        ORDER BY f.filing_date DESC NULLS LAST, t.transaction_date DESC NULLS LAST, t.id DESC
        LIMIT ${MEMBER_PAGE_TRADE_LIMIT}`,

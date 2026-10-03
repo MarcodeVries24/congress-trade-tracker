@@ -94,6 +94,8 @@ interface FinnhubProfile {
   /** The listing's own currency: "USD", "JPY", "KRW", "TWD", … */
   currency?: string;
   name?: string;
+  /** A URL on Finnhub's static host, or "" when none is on file. */
+  logo?: string;
 }
 
 /** Units of the currency per 1 USD, e.g. { JPY: 157.2, KRW: 1368.6 }. */
@@ -311,7 +313,9 @@ async function resolveNewAssetNames(): Promise<void> {
 }
 
 /**
- * @param missingOnly  Only tickers with no row in company_market_caps at all.
+ * @param mode  'all' refreshes every ticker; 'missing' only tickers with no row
+ *              at all; 'logos' only tickers whose profile has never been read
+ *              for a logo, which is every ticker once, the first time.
  *
  * The monthly full refresh keeps caps current, but it leaves a gap: a ticker
  * first traded on the 2nd shows "Undefined" for the next 51 days, because
@@ -322,14 +326,21 @@ async function resolveNewAssetNames(): Promise<void> {
  * A failed lookup writes no row, so gap-fill also retries anything the last
  * full run couldn't reach.
  */
-async function refreshMarketCaps(missingOnly = false): Promise<void> {
+async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Promise<void> {
+  const missingOnly = mode === "missing";
   const rows = (await sql.query(`
     SELECT ticker FROM (
       SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker != ''
       UNION
       SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL
     ) t
-    ${missingOnly ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker)" : ""}
+    ${
+      mode === 'missing'
+        ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker)"
+        : mode === 'logos'
+          ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
+          : ""
+    }
   `)) as { ticker: string }[];
 
   if (rows.length === 0) {
@@ -352,12 +363,19 @@ async function refreshMarketCaps(missingOnly = false): Promise<void> {
     const ticker = rows[i].ticker;
     try {
       const data = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(ticker));
+      const logo = data.logo?.trim() || null;
       const marketCap = toUsdMarketCap(data, rates);
       if (marketCap === undefined) {
         // Can't be expressed in USD right now. Writing what the provider
         // gave would put a figure in yen or won into a column every other
-        // row reads as dollars, so this row is left exactly as it was.
+        // row reads as dollars, so the cap is left exactly as it was. The
+        // logo has no such problem and is kept.
         skipped++;
+        await sql.query(
+          `INSERT INTO company_market_caps (ticker, logo_url, logo_checked_at, updated_at) VALUES ($1, $2, NOW(), NOW())
+           ON CONFLICT (ticker) DO UPDATE SET logo_url = EXCLUDED.logo_url, logo_checked_at = NOW()`,
+          [ticker, logo]
+        );
         continue;
       }
       if (marketCap !== null) {
@@ -368,11 +386,12 @@ async function refreshMarketCaps(missingOnly = false): Promise<void> {
         noCap++;
       }
       await sql.query(
-        `INSERT INTO company_market_caps (ticker, market_cap, company_name, source_currency, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
+        `INSERT INTO company_market_caps (ticker, market_cap, company_name, source_currency, logo_url, logo_checked_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
          ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, company_name = EXCLUDED.company_name,
-           source_currency = EXCLUDED.source_currency, updated_at = NOW()`,
-        [ticker, marketCap, data.name ?? null, (data.currency ?? "").toUpperCase() || null]
+           source_currency = EXCLUDED.source_currency, logo_url = EXCLUDED.logo_url, logo_checked_at = NOW(),
+           updated_at = NOW()`,
+        [ticker, marketCap, data.name ?? null, (data.currency ?? "").toUpperCase() || null, logo]
       );
     } catch (err) {
       failed++;
@@ -394,14 +413,18 @@ async function main() {
   // `--missing-only` is the cheap mode meant to run after every ingest: it
   // skips the name-resolution sweep and looks up only tickers nothing has
   // priced yet. The full run stays monthly (see market-caps.yml).
-  const missingOnly = process.argv.slice(2).includes("--missing-only");
+  // `--logos` reads the profile of every ticker whose logo has never been
+  // looked for: a one-time backfill, then nothing, since the other two modes
+  // record the logo as they go.
+  const args = process.argv.slice(2);
+  const mode = args.includes("--missing-only") ? "missing" : args.includes("--logos") ? "logos" : "all";
 
   await ensureSchema();
-  if (!missingOnly) {
+  if (mode === "all") {
     await resolveEmbeddedTickers();
     await resolveNewAssetNames();
   }
-  await refreshMarketCaps(missingOnly);
+  await refreshMarketCaps(mode);
 }
 
 main().catch((err) => {

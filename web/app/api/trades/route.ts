@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ALERT_FROM_SQL, buildAlertConditions } from "@/lib/alertFilters";
 import { getMemberSlugsByName } from "@/lib/members";
+import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
 import { hasFeatureServer } from "@/lib/access";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
@@ -132,8 +133,10 @@ export async function GET(req: NextRequest) {
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.state, mr.state) AS member_state,
               cmc.market_cap, cmc.company_name,
-              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
+              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
+              ${PRICE_COLUMNS_SQL}
        ${ALERT_FROM_SQL}
+       ${PRICE_JOINS_SQL}
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST, t.id ${order}
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,

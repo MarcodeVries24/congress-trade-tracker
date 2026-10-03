@@ -4,10 +4,10 @@ import { compactUSD } from "@/lib/format";
 /**
  * A member's, or an issuer's, disclosed trading quarter by quarter.
  *
- * Deliberately not a price chart. Everyone draws one of those, it needs a
- * market-data feed this project doesn't have, and it mostly tells you what
- * the market did rather than what the member did. This draws the two things
- * only a disclosure corpus knows:
+ * Deliberately not a price chart: a price chart mostly tells you what the
+ * market did rather than what the member did, and the one place it helps
+ * (company pages) is PriceTradesChart. This draws the two things only a
+ * disclosure corpus knows:
  *
  *  - direction and size — purchases rise from the axis, sales fall below it,
  *    so a quarter of heavy selling is a shape rather than a number to read;

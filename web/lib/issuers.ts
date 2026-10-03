@@ -3,6 +3,7 @@ import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "
 import { ISSUER_SLUG_SQL, issuerSlug } from "./issuerSlug";
 import { assetGroupName } from "./assetGroup";
 import { getTradeFlow, type TradeFlowQuarter } from "./tradeFlow";
+import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL, type TradePrices } from "./prices";
 
 /**
  * Issuer pages — one per traded company, the asset-side counterpart to the
@@ -63,7 +64,7 @@ export interface IssuerSummary {
   last_filed: string | null;
 }
 
-export interface IssuerTrade {
+export interface IssuerTrade extends TradePrices {
   id: number;
   member_name: string;
   bioguide_id: string | null;
@@ -262,12 +263,14 @@ export async function getIssuerBySlug(slug: string): Promise<{
               t.amount_high, f.filing_date, f.pdf_url, f.chamber, cmc.company_name,
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
-              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file
+              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
+              ${PRICE_COLUMNS_SQL}
        FROM transactions t
        JOIN filings f ON f.doc_id = t.doc_id
        LEFT JOIN members_reference mr ON mr.state_district = t.state_district
        LEFT JOIN members_history mh ON mh.bioguide_id = f.bioguide_id
        LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
+       ${PRICE_JOINS_SQL}
        WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} AND t.ticker = $1
        ORDER BY f.filing_date DESC NULLS LAST, t.transaction_date DESC NULLS LAST, t.id DESC
        LIMIT ${ISSUER_PAGE_TRADE_LIMIT}`,

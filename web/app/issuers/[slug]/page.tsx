@@ -20,6 +20,12 @@ import { compactUSD, formatDate, typeBadge } from "@/lib/format";
 import { getIssuerBySlug, getIssuerTradeFlow, ISSUER_PAGE_TRADE_LIMIT } from "@/lib/issuers";
 import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { memberDisplayName } from "@/lib/memberDisplay";
+import { PriceMove } from "@/components/PriceMove";
+import { PriceTradesChart } from "@/components/PriceTradesChart";
+import { TickerLogo } from "@/components/TickerLogo";
+import { TimingPanel } from "@/components/TimingPanel";
+import { getTimingSummary, moveBeforeDisclosure } from "@/lib/prices";
+import { daysAgo, getPriceSeries } from "@/lib/priceSeries";
 
 /**
  * One page per traded company — the asset-side counterpart to the member
@@ -76,6 +82,18 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
   const news = await getIssuerNews(issuer.ticker, issuer.company_name);
   const tradesHref = `/trades?tickers=${encodeURIComponent(issuer.ticker)}`;
   const cap = formatMarketCap(issuer.market_cap);
+  // Two years of closes, or back to the oldest trade shown if that is sooner,
+  // so the chart frames the trades rather than a decade of history. Both
+  // resolve to nothing on any failure, and their sections then do not render.
+  const oldest = trades.reduce<string | null>(
+    (min, t) => (t.transaction_date && (!min || t.transaction_date < min) ? t.transaction_date : min),
+    null
+  );
+  const twoYears = daysAgo(730);
+  const [series, timing] = await Promise.all([
+    getPriceSeries(issuer.ticker, oldest && oldest > twoYears ? oldest : twoYears),
+    getTimingSummary("t.ticker = $1", [issuer.ticker]).catch(() => null),
+  ]);
 
   return (
     <>
@@ -91,9 +109,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
 
         <div className="rounded-xl border border-line bg-panel p-4 sm:p-6">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-line bg-panel-muted font-mono text-sm font-semibold text-ink-muted">
-              {issuer.ticker.slice(0, 5)}
-            </div>
+            <TickerLogo ticker={issuer.ticker} size={64} />
             <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">{name}</h1>
               <p className="mt-0.5 text-sm text-ink-muted">
@@ -143,6 +159,26 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
             </div>
           )}
 
+          {timing ? <TimingPanel summary={timing} subject="company" /> : null}
+
+          {series ? (
+            <div className="mt-5">
+              <PriceTradesChart
+                ticker={issuer.ticker}
+                points={series}
+                trades={trades.map((t) => ({
+                  transaction_type: t.transaction_type,
+                  transaction_date: t.transaction_date,
+                  filing_date: t.filing_date,
+                  who: memberDisplayName(t),
+                  amount: amountLabel(t.amount_range),
+                  price_at_trade: t.price_at_trade,
+                  price_at_filing: t.price_at_filing,
+                }))}
+              />
+            </div>
+          ) : null}
+
           <TradeFlowChart quarters={flow} subject={`${name} (${issuer.ticker})`} />
         </div>
 
@@ -171,6 +207,9 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Traded</th>
                 <th className="px-4 py-3">Filed</th>
+                <th className="px-4 py-3" title="The stock's close on the trade date against its close on the disclosure date">
+                  Before disclosure
+                </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
             </thead>
@@ -208,6 +247,9 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                           late
                         </span>
                       )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <PriceMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} />
                     </td>
                     <td className="px-4 py-3">
                       <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline decoration-line-strong hover:decoration-current">
@@ -251,6 +293,11 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                     filed {formatDate(t.filing_date)}
                     {t.days_to_file !== null && t.days_to_file > 45 && <span className="ml-1 text-amber-500">late</span>}
                   </span>
+                  {moveBeforeDisclosure(t) !== null && (
+                    <span>
+                      <PriceMove move={moveBeforeDisclosure(t)} /> before disclosure
+                    </span>
+                  )}
                   <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-accent underline decoration-line-strong">
                     PTR PDF
                   </a>

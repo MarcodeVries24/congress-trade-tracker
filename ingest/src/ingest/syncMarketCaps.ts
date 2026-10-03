@@ -329,11 +329,12 @@ async function resolveNewAssetNames(): Promise<void> {
 async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Promise<void> {
   const missingOnly = mode === "missing";
   const rows = (await sql.query(`
-    SELECT ticker FROM (
+    SELECT t.ticker FROM (
       SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker != ''
       UNION
       SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL
     ) t
+    LEFT JOIN (SELECT ticker, COUNT(*) AS n FROM transactions GROUP BY ticker) traded ON traded.ticker = t.ticker
     ${
       mode === 'missing'
         ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker)"
@@ -341,6 +342,8 @@ async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Pro
           ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
           : ""
     }
+    -- Most-traded first, so a run cut short has done the tickers people see.
+    ORDER BY COALESCE(traded.n, 0) DESC, t.ticker
   `)) as { ticker: string }[];
 
   if (rows.length === 0) {

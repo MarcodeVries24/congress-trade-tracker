@@ -27,9 +27,11 @@ export interface ChartTrade {
   price_at_filing: number | null;
 }
 
-// A narrower canvas than TradeFlowChart's, so the labels stay legible when
-// the whole thing is scaled down to a phone's width.
-const WIDTH = 680;
+// Drawn twice, at a phone's width and at a desktop's, with one shown by
+// breakpoint: an SVG scales its text with it, so one canvas stretched across
+// both would have labels too small on one or far too large on the other.
+const NARROW = 680;
+const WIDE = 1120;
 const PRICE_H = 210;
 const LANE_H = 50;
 const GAP = 26;
@@ -38,7 +40,6 @@ const PAD_BOTTOM = 26;
 const PAD_LEFT = 50;
 const PAD_RIGHT = 12;
 const HEIGHT = PAD_TOP + PRICE_H + GAP + LANE_H + PAD_BOTTOM;
-const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 const LATE_DAYS = 45;
 
 const dayMs = (d: string) => new Date(`${d}T00:00:00Z`).getTime();
@@ -65,6 +66,30 @@ export function PriceTradesChart({
   ticker: string;
 }) {
   if (points.length < 10) return null;
+  return (
+    <>
+      <div className="lg:hidden">
+        <Chart points={points} trades={trades} ticker={ticker} width={NARROW} />
+      </div>
+      <div className="hidden lg:block">
+        <Chart points={points} trades={trades} ticker={ticker} width={WIDE} />
+      </div>
+    </>
+  );
+}
+
+function Chart({
+  points,
+  trades,
+  ticker,
+  width: WIDTH,
+}: {
+  points: PricePoint[];
+  trades: ChartTrade[];
+  ticker: string;
+  width: number;
+}) {
+  const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
 
   const start = dayMs(points[0].d);
   const end = dayMs(points[points.length - 1].d);
@@ -82,9 +107,30 @@ export function PriceTradesChart({
   const line = points.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)},${y(p.c).toFixed(1)}`).join("");
   const area = `${line}L${x(points[points.length - 1].d).toFixed(1)},${PAD_TOP + PRICE_H}L${PAD_LEFT},${PAD_TOP + PRICE_H}Z`;
 
-  const shown = trades.filter(
-    (t) => inRange(t.transaction_date) && t.price_at_trade !== null && /^[PS]/i.test(t.transaction_type)
-  );
+  // Each trade's price is read off the series being drawn (the last close on
+  // or before its date), not the stored closes, so the dots sit exactly on
+  // the line and a ticker the price sync has not reached yet still has them.
+  const closeOn = (day: string): number | null => {
+    let lo = 0;
+    let hi = points.length - 1;
+    let found: number | null = null;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (points[mid].d <= day) {
+        found = points[mid].c;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    return found;
+  };
+  const shown = trades
+    .filter((t) => inRange(t.transaction_date) && /^[PS]/i.test(t.transaction_type))
+    .map((t) => ({
+      ...t,
+      price_at_trade: closeOn(t.transaction_date!),
+      price_at_filing: inRange(t.filing_date) ? closeOn(t.filing_date) : t.price_at_filing,
+    }))
+    .filter((t) => t.price_at_trade !== null);
   const laneTop = PAD_TOP + PRICE_H + GAP;
   // Each gap gets its own row in the lane, cycling, so overlapping ones stay
   // separable rather than painting one thick bar.
@@ -95,7 +141,9 @@ export function PriceTradesChart({
   const months: number[] = [];
   const first = new Date(start);
   const cursor = Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 1);
-  const stepMonths = span > 400 * 86_400_000 ? 4 : span > 200 * 86_400_000 ? 2 : 1;
+  // About one label per 110 units of width.
+  const spanMonths = span / (30.4 * 86_400_000);
+  const stepMonths = [1, 2, 3, 4, 6, 12].find((m) => spanMonths / m <= PLOT_W / 110) ?? 12;
   for (let m = cursor; m <= end;) {
     months.push(m);
     const d = new Date(m);
@@ -130,7 +178,7 @@ export function PriceTradesChart({
         aria-label={`${ticker} daily closing price with ${shown.length} congressional trades marked`}
       >
         <defs>
-          <linearGradient id={`area-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`area-${ticker}-${WIDTH}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="rgb(58 130 194)" stopOpacity="0.22" />
             <stop offset="100%" stopColor="rgb(58 130 194)" stopOpacity="0" />
           </linearGradient>
@@ -151,7 +199,7 @@ export function PriceTradesChart({
           </g>
         ))}
 
-        <path d={area} fill={`url(#area-${ticker})`} />
+        <path d={area} fill={`url(#area-${ticker}-${WIDTH})`} />
         <path d={line} fill="none" stroke="rgb(58 130 194)" strokeWidth={2} strokeLinejoin="round" />
 
         {shown.map((t, i) => {

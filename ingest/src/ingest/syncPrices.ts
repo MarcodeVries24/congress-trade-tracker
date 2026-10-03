@@ -30,6 +30,9 @@ const RECENT_DAYS = 14;
 // A symbol the source does not know is asked about again after this long, in
 // case it was a temporary gap rather than a delisting.
 const NOT_FOUND_RETRY_DAYS = 30;
+// A ticker synced this recently with nothing missing is left alone, so a
+// second run the same day (a restart, a manual dispatch) skips what is done.
+const FRESH_HOURS = 18;
 // This many failures in a row means the source is refusing us, not that
 // these particular tickers are odd; stop rather than hammer it.
 const MAX_CONSECUTIVE_FAILURES = 8;
@@ -107,7 +110,9 @@ async function main() {
        WHERE t.ticker IS NOT NULL AND t.ticker <> '' AND f.filing_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
      ) x
      WHERE day <= $1 ${only ? "AND ticker = $2" : ""}
-     GROUP BY ticker ORDER BY ticker`,
+     GROUP BY ticker
+     -- Most-traded first, so a run cut short has done the tickers people see.
+     ORDER BY COUNT(*) DESC, ticker`,
     only ? [today, only] : [today]
   )) as { ticker: string; days: string[] }[];
 
@@ -150,6 +155,10 @@ async function main() {
       (!known?.close_day || d <= known.close_day) && (!known?.first_day || d >= known.first_day);
     const missing = days.filter((d) => !have.has(d) && answerable(d));
     const whole = full || !known || known.status !== "ok" || missing.length > 0;
+    if (!whole && Date.now() - new Date(known!.synced_at).getTime() < FRESH_HOURS * 3_600_000) {
+      skipped++;
+      continue;
+    }
     const fromDay = whole ? daysBefore(days[0], 10) : daysBefore(known!.close_day ?? today, RECENT_DAYS);
 
     try {
@@ -217,7 +226,7 @@ async function main() {
 
   console.log(
     `Prices: ${fetched} fetched in full, ${refreshed} refreshed, ${notFound} not found at ${SOURCE.name}, ` +
-      `${skipped} skipped (recently not found), ${failed} failed. ${points} closes written.`
+      `${skipped} skipped (recently not found, or synced in the last ${FRESH_HOURS}h), ${failed} failed. ${points} closes written.`
   );
   if (failed > 0 && fetched + refreshed === 0) process.exit(1);
 }

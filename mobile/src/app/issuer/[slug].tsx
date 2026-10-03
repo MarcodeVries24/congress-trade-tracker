@@ -19,7 +19,6 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { IssuerPriceCard } from '@/ui/issuer-price-card';
 import { TickerLogo } from '@/ui/ticker-logo';
-import { TimingCard } from '@/ui/timing-card';
 import { TradeRow } from '@/ui/trade-row';
 
 const RECENT_DAYS = 90;
@@ -166,7 +165,6 @@ export default function IssuerScreen() {
 
       <View style={styles.cards}>
         <IssuerPriceCard ticker={i.ticker} trades={trades} />
-        <TimingCard timing={detail.timing} who="the trader's" />
       </View>
 
       <View style={[styles.lean, { backgroundColor: c.surface, borderColor: c.border }]}>

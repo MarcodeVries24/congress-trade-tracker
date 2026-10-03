@@ -23,8 +23,6 @@ import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { PriceTradesChart } from "@/components/PriceTradesChart";
 import { TickerLogo } from "@/components/TickerLogo";
-import { TimingPanel } from "@/components/TimingPanel";
-import { getTimingSummary } from "@/lib/prices";
 import { daysAgo, getPriceSeries } from "@/lib/priceSeries";
 
 /**
@@ -83,17 +81,14 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
   const tradesHref = `/trades?tickers=${encodeURIComponent(issuer.ticker)}`;
   const cap = formatMarketCap(issuer.market_cap);
   // Two years of closes, or back to the oldest trade shown if that is sooner,
-  // so the chart frames the trades rather than a decade of history. Both
-  // resolve to nothing on any failure, and their sections then do not render.
+  // so the chart frames the trades rather than a decade of history. Resolves
+  // to nothing on any failure, and the chart then does not render.
   const oldest = trades.reduce<string | null>(
     (min, t) => (t.transaction_date && (!min || t.transaction_date < min) ? t.transaction_date : min),
     null
   );
   const twoYears = daysAgo(730);
-  const [series, timing] = await Promise.all([
-    getPriceSeries(issuer.ticker, oldest && oldest > twoYears ? oldest : twoYears),
-    getTimingSummary("t.ticker = $1", [issuer.ticker]).catch(() => null),
-  ]);
+  const series = await getPriceSeries(issuer.ticker, oldest && oldest > twoYears ? oldest : twoYears);
 
   return (
     <>
@@ -159,7 +154,6 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
             </div>
           )}
 
-          {timing ? <TimingPanel summary={timing} subject="company" /> : null}
 
           {series ? (
             <div className="mt-5">

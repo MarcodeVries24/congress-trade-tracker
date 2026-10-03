@@ -45,14 +45,6 @@ export function formatPrice(n: number): string {
   return n >= 1000 ? `$${Math.round(n).toLocaleString('en-US')}` : `$${n.toFixed(2)}`;
 }
 
-/** The website's "before the public knew" summary for a member or company. */
-export interface TimingSummary {
-  priced: number;
-  theirWay: number;
-  averageEdge: number | null;
-  sameDay: number;
-}
-
 export interface PricePoint {
   /** YYYY-MM-DD */
   d: string;

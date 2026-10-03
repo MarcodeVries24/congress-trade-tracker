@@ -12,7 +12,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-import type { TimingSummary, TradePrices } from "@/lib/prices";
+import type { TradePrices } from "@/lib/prices";
 
 /**
  * In development, EXPO_PUBLIC_API_BASE=auto means "the website's dev server
@@ -364,8 +364,6 @@ export interface IssuerDetail {
     photo_url: string | null;
     chamber: "house" | "senate";
   })[];
-  /** Over every trade in the company; absent from an older server. */
-  timing?: TimingSummary | null;
 }
 
 export function fetchIssuer(slug: string, options: RequestOptions = {}): Promise<IssuerDetail> {

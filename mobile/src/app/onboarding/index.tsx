@@ -13,7 +13,6 @@ import { radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { Icon, type IconName } from '@/ui/icon';
-import { Brand } from '@/ui/logo';
 import { Pill } from '@/ui/pill';
 import { Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
@@ -75,10 +74,6 @@ export default function WelcomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
         showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.logo}>
-          <Brand size={24} />
-        </Animated.View>
-
         <Animated.View entering={FadeInDown.duration(450).delay(120)} style={styles.copy}>
           <Text variant="display">See what Congress trades, the moment it&apos;s filed.</Text>
           <Text variant="body" tone="muted">
@@ -166,7 +161,6 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: 22, paddingBottom: 24 },
-  logo: { alignItems: 'center' },
   examples: { marginTop: 30 },
   stack: { marginTop: 12, gap: 10 },
   tradeCard: {
@@ -178,7 +172,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   flex: { flex: 1, gap: 2 },
-  copy: { marginTop: 28, gap: 12 },
+  copy: { marginTop: 18, gap: 12 },
   points: { marginTop: 28, gap: 14 },
   point: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   pointIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

@@ -24,7 +24,7 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { NotAdvice } from '@/ui/not-advice';
 import { TickerLogo } from '@/ui/ticker-logo';
-import { FeaturedTiming, TimedTradeCard, TimingFacts } from '@/ui/timing-feature';
+import { FeaturedTiming, TimedTradeCard } from '@/ui/timing-feature';
 import { TradeRow } from '@/ui/trade-row';
 
 const CHAMBERS = [
@@ -133,7 +133,7 @@ export default function DiscoverScreen() {
     }
   }, [authed]);
 
-  // The best-timed trades of the last 90 days, for the featured section.
+  // Congress's best trades of the last 30 or 90 days, for the featured section.
   // Optional: on failure the section simply does not show.
   const loadTiming = useCallback(
     async (days: TimingKey) => {
@@ -342,8 +342,8 @@ export default function DiscoverScreen() {
       {timing !== 'failed' ? (
         <View style={styles.block}>
           <SectionHeader
-            title="Best-timed trades"
-            subtitle="How far the stock moved their way before the public knew. Filed on time only."
+            title="Congress's best trades"
+            subtitle="What each trade has returned since it was made. Filed on time only."
             action="See all"
             onAction={() => router.push('/timing')}
           />
@@ -372,7 +372,6 @@ export default function DiscoverScreen() {
                 ) : null}
                 {shown ? (
                   <View style={styles.timingFoot}>
-                    {shown.summary ? <TimingFacts summary={shown.summary} days={shown.days} /> : null}
                     <NotAdvice />
                   </View>
                 ) : null}

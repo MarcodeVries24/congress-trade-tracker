@@ -8,43 +8,39 @@ import { memberDisplayName } from "@/lib/memberDisplay";
 import { formatMove } from "@/lib/priceMath";
 import type { PricePoint } from "@/lib/priceSeries";
 import type { TimedTrade, TimingLeader } from "@/lib/timing";
-import type { TimingSummary } from "@/lib/prices";
 
 /**
- * The pieces of "Before the public knew": the best-timed trade with its
- * chart, the ranked list, the members whose trades most often move their
- * way, and the figures for everyone. Plain components with no data fetching
- * of their own, so the home page's card (a client component, which fetches
- * /api/timing) and /before-disclosure (rendered on the server) share them.
+ * The pieces of "Congress's best trades": the best trade with its chart, the
+ * ranked list, and the members whose trades do best on average. Plain
+ * components with no data fetching of their own, so the home page's card (a
+ * client component, which fetches /api/timing) and /best-trades (rendered on
+ * the server) share them.
+ *
+ * Every figure is the stock's move since the trade, in the trader's favour:
+ * the rise since a purchase, or the fall since a sale.
  */
 
 export const NOT_ADVICE =
-  "For information only. This shows what prices did around public disclosures; it is not investment advice or a recommendation to buy or sell anything.";
+  "For information only. This shows what prices did after trades members of Congress disclosed; it is not investment advice or a recommendation to buy or sell anything.";
+
+function isBuy(type: string): boolean {
+  return /^P/i.test(type);
+}
 
 function verb(type: string): string {
-  if (/^P/i.test(type)) return "bought";
+  if (isBuy(type)) return "bought";
   if (isPartialSale(type)) return "sold part of";
   return "sold";
 }
 
-function daysLabel(days: number | null): string {
-  if (days === null) return "";
-  if (days >= 365) {
-    const years = days / 365;
-    return `${days.toLocaleString()} days (${years.toFixed(1)} years)`;
-  }
-  return `${days} ${days === 1 ? "day" : "days"}`;
-}
-
-/** What "their way" was for this trade, in words. */
-function edgeWords(t: TimedTrade): string {
-  return /^P/i.test(t.transaction_type) ? "rose" : "fell";
+/** "since bought" / "since sold", under a figure. */
+export function sinceLabel(type: string): string {
+  return isBuy(type) ? "since bought" : "since sold";
 }
 
 export function FeaturedTimedTrade({ trade: t, points }: { trade: TimedTrade; points: PricePoint[] | null }) {
   const name = memberDisplayName(t);
-  const kind = /^P/i.test(t.transaction_type) ? "buy" : "sell";
-  const late = t.days_to_file !== null && t.days_to_file > 45;
+  const buy = isBuy(t.transaction_type);
   return (
     <Link
       href={`/trades/${t.id}`}
@@ -53,7 +49,7 @@ export function FeaturedTimedTrade({ trade: t, points }: { trade: TimedTrade; po
       <div className="flex items-start gap-3">
         <MemberPhoto name={name} photoUrl={t.photo_url} />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">Best-timed trade</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">Best trade</div>
           <div className="mt-0.5 text-base font-semibold leading-snug text-ink sm:text-lg">
             {name} {verb(t.transaction_type)} {t.ticker ?? displayAssetName(t)}
           </div>
@@ -69,18 +65,25 @@ export function FeaturedTimedTrade({ trade: t, points }: { trade: TimedTrade; po
           <div className="text-4xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-5xl">
             {formatMove(t.edge)}
           </div>
-          <div className="text-xs font-semibold text-ink-muted">in the trader&rsquo;s favour</div>
+          <div className="text-xs font-semibold text-ink-muted">{buy ? "since they bought" : "since they sold"}</div>
         </div>
         <p className="max-w-md pb-1 text-sm leading-snug text-ink-muted">
-          The stock {edgeWords(t)} {formatMove(Math.abs(t.edge)).replace("+", "")} in the {daysLabel(t.days_to_file)}{" "}
-          between the trade and its disclosure
-          {late ? <span className="text-amber-600 dark:text-amber-400">, well past the 45 days the law allows</span> : null}.
+          {buy
+            ? `The stock has risen ${formatMove(t.edge).replace("+", "")} since the day of the purchase.`
+            : `The stock has fallen ${formatMove(t.edge).replace("+", "")} since the day of the sale.`}
+          {t.edge_before !== null && t.days_to_file
+            ? ` By the time it was disclosed, ${t.days_to_file} days later, it ${
+                t.edge_before >= 0
+                  ? `had already moved ${formatMove(t.edge_before).replace("+", "")} their way`
+                  : `was still ${formatMove(t.edge_before).replace("−", "")} against them`
+              }.`
+            : ""}
         </p>
       </div>
 
       {points && points.length > 4 && t.transaction_date ? (
         <div className="mt-3">
-          <TradeWindowChart points={points} traded={t.transaction_date} filed={t.filing_date} kind={kind} />
+          <TradeWindowChart points={points} traded={t.transaction_date} filed={t.filing_date} kind={buy ? "buy" : "sell"} />
         </div>
       ) : null}
       <div className="mt-2 text-xs text-accent group-hover:underline">See the trade →</div>
@@ -103,12 +106,12 @@ export function TimedTradeList({ trades, start = 1 }: { trades: TimedTrade[]; st
                   {name} <span className="text-ink-muted">{verb(t.transaction_type)}</span> {t.ticker ?? displayAssetName(t)}
                 </div>
                 <div className="truncate text-xs text-ink-faint">
-                  {amountLabel(t.amount_range)} · disclosed after {daysLabel(t.days_to_file)}
+                  {amountLabel(t.amount_range)} · traded {formatDate(t.transaction_date)}
                 </div>
               </div>
               <div className="shrink-0 text-right">
                 <div className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatMove(t.edge)}</div>
-                <div className="text-[10px] text-ink-faint">their way</div>
+                <div className="text-[10px] text-ink-faint">{sinceLabel(t.transaction_type)}</div>
               </div>
             </Link>
           </li>
@@ -129,7 +132,7 @@ export function TimingLeaderList({ leaders }: { leaders: TimingLeader[] }) {
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm text-ink">{l.display}</div>
               <div className="text-xs text-ink-faint">
-                {l.theirWay} of {l.trades} trades moved their way
+                {l.theirWay} of {l.trades} trades went their way
               </div>
             </div>
             <div className="shrink-0 text-right">
@@ -144,17 +147,5 @@ export function TimingLeaderList({ leaders }: { leaders: TimingLeader[] }) {
         </li>
       ))}
     </ol>
-  );
-}
-
-export function TimingFacts({ summary, days }: { summary: TimingSummary; days: number }) {
-  const share = summary.priced ? Math.round((summary.theirWay / summary.priced) * 100) : 0;
-  const window = days === 365 ? "past year" : `past ${days} days`;
-  return (
-    <p className="text-xs text-ink-muted">
-      Across all {summary.priced.toLocaleString()} priced trades disclosed in the {window}, {share}% moved the
-      trader&rsquo;s way before disclosure
-      {summary.averageEdge !== null ? `, by ${formatMove(summary.averageEdge)} on average` : ""}.
-    </p>
   );
 }

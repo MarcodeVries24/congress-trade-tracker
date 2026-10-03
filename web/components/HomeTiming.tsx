@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { NOT_ADVICE, TimedTradeList, TimingFacts } from "@/components/TimingFeature";
+import { NOT_ADVICE, TimedTradeList } from "@/components/TimingFeature";
 import type { TimingOverview } from "@/lib/timing";
 
 const WINDOWS = [30, 90] as const;
@@ -10,11 +10,11 @@ type Window = (typeof WINDOWS)[number];
 const SHOWN = 6;
 
 /**
- * The home page's "Best-timed trades": the recently disclosed trades whose
- * stock moved furthest the trader's way before disclosure, all of them filed
- * within the 45 days the law allows, with a switch between the past 30 and 90
- * days. The full ranking, with its chart and the members, is at
- * /before-disclosure.
+ * The home page's "Congress's best trades": the recently disclosed trades
+ * that have done best since the day they were made (a rise since a purchase,
+ * a fall since a sale), all filed within the 45 days the law allows, with a
+ * switch between the past 30 and 90 days. The full ranking, with its chart
+ * and the members, is at /best-trades.
  *
  * Styled as one of the home page's cards. Renders nothing if the data fails
  * to load: nothing else on the page depends on it.
@@ -45,9 +45,9 @@ export function HomeTiming() {
     <section className="mt-4 flex flex-col overflow-hidden rounded-lg border border-line bg-panel lg:mt-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Best-timed trades, disclosed in the past {days} days</h2>
+          <h2 className="text-sm font-semibold text-ink">Congress&rsquo;s best trades, disclosed in the past {days} days</h2>
           <p className="text-xs text-ink-faint">
-            How far the stock moved the trader&rsquo;s way before the public knew. Only trades filed on time.
+            What each trade has returned since the day it was made, to the latest close. Only trades filed on time.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -65,7 +65,7 @@ export function HomeTiming() {
               </button>
             ))}
           </div>
-          <Link href={`/before-disclosure?days=${days}`} className="shrink-0 text-xs text-accent hover:underline">
+          <Link href={`/best-trades?days=${days}`} className="shrink-0 text-xs text-accent hover:underline">
             View all →
           </Link>
         </div>
@@ -89,10 +89,7 @@ export function HomeTiming() {
         <p className="px-5 py-6 text-sm text-ink-muted">No priced trades were disclosed on time in this window yet.</p>
       )}
 
-      <div className="space-y-1 border-t border-line px-4 py-3 sm:px-5">
-        {shown?.summary ? <TimingFacts summary={shown.summary} days={days} /> : null}
-        <p className="text-[11px] text-ink-faint">{NOT_ADVICE}</p>
-      </div>
+      <p className="border-t border-line px-4 py-3 text-[11px] text-ink-faint sm:px-5">{NOT_ADVICE}</p>
     </section>
   );
 }

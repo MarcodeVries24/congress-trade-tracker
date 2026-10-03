@@ -10,7 +10,7 @@ import { NotAdvice } from '@/ui/not-advice';
 import { Segmented } from '@/ui/segmented';
 import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { Text } from '@/ui/text';
-import { FeaturedTiming, LeaderRow, TimedTradeRow, TimingFacts } from '@/ui/timing-feature';
+import { FeaturedTiming, LeaderRow, TimedTradeRow } from '@/ui/timing-feature';
 
 const WINDOWS = [
   { key: '30', label: '30 days' },
@@ -20,11 +20,11 @@ const WINDOWS = [
 type WindowKey = (typeof WINDOWS)[number]['key'];
 
 /**
- * "Before the public knew" in full, the app's counterpart of the website's
- * /before-disclosure: what it is, the best-timed trades disclosed in a
- * window, and the members whose trades most often move their way before
- * anyone else can see them. Opens with the not-financial-advice note, since
- * this is the screen most likely to be read as tips.
+ * Congress's best trades in full, the app's counterpart of the website's
+ * /best-trades: the trades disclosed in a window that have done best since
+ * they were made, and the members whose trades do best on average. Opens with
+ * the not-financial-advice note, since this is the screen most likely to be
+ * read as tips.
  */
 export default function TimingScreen() {
   const { c } = useTheme();
@@ -74,12 +74,10 @@ export default function TimingScreen() {
         />
       }>
       <View style={styles.intro}>
-        <Text variant="title">Before the public knew</Text>
+        <Text variant="title">Congress&apos;s best trades</Text>
         <Text variant="body" tone="muted">
-          Members of Congress can take up to 45 days to disclose a trade, and some take far longer. For every trade in a
-          listed stock, this is what the price did before the public could see it. These moved furthest the
-          trader&apos;s way (up after a purchase, down after a sale), among trades filed within the 45 days the law
-          allows.
+          What each disclosed trade has returned since the day it was made, to the latest close: the rise since a
+          purchase, or the fall a sale got out ahead of. Only trades filed within the 45 days the law allows.
         </Text>
       </View>
 
@@ -96,12 +94,11 @@ export default function TimingScreen() {
         </>
       ) : (
         <>
-          {shown.summary ? <TimingFacts summary={shown.summary} days={shown.days} /> : null}
           {top ? <FeaturedTiming trade={top} /> : <Text tone="muted">No priced trades were disclosed in this window yet.</Text>}
 
           {rest.length ? (
             <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <Text variant="subhead">Best-timed trades</Text>
+              <Text variant="subhead">Best trades</Text>
               {rest.map((t, i) => (
                 <TimedTradeRow key={t.id} trade={t} rank={i + 2} divider={i < rest.length - 1} />
               ))}
@@ -111,10 +108,10 @@ export default function TimingScreen() {
           {shown.leaders.length ? (
             <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
               <View style={styles.cardHead}>
-                <Text variant="subhead">Whose trades move their way most</Text>
+                <Text variant="subhead">Members whose trades do best</Text>
                 <Text variant="caption" tone="muted">
-                  Average move in their favour before disclosure over the past year, for members with at least five
-                  priced trades filed on time.
+                  Average return since the trade, for every trade disclosed on time in the past year, among members
+                  with at least five.
                 </Text>
               </View>
               {shown.leaders.map((l, i) => (
@@ -126,12 +123,12 @@ export default function TimingScreen() {
           <View style={[styles.card, { backgroundColor: c.surfaceMuted, borderColor: c.border }]}>
             <Text variant="subhead">How this is worked out</Text>
             <Text variant="caption" tone="muted">
-              Each trade is priced at the stock&apos;s daily close on the day it was made and on the day it was
-              disclosed, split-adjusted. Filings give a value range, never the price paid, so this is the stock&apos;s
-              move, not the member&apos;s profit. Several lots of one stock in a filing count once, no member appears
-              more than twice, and moves over 400% (usually a mismatched listing) are left out. Only trades filed on time
-              are ranked; late ones are on each trade&apos;s screen. Prices update every weekday evening; new trades are
-              priced within hours of being filed.
+              Each trade is priced at the stock&apos;s daily close on the day it was made and at the latest close,
+              split-adjusted. A purchase counts by how much the stock has risen since, a sale by how much it has fallen
+              since. Filings give a value range, never the price paid, so this is the stock&apos;s return, not the
+              member&apos;s profit. Several lots of one stock in a filing count once, no member appears more than twice,
+              and moves over 400% (usually a mismatched listing) are left out. Only trades filed on time are ranked.
+              Prices update every weekday evening; new trades are priced within hours of being filed.
             </Text>
             <NotAdvice long />
           </View>

@@ -44,10 +44,10 @@ export function Header() {
             All Trades
           </Link>
           <Link
-            href="/before-disclosure"
+            href="/best-trades"
             className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
           >
-            Before Disclosure
+            Best Trades
           </Link>
           <Link
             href="/politicians"

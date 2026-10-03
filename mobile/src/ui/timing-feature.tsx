@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { TimedTrade, TimingLeader } from '@/lib/api';
 import { amountLabel, assetLabel, memberName, shortDate, surname, tradeVerb } from '@/lib/format';
-import { dayOffset, fetchPriceSeries, formatMove, type PricePoint, type TimingSummary } from '@/lib/prices';
+import { dayOffset, fetchPriceSeries, formatMove, type PricePoint } from '@/lib/prices';
 import { rememberTrades } from '@/lib/trade-cache';
 import { radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
@@ -15,10 +15,11 @@ import { Text } from '@/ui/text';
 import { TickerLogo } from '@/ui/ticker-logo';
 
 /**
- * "Before the public knew", as Discover and the ranking screen show it: the
- * best-timed trade as a card with its chart, the runners-up, and the members
- * whose trades most often move their way. The data is /api/timing, the same
- * as the website's home page.
+ * Congress's best trades, as Discover and the ranking screen show them: the
+ * best trade as a card with its chart, the runners-up, and the members whose
+ * trades do best. Every figure is the stock's move since the trade in the
+ * trader's favour: the rise since a purchase, the fall since a sale. The data
+ * is /api/timing, the same as the website's.
  */
 
 const MARGIN_DAYS = 30;
@@ -27,6 +28,10 @@ function daysLabel(days: number | null): string {
   if (days === null) return '';
   if (days >= 365) return `${days.toLocaleString()} days (${(days / 365).toFixed(1)} years)`;
   return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+function sinceLabel(type: string): string {
+  return /^P/i.test(type) ? 'since bought' : 'since sold';
 }
 
 function useOpenTrade() {
@@ -44,17 +49,15 @@ export function FeaturedTiming({ trade: t }: { trade: TimedTrade }) {
   const traded = t.transaction_date;
   const filed = t.filing_date;
 
+  // From a month before the trade to the latest close: the whole run since.
   useEffect(() => {
-    if (!t.ticker || !traded || !filed) return;
+    if (!t.ticker || !traded) return;
     let live = true;
-    const end = dayOffset(filed, MARGIN_DAYS);
-    void fetchPriceSeries(t.ticker, dayOffset(traded, -MARGIN_DAYS)).then(
-      (p) => live && setPoints(p ? p.filter((x) => x.d <= end) : null)
-    );
+    void fetchPriceSeries(t.ticker, dayOffset(traded, -MARGIN_DAYS)).then((p) => live && setPoints(p));
     return () => {
       live = false;
     };
-  }, [t.ticker, traded, filed]);
+  }, [t.ticker, traded]);
 
   const name = memberName(t);
   const buy = /^P/i.test(t.transaction_type);
@@ -70,13 +73,13 @@ export function FeaturedTiming({ trade: t }: { trade: TimedTrade }) {
         <Avatar uri={t.photo_url} name={name} party={t.party} size={44} />
         <View style={styles.flex}>
           <Text variant="label" tone="accent">
-            BEST-TIMED TRADE
+            BEST TRADE
           </Text>
           <Text variant="bodyStrong" numberOfLines={2}>
             {name} {tradeVerb(t.transaction_type).toLowerCase()} {t.ticker ?? assetLabel(t)}
           </Text>
           <Text variant="footnote" tone="faint">
-            {amountLabel(t.amount_range)} · disclosed {shortDate(filed)}
+            {amountLabel(t.amount_range)} · traded {shortDate(traded)}
           </Text>
         </View>
         {t.ticker ? <TickerLogo ticker={t.ticker} size={40} /> : null}
@@ -88,12 +91,19 @@ export function FeaturedTiming({ trade: t }: { trade: TimedTrade }) {
             {formatMove(t.edge)}
           </Text>
           <Text variant="caption" tone="muted" style={styles.figureNote}>
-            in their favour
+            {buy ? 'since they bought' : 'since they sold'}
           </Text>
         </View>
         <Text variant="callout" tone="muted">
-          The stock {buy ? 'rose' : 'fell'} in the {daysLabel(t.days_to_file)} between the trade and its disclosure
-          {late ? ', well past the 45 days the law allows' : ''}.
+          The stock has {buy ? 'risen' : 'fallen'} {formatMove(t.edge).replace('+', '')} since the day of the{' '}
+          {buy ? 'purchase' : 'sale'}.
+          {t.edge_before !== null && t.days_to_file
+            ? ` When it was disclosed, ${daysLabel(t.days_to_file)} later, it ${
+                t.edge_before >= 0
+                  ? `had already moved ${formatMove(t.edge_before).replace('+', '')} their way`
+                  : `was still ${formatMove(t.edge_before).replace('−', '')} against them`
+              }.`
+            : ''}
         </Text>
       </View>
 
@@ -137,7 +147,7 @@ export function TimedTradeCard({ trade: t, rank }: { trade: TimedTrade; rank: nu
         {surname(memberName(t))} {tradeVerb(t.transaction_type).toLowerCase()} {t.ticker ?? assetLabel(t)}
       </Text>
       <Text variant="footnote" tone="faint" numberOfLines={1}>
-        in {daysLabel(t.days_to_file)}
+        {sinceLabel(t.transaction_type)} {shortDate(t.transaction_date)}
       </Text>
     </Tap>
   );
@@ -164,12 +174,17 @@ export function TimedTradeRow({ trade: t, rank, divider }: { trade: TimedTrade; 
           {tradeVerb(t.transaction_type)} {t.ticker ?? assetLabel(t)} · {amountLabel(t.amount_range)}
         </Text>
         <Text variant="footnote" tone="faint">
-          disclosed after {daysLabel(t.days_to_file)}
+          traded {shortDate(t.transaction_date)}
         </Text>
       </View>
-      <Text variant="bodyStrong" tone="gain">
-        {formatMove(t.edge)}
-      </Text>
+      <View style={styles.right}>
+        <Text variant="bodyStrong" tone="gain">
+          {formatMove(t.edge)}
+        </Text>
+        <Text variant="footnote" tone="faint">
+          {sinceLabel(t.transaction_type)}
+        </Text>
+      </View>
     </Tap>
   );
 }
@@ -191,7 +206,7 @@ export function LeaderRow({ leader: l, rank, divider }: { leader: TimingLeader; 
           {l.display}
         </Text>
         <Text variant="caption" tone="muted">
-          {l.theirWay} of {l.trades} trades moved their way
+          {l.theirWay} of {l.trades} trades went their way
         </Text>
       </View>
       <View style={styles.right}>
@@ -203,17 +218,6 @@ export function LeaderRow({ leader: l, rank, divider }: { leader: TimingLeader; 
         </Text>
       </View>
     </Tap>
-  );
-}
-
-export function TimingFacts({ summary, days }: { summary: TimingSummary; days: number }) {
-  const share = summary.priced ? Math.round((summary.theirWay / summary.priced) * 100) : 0;
-  return (
-    <Text variant="caption" tone="muted">
-      Across all {summary.priced.toLocaleString()} priced trades disclosed in the{' '}
-      {days === 365 ? 'past year' : `past ${days} days`}, {share}% moved the trader&apos;s way before disclosure
-      {summary.averageEdge !== null ? `, by ${formatMove(summary.averageEdge)} on average` : ''}.
-    </Text>
   );
 }
 

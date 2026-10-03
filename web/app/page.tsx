@@ -346,8 +346,8 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* Below the trading panels: the best-timed recent trades, the
-            ranking that /before-disclosure has in full. */}
+        {/* Below the trading panels: the best recent trades, the
+            ranking that /best-trades has in full. */}
         <HomeTiming />
 
         {/* A column of prose beside the chart rather than a band above it: at

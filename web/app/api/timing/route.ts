@@ -15,6 +15,11 @@ export async function GET(req: NextRequest) {
   const days = parseTimingWindow(req.nextUrl.searchParams.get("days"));
   const overview = await getTimingOverviewCached(days, { trades: 12, leaders: 10 });
   return NextResponse.json(overview, {
-    headers: { "cache-control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" },
+    headers: {
+      // Browsers always ask again (a stale-while-revalidate here let them show
+      // an old ranking after it changed); the CDN keeps it for an hour.
+      "cache-control": "public, max-age=0, must-revalidate",
+      "CDN-Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+    },
   });
 }

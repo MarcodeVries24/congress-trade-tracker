@@ -516,8 +516,12 @@ export function previewAlert(
   return send<{ total: number; recent: number }>("POST", "/api/alerts/preview", { filters }, options);
 }
 
-/** A trade in the "before the public knew" ranking: `edge` is the move, positive when it went the trader's way. */
-export type TimedTrade = Trade & { edge: number };
+/**
+ * A trade in the best-trades ranking. `edge` is the stock's move since the
+ * trade, positive when it went the trader's way (up since a purchase, down
+ * since a sale); `edge_before` the same up to its disclosure.
+ */
+export type TimedTrade = Trade & { edge: number; edge_before: number | null };
 
 export interface TimingLeader {
   slug: string;
@@ -531,12 +535,11 @@ export interface TimingLeader {
 
 export interface TimingOverview {
   days: number;
-  summary: TimingSummary | null;
   trades: TimedTrade[];
   leaders: TimingLeader[];
 }
 
-/** The best-timed trades disclosed in the last `days` (30, 90 or 365), and the members who time best. */
+/** The best trades disclosed in the last `days` (30, 90 or 365) by return since the trade, and the members whose trades do best. */
 export function fetchTiming(days: 30 | 90 | 365 = 90, options: RequestOptions = {}): Promise<TimingOverview> {
   return get<TimingOverview>("/api/timing", new URLSearchParams({ days: String(days) }), options);
 }

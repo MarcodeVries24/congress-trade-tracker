@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -11,35 +10,8 @@ import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
 import { RowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
+import { NewsImage } from '@/ui/news-image';
 import { Text } from '@/ui/text';
-
-/**
- * A publisher's picture, or its name on a tint when there is none or it will
- * not load, so a card is never a grey hole. (CNBC's image server turns away
- * some clients by user agent; a phone's own is not one of them.)
- */
-function NewsImage({
-  uri,
-  source,
-  style,
-}: {
-  uri: string | null;
-  source: string;
-  style: object;
-}) {
-  const { c } = useTheme();
-  const [failed, setFailed] = useState(false);
-  if (!uri || failed) {
-    return (
-      <View style={[style, styles.fallback, { backgroundColor: c.surfaceMuted }]}>
-        <Text variant="label" tone="muted" style={styles.fallbackLabel}>
-          {source.toUpperCase()}
-        </Text>
-      </View>
-    );
-  }
-  return <Image source={{ uri }} style={style} contentFit="cover" transition={200} onError={() => setFailed(true)} />;
-}
 
 /**
  * News, laid out like the website's news page: the markets desk first, the
@@ -250,6 +222,4 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   cardImage: { width: '100%', aspectRatio: 16 / 10 },
   cardText: { padding: 12, gap: 6, flex: 1 },
-  fallback: { alignItems: 'center', justifyContent: 'center' },
-  fallbackLabel: { letterSpacing: 2 },
 });

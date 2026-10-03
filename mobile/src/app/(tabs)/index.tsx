@@ -1,38 +1,30 @@
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { fetchTiming, fetchTrades, type TimingOverview, type Trade } from '@/lib/api';
+import { fetchNews, fetchTiming, fetchTrades, type NewsItem, type TimingOverview, type Trade } from '@/lib/api';
 import { memberName, surname } from '@/lib/format';
-import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
-import { Button, IconButton } from '@/ui/button';
+import { IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
-import { EmptyState } from '@/ui/empty-state';
-import { Icon, type IconName } from '@/ui/icon';
+import { Icon } from '@/ui/icon';
+import { NewsCard } from '@/ui/news-card';
+import { NotAdvice } from '@/ui/not-advice';
 import { SearchBar } from '@/ui/search-bar';
 import { SectionHeader } from '@/ui/section';
 import { SentimentBar } from '@/ui/sentiment-bar';
-import { RowSkeleton, Skeleton } from '@/ui/skeleton';
+import { Skeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-import { NotAdvice } from '@/ui/not-advice';
 import { TickerLogo } from '@/ui/ticker-logo';
 import { FeaturedTiming, TimedTradeCard } from '@/ui/timing-feature';
-import { TradeRow } from '@/ui/trade-row';
-
-const CHAMBERS = [
-  { key: 'both', label: 'All trades' },
-  { key: 'house', label: 'House' },
-  { key: 'senate', label: 'Senate' },
-] as const;
-type ChamberKey = (typeof CHAMBERS)[number]['key'];
+import { TradeCard } from '@/ui/trade-card';
 
 const TIMING_WINDOWS = [
   { key: '30', label: 'Past 30 days' },
@@ -40,7 +32,8 @@ const TIMING_WINDOWS = [
 ] as const;
 type TimingKey = (typeof TIMING_WINDOWS)[number]['key'];
 
-const PAGE = 30;
+// How many cards each sideways row shows before "See all".
+const ROW = 5;
 
 type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
 type Trending = { ticker: string; company: string | null; count: number; buys: number; sells: number; members: number };
@@ -99,41 +92,38 @@ function greeting(): string {
  * Discover: the home tab.
  *
  * Built like the apps people open without thinking: a search pill at the top,
- * a row of faces who just did something, cards to scroll sideways, and then
- * the feed itself, endless, one trade per row.
+ * a row of faces who just did something, and then rows of cards to scroll
+ * sideways, each five long with a "See all" to the full list: the latest
+ * trades, the stocks Congress keeps trading, its best recent trades, and the
+ * markets news. Nothing here scrolls forever; the Trades tab and News do.
  */
 export default function DiscoverScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
   const { user } = useUser();
-  const { answers } = useOnboarding();
 
-  const [chamber, setChamber] = useState<ChamberKey>(answers.chamber === 'both' ? 'both' : answers.chamber);
-  const [recent, setRecent] = useState<Trade[] | null>(null);
+  const [recent, setRecent] = useState<Trade[] | null | 'failed'>(null);
   // Both windows kept once loaded, so switching back is instant.
   const [timingDays, setTimingDays] = useState<TimingKey>('90');
   const [timing, setTiming] = useState<Partial<Record<TimingKey, TimingOverview>> | null | 'failed'>(null);
-  const [feed, setFeed] = useState<Trade[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [error, setError] = useState<string | null>(null);
+  const [news, setNews] = useState<NewsItem[] | null | 'failed'>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const loadingMore = useRef(false);
-  const generation = useRef(0);
 
+  // The latest filings: the trades row, and the faces and trending stocks
+  // worked out from them.
   const loadRecent = useCallback(async () => {
     try {
       const res = await fetchTrades({ page: 1, limit: 200 }, await authed());
       rememberTrades(res.data);
       setRecent(res.data);
     } catch {
-      setRecent((prev) => prev ?? []);
+      setRecent((prev) => (Array.isArray(prev) ? prev : 'failed'));
+    } finally {
+      setRefreshing(false);
     }
   }, [authed]);
 
-  // Congress's best trades of the last 30 or 90 days, for the featured section.
   // Optional: on failure the section simply does not show.
   const loadTiming = useCallback(
     async (days: TimingKey) => {
@@ -148,76 +138,49 @@ export default function DiscoverScreen() {
     [authed]
   );
 
-  const loadFeed = useCallback(
-    async (nextPage: number, replace: boolean) => {
-      const mine = replace ? ++generation.current : generation.current;
-      if (!replace) {
-        if (loadingMore.current) return;
-        loadingMore.current = true;
-      }
-      try {
-        const res = await fetchTrades(
-          { page: nextPage, limit: PAGE, chamber: chamber === 'both' ? undefined : [chamber] },
-          await authed()
-        );
-        if (mine !== generation.current) return;
-        rememberTrades(res.data);
-        // Offset pages over a sort with ties can hand back a row twice.
-        setFeed((prev) => {
-          if (replace) return res.data;
-          const seen = new Set(prev.map((t) => t.id));
-          return [...prev, ...res.data.filter((t) => !seen.has(t.id))];
-        });
-        setPage(res.page);
-        setTotalPages(res.totalPages);
-        setStatus('ready');
-        setError(null);
-      } catch (err) {
-        if (mine !== generation.current) return;
-        setError(err instanceof Error ? err.message : 'Something went wrong.');
-        if (replace) setStatus('error');
-      } finally {
-        if (!replace) loadingMore.current = false;
-        setRefreshing(false);
-      }
-    },
-    [chamber, authed]
-  );
+  // The markets desk first, as on the website's home page.
+  const loadNews = useCallback(async () => {
+    try {
+      const sections = await fetchNews();
+      const markets = sections.find((s) => s.key === 'cnbc-markets') ?? sections[0];
+      setNews(markets ? markets.items.slice(0, ROW) : []);
+    } catch {
+      setNews((prev) => (Array.isArray(prev) ? prev : 'failed'));
+    }
+  }, []);
 
   useEffect(() => {
     // Every state update in these is behind an await; the rule cannot see that.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRecent();
-  }, [loadRecent]);
+    void loadNews();
+  }, [loadRecent, loadNews]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadTiming(timingDays);
   }, [loadTiming, timingDays]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadFeed(1, true);
-  }, [loadFeed]);
-
-  const { stories, trending } = useMemo(() => digest(recent ?? []), [recent]);
+  const trades = useMemo(() => (Array.isArray(recent) ? recent : []), [recent]);
+  const { stories, trending } = useMemo(() => digest(trades), [trades]);
+  const loading = recent === null;
 
   const onRefresh = () => {
     setRefreshing(true);
     void loadRecent();
+    void loadNews();
     void loadTiming(timingDays);
-    void loadFeed(1, true);
   };
 
   const firstName = user?.firstName;
+  const shownTiming = timing && timing !== 'failed' ? timing[timingDays] : undefined;
 
-  const browse: { icon: IconName; label: string; hint: string; href: '/issuers' | '/news' }[] = [
-    { icon: 'business-outline', label: 'Companies', hint: 'Who holds what', href: '/issuers' },
-    { icon: 'newspaper-outline', label: 'News', hint: 'Markets and Washington', href: '/news' },
-  ];
-
-  const header = (
-    <View>
+  return (
+    <ScrollView
+      style={[styles.screen, { backgroundColor: c.background }]}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textMuted} />}>
       <TabHeader
         brand
         right={
@@ -249,7 +212,7 @@ export default function DiscoverScreen() {
 
       <View style={styles.block}>
         <SectionHeader title="Just filed" subtitle="Members with new disclosures" />
-        {recent === null ? (
+        {loading ? (
           <View style={styles.storiesRow}>
             {Array.from({ length: 5 }, (_, i) => (
               <View key={i} style={styles.story}>
@@ -282,13 +245,36 @@ export default function DiscoverScreen() {
 
       <View style={styles.block}>
         <SectionHeader
+          title="Latest trades"
+          subtitle="The newest disclosures"
+          action="See all"
+          onAction={() => router.push('/trades')}
+        />
+        {recent === 'failed' ? (
+          <Tap onPress={() => void loadRecent()} style={styles.retry}>
+            <Text variant="callout" tone="muted">
+              Couldn&apos;t load the latest trades. Tap to try again.
+            </Text>
+          </Tap>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+            {loading
+              ? Array.from({ length: 2 }, (_, i) => <Skeleton key={i} width={264} height={164} round={20} />)
+              : trades.slice(0, ROW).map((t) => <TradeCard key={t.id} trade={t} />)}
+            {!loading && trades.length > ROW ? <SeeAllCard label="All trades" onPress={() => router.push('/trades')} /> : null}
+          </ScrollView>
+        )}
+      </View>
+
+      <View style={styles.block}>
+        <SectionHeader
           title="Trending in Congress"
           subtitle="Most traded in the latest filings"
-          action="All"
+          action="See all"
           onAction={() => router.push('/issuers')}
         />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendRow}>
-          {recent === null
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          {loading
             ? Array.from({ length: 3 }, (_, i) => (
                 <View key={i} style={[styles.trendCard, { backgroundColor: c.surface, borderColor: c.border }]}>
                   <Skeleton width={52} height={52} round={16} />
@@ -296,7 +282,7 @@ export default function DiscoverScreen() {
                   <Skeleton width="90%" height={10} />
                 </View>
               ))
-            : trending.map((t) => (
+            : trending.slice(0, ROW).map((t) => (
                 <Card
                   key={t.ticker}
                   onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: t.ticker.toLowerCase() } })}
@@ -317,27 +303,8 @@ export default function DiscoverScreen() {
                   <SentimentBar buys={t.buys} sells={t.sells} showLabels={false} />
                 </Card>
               ))}
+          {!loading && trending.length ? <SeeAllCard label="All companies" onPress={() => router.push('/issuers')} /> : null}
         </ScrollView>
-      </View>
-
-      <View style={[styles.browse, styles.inset]}>
-        {browse.map((b) => (
-          <Tap
-            key={b.label}
-            feedback="tap"
-            onPress={() => router.push(b.href)}
-            style={[styles.browseTile, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={[styles.browseIcon, { backgroundColor: c.accentSoft }]}>
-              <Icon name={b.icon} size={20} color={c.accent} />
-            </View>
-            <View style={styles.flex}>
-              <Text variant="bodyStrong">{b.label}</Text>
-              <Text variant="footnote" tone="muted" numberOfLines={1}>
-                {b.hint}
-              </Text>
-            </View>
-          </Tap>
-        ))}
       </View>
 
       {timing !== 'failed' ? (
@@ -349,147 +316,94 @@ export default function DiscoverScreen() {
             onAction={() => router.push('/timing')}
           />
           <ChipRow options={TIMING_WINDOWS} value={timingDays} onChange={setTimingDays} />
-          {(() => {
-            const shown = timing?.[timingDays];
-            return (
-              <>
-                <View style={styles.timing}>
-                  {!shown ? (
-                    <Skeleton width="100%" height={330} round={20} />
-                  ) : shown.trades[0] ? (
-                    <FeaturedTiming trade={shown.trades[0]} />
-                  ) : (
-                    <Text variant="callout" tone="muted">
-                      No priced trades were disclosed on time in this window yet.
-                    </Text>
-                  )}
-                </View>
-                {shown && shown.trades.length > 1 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timingRow}>
-                    {shown.trades.slice(1, 8).map((t, i) => (
-                      <TimedTradeCard key={t.id} trade={t} rank={i + 2} />
-                    ))}
-                  </ScrollView>
-                ) : null}
-                {shown ? (
-                  <View style={styles.timingFoot}>
-                    <NotAdvice />
-                  </View>
-                ) : null}
-              </>
-            );
-          })()}
-        </View>
-      ) : null}
-
-      <View style={styles.feedHead}>
-        <SectionHeader
-          title="Latest trades"
-          subtitle="Newest disclosures first"
-          action="Filters"
-          onAction={() => router.push('/trades')}
-        />
-        <ChipRow options={CHAMBERS} value={chamber} onChange={setChamber} />
-      </View>
-      {status === 'loading' && feed.length === 0 ? <RowSkeleton count={6} /> : null}
-      {status === 'error' && feed.length === 0 ? (
-        <EmptyState
-          icon="cloud-offline-outline"
-          title="Couldn't load trades"
-          body={error}
-          action="Try again"
-          onAction={() => void loadFeed(1, true)}
-          compact
-        />
-      ) : null}
-    </View>
-  );
-
-  return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <FlatList
-        data={status === 'ready' || feed.length ? feed : []}
-        keyExtractor={(t) => String(t.id)}
-        renderItem={({ item }) => <TradeRow trade={item} />}
-        ListHeaderComponent={header}
-        ListFooterComponent={
-          page < totalPages && feed.length ? (
-            <View style={styles.footer}>
-              <ActivityIndicator />
-            </View>
-          ) : feed.length ? (
-            <View style={styles.footer}>
-              <Text variant="caption" tone="faint">
-                That is every trade on file.
+          <View style={styles.inset}>
+            {!shownTiming ? (
+              <Skeleton width="100%" height={330} round={20} />
+            ) : shownTiming.trades[0] ? (
+              <FeaturedTiming trade={shownTiming.trades[0]} />
+            ) : (
+              <Text variant="callout" tone="muted">
+                No priced trades were disclosed on time in this window yet.
               </Text>
+            )}
+          </View>
+          {shownTiming && shownTiming.trades.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+              {shownTiming.trades.slice(1, ROW).map((t, i) => (
+                <TimedTradeCard key={t.id} trade={t} rank={i + 2} />
+              ))}
+              <SeeAllCard label="Full ranking" onPress={() => router.push('/timing')} compact />
+            </ScrollView>
+          ) : null}
+          {shownTiming ? (
+            <View style={styles.inset}>
+              <NotAdvice />
             </View>
-          ) : null
-        }
-        onEndReached={() => {
-          if (status === 'ready' && page < totalPages) void loadFeed(page + 1, false);
-        }}
-        onEndReachedThreshold={0.8}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textMuted} />}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-      />
-      {error && feed.length ? (
-        <View style={[styles.toast, { backgroundColor: c.primary }]}>
-          <Text variant="caption" color={c.primaryText}>
-            {error}
-          </Text>
-          <Button label="Retry" size="md" kind="secondary" onPress={() => void loadFeed(page + 1, false)} />
+          ) : null}
         </View>
       ) : null}
-    </View>
+
+      {news !== 'failed' && (news === null || news.length) ? (
+        <View style={styles.block}>
+          <SectionHeader title="News" subtitle="Markets and investing, from CNBC" action="See all" onAction={() => router.push('/news')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+            {news === null
+              ? Array.from({ length: 2 }, (_, i) => <Skeleton key={i} width={248} height={230} round={20} />)
+              : news.map((item) => <NewsCard key={item.url} item={item} />)}
+            {news && news.length ? <SeeAllCard label="All news" onPress={() => router.push('/news')} /> : null}
+          </ScrollView>
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+/** The last card in a sideways row: the way on to the full list. */
+function SeeAllCard({ label, onPress, compact = false }: { label: string; onPress: () => void; compact?: boolean }) {
+  const { c } = useTheme();
+  return (
+    <Tap
+      feedback="tap"
+      scaleTo={0.95}
+      onPress={onPress}
+      style={[styles.seeAll, compact && styles.seeAllCompact, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <View style={[styles.seeAllIcon, { backgroundColor: c.accentSoft }]}>
+        <Icon name="arrow-forward" size={20} color={c.accent} />
+      </View>
+      <Text variant="callout" style={styles.bold}>
+        {label}
+      </Text>
+    </Tap>
   );
 }
 
 const styles = StyleSheet.create({
-  timing: { paddingHorizontal: 16 },
-  timingRow: { paddingHorizontal: 16, gap: 10 },
-  timingFoot: { paddingHorizontal: 16, gap: 8 },
   screen: { flex: 1 },
-  list: { paddingBottom: 32 },
+  list: { paddingBottom: 40 },
+  bold: { fontWeight: '700' },
   hello: { paddingHorizontal: 16, paddingTop: 6, gap: 2 },
   search: { paddingHorizontal: 16, paddingTop: 16 },
   block: { paddingTop: 26, gap: 14 },
-  inset: { paddingHorizontal: 16, paddingTop: 26 },
+  inset: { paddingHorizontal: 16 },
+  row: { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
+  retry: { paddingHorizontal: 16, paddingVertical: 8 },
   // Each face is centred in a tile wider than it; this puts the first ring,
   // not the tile, on the page margin.
   storiesRow: { paddingHorizontal: 13, gap: 10 },
   story: { width: 78, alignItems: 'center', gap: 6 },
   storyName: { fontWeight: '600', maxWidth: 76 },
   storyCount: { marginTop: -4 },
-  trendRow: { paddingHorizontal: 16, gap: 12, paddingBottom: 8 },
   trendCard: { width: 176, gap: 12, borderRadius: radius.xl, padding: 16, borderWidth: StyleSheet.hairlineWidth },
   trendTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   trendText: { gap: 1 },
-  browse: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  browseTile: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    flexDirection: 'row',
+  seeAll: {
+    width: 132,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
-    padding: 12,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  browseIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  flex: { flex: 1 },
-  feedHead: { paddingTop: 30, gap: 14, paddingBottom: 6 },
-  footer: { paddingVertical: 28, alignItems: 'center' },
-  toast: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 12,
-    borderRadius: radius.lg,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
+  seeAllCompact: { width: 120 },
+  seeAllIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

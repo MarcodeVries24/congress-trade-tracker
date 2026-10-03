@@ -50,6 +50,14 @@
           "color": "#3A82C2",
           "defaultChannel": "alerts"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CongTrade uses the photo you choose as your profile picture.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

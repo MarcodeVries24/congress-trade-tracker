@@ -53,7 +53,12 @@ export default async function AccountPage() {
                   )}
                 </p>
                 {user?.primaryEmailAddress?.emailAddress && (
-                  <p className="mt-1 text-xs text-ink-faint">Signed in as {user.primaryEmailAddress.emailAddress}</p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    Signed in as {user.primaryEmailAddress.emailAddress} ·{" "}
+                    <Link href="/account/profile" className="underline hover:text-ink">
+                      Profile, email and password
+                    </Link>
+                  </p>
                 )}
               </div>
               {/* A subscriber goes to Stripe's portal; everyone else to the

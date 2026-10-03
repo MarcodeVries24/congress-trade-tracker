@@ -1,4 +1,4 @@
-import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,10 +6,10 @@ import { StyleSheet, View } from 'react-native';
 import { useAccess } from '@/lib/access';
 import { API_BASE } from '@/lib/api';
 import { haptic } from '@/lib/haptics';
-import { LINKS, SITE, openPage } from '@/lib/links';
+import { LINKS, openPage } from '@/lib/links';
 import { usePush } from '@/lib/push';
+import { ProfileEditor } from '@/components/profile-editor';
 import { radius, useTheme } from '@/theme';
-import { UserAvatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { ListRow } from '@/ui/list-row';
@@ -19,7 +19,8 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 /**
- * The signed-in account: who, which plan, sign out, and delete.
+ * The signed-in account: who (and their name and photo, see ProfileEditor),
+ * which plan, managing or cancelling it, sign out, and delete.
  *
  * Deletion is here because Apple requires an app that creates accounts to let
  * people delete them from inside the app, not only by email. It asks once, in
@@ -34,7 +35,6 @@ export function AccountPanel() {
   const router = useRouter();
   const { signOut, getToken } = useAuth();
   const push = usePush();
-  const { user } = useUser();
   const { status, renewing } = useAccess();
 
   const [confirming, setConfirming] = useState(false);
@@ -42,7 +42,33 @@ export function AccountPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const storeRenewing = renewing.filter((p): p is 'apple' | 'google' => p === 'apple' || p === 'google');
-  const name = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Your account';
+
+  /**
+   * Where a subscription is managed or cancelled is wherever it was bought.
+   * The App Store and Google Play only let people cancel in their own
+   * settings, so those open there. A website subscription opens Stripe's
+   * portal, signed in with this session, on its cancel step for "cancel".
+   */
+  const openBilling = async (flow: 'manage' | 'cancel') => {
+    setError(null);
+    if (!renewing.includes('stripe')) {
+      openPage(storeRenewing[0] === 'google' ? LINKS.manageGoogle : LINKS.manageApple);
+      return;
+    }
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/stripe/portal`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(flow === 'cancel' ? { flow: 'cancel' } : {}),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (data.url) openPage(data.url);
+      else setError(data.error ?? 'Could not open billing. Please try again.');
+    } catch {
+      setError('Could not reach CongTrade. Check your connection and try again.');
+    }
+  };
 
   const deleteAccount = async () => {
     setError(null);
@@ -71,26 +97,20 @@ export function AccountPanel() {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.identity}>
-        <UserAvatar user={user} size={84} />
-        <Text variant="title" style={styles.center}>
-          {name}
-        </Text>
-        {user?.fullName ? (
-          <Text variant="callout" tone="muted">
-            {user.primaryEmailAddress?.emailAddress}
-          </Text>
-        ) : null}
-        <View style={styles.plan}>
-          {status === 'pro' ? (
-            <Pill label="CongTrade Pro" tone="accent" />
-          ) : (
-            <Pill label="No active plan" tone="neutral" solid={false} />
-          )}
-        </View>
-      </View>
+      <ProfileEditor />
 
       <Group>
+        <ListRow
+          icon="sparkles-outline"
+          label="Plan"
+          right={
+            status === 'pro' ? (
+              <Pill label="CongTrade Pro" tone="accent" />
+            ) : (
+              <Pill label="No active plan" tone="neutral" solid={false} />
+            )
+          }
+        />
         <ListRow
           icon="card-outline"
           label="Manage subscription"
@@ -101,16 +121,27 @@ export function AccountPanel() {
                 ? `Billed by ${storeRenewing[0] === 'apple' ? 'the App Store' : 'Google Play'}`
                 : 'No subscription renewing'
           }
-          onPress={() =>
-            openPage(
-              renewing.includes('stripe')
-                ? `${SITE}/account`
-                : storeRenewing[0] === 'google'
-                  ? LINKS.manageGoogle
-                  : LINKS.manageApple
-            )
-          }
+          onPress={() => void openBilling('manage')}
+          last={!renewing.length}
         />
+        {/* Only while something renews: there is nothing to cancel otherwise. */}
+        {renewing.length ? (
+          <ListRow
+            icon="close-circle-outline"
+            label="Cancel subscription"
+            detail={
+              renewing.includes('stripe')
+                ? 'You keep Pro until the end of the period you paid for'
+                : `In your ${storeRenewing[0] === 'google' ? 'Google Play' : 'App Store'} settings`
+            }
+            destructive
+            onPress={() => void openBilling('cancel')}
+            last
+          />
+        ) : null}
+      </Group>
+
+      <Group>
         <ListRow icon="log-out-outline" label="Sign out" chevron={false} onPress={() => void push.signOut()} last />
       </Group>
 
@@ -174,9 +205,7 @@ export function AccountPanel() {
 
 const styles = StyleSheet.create({
   wrap: { gap: 20 },
-  identity: { alignItems: 'center', gap: 6 },
   center: { textAlign: 'center' },
-  plan: { marginTop: 6 },
   bold: { fontWeight: '700' },
   underline: { textDecorationLine: 'underline' },
   deleteLink: { alignItems: 'center', paddingVertical: 6 },

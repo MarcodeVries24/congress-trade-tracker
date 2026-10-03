@@ -9,9 +9,31 @@
  * workspace package lands they become an import instead; until then, treat
  * web/lib/api.ts as the original and this as the copy that follows it.
  */
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+
 import type { TimingSummary, TradePrices } from "@/lib/prices";
 
-export const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "https://www.congtrade.com";
+/**
+ * In development, EXPO_PUBLIC_API_BASE=auto means "the website's dev server
+ * on the computer this app was loaded from": the host Metro served the bundle
+ * from (or the page's, on the web build), on port 3000. A fixed address baked
+ * in at start goes stale whenever the computer's Wi-Fi address changes, and
+ * every screen on a phone or simulator then comes up empty.
+ */
+function devApiBase(): string | null {
+  const host =
+    Platform.OS === "web"
+      ? typeof window !== "undefined"
+        ? window.location.hostname
+        : null
+      : Constants.expoConfig?.hostUri?.split(":")[0];
+  return host ? `http://${host}:3000` : null;
+}
+
+const configured = process.env.EXPO_PUBLIC_API_BASE;
+export const API_BASE =
+  (configured === "auto" ? devApiBase() : configured) ?? "https://www.congtrade.com";
 
 export interface Trade extends TradePrices {
   id: number;

@@ -7,6 +7,7 @@ import { fetchNews, fetchTiming, fetchTrades, type NewsItem, type TimingOverview
 import { memberName, surname } from '@/lib/format';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
+import { useRefresh } from '@/lib/use-refresh';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button, IconButton } from '@/ui/button';
@@ -111,7 +112,6 @@ export default function DiscoverScreen() {
   const [timingDays, setTimingDays] = useState<TimingKey>('90');
   const [timing, setTiming] = useState<Partial<Record<TimingKey, TimingOverview>> | null | 'failed'>(null);
   const [news, setNews] = useState<NewsItem[] | null | 'failed'>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   // The latest filings: the trades row, and the faces and trending stocks
   // worked out from them.
@@ -122,8 +122,6 @@ export default function DiscoverScreen() {
       setRecent(res.data);
     } catch {
       setRecent((prev) => (Array.isArray(prev) ? prev : 'failed'));
-    } finally {
-      setRefreshing(false);
     }
   }, [authed]);
 
@@ -168,12 +166,9 @@ export default function DiscoverScreen() {
   const { stories, trending } = useMemo(() => digest(trades), [trades]);
   const loading = recent === null;
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    void loadRecent();
-    void loadNews();
-    void loadTiming(timingDays);
-  };
+  const { refreshing, onRefresh } = useRefresh(
+    useCallback(() => [loadRecent(), loadNews(), loadTiming(timingDays)], [loadRecent, loadNews, loadTiming, timingDays])
+  );
 
   const firstName = user?.firstName;
   const shownTiming = timing && timing !== 'failed' ? timing[timingDays] : undefined;

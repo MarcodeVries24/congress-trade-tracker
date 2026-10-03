@@ -12,4 +12,7 @@ export type StoreProduct = {
   id: string;
   period: BillingPeriod;
   displayPrice: string;
+  /** The same price as a number, in `currency`, for working out a per-week figure. */
+  price: number | null;
+  currency: string | null;
 };

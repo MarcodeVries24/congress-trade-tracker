@@ -126,7 +126,9 @@ export function usePurchases(onEntitled: () => void): Purchases {
       subscriptions
         .map((s) => {
           const period = periodForProduct(s.id);
-          return period ? { id: s.id, period, displayPrice: s.displayPrice } : null;
+          return period
+            ? { id: s.id, period, displayPrice: s.displayPrice, price: s.price ?? null, currency: s.currency || null }
+            : null;
         })
         .filter((p): p is StoreProduct => p !== null),
     [subscriptions]

@@ -87,8 +87,7 @@ export default function MoreScreen() {
 
         <Group title="Browse">
           <ListRow icon="business-outline" label="Companies" onPress={() => router.push('/issuers')} />
-          <ListRow icon="newspaper-outline" label="News" onPress={() => router.push('/news')} />
-          <ListRow icon="albums-outline" label="Swipe through Congress" onPress={() => router.push('/swipe')} last />
+          <ListRow icon="newspaper-outline" label="News" onPress={() => router.push('/news')} last />
         </Group>
 
         <Group>

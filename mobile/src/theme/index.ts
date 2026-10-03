@@ -11,7 +11,7 @@ export const brand = {
   blueDeep: '#1F5C96',
   blueLight: '#8CC0EC',
   page: '#F9FAFC',
-  /** The navy-to-blue sweep behind heroes and the swipe card. */
+  /** The navy-to-blue sweep behind the paywall's hero. */
   hero: ['#101729', '#1B3556', '#2A6BA8'] as const,
   /** The story ring, Instagram's gradient in the logo's blues. */
   ring: ['#1F5C96', '#3A82C2', '#8CC0EC'] as const,

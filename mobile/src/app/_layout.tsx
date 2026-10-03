@@ -68,10 +68,6 @@ function Navigation() {
           name="search"
           options={{ headerShown: false, presentation: 'modal', animation: 'fade_from_bottom' }}
         />
-        <Stack.Screen
-          name="swipe"
-          options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: true }}
-        />
         <Stack.Screen name="alert/[id]" options={{ ...modal, title: 'Alert' }} />
         <Stack.Screen name="sign-in" options={{ ...modal, title: 'Account' }} />
       </Stack>

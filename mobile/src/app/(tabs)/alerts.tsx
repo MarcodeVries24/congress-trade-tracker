@@ -169,10 +169,9 @@ export default function AlertsScreen() {
                 compact
               />
               <View style={styles.ctas}>
-                <Button label="Swipe through Congress" icon="albums" onPress={() => router.push('/swipe')} />
                 <Button
                   label="Browse politicians"
-                  kind="secondary"
+                  icon="people-outline"
                   onPress={() => router.push({ pathname: '/politicians', params: { view: 'all' } })}
                 />
               </View>

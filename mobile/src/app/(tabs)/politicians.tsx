@@ -284,12 +284,7 @@ export default function PoliticiansScreen() {
                   </View>
                 </>
               ) : null}
-              <Button
-                label="Swipe to find more"
-                icon="albums-outline"
-                kind="secondary"
-                onPress={() => router.push('/swipe')}
-              />
+              <Button label="Browse all politicians" icon="people-outline" kind="secondary" onPress={() => setView('all')} />
             </View>
           }
           refreshControl={

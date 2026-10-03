@@ -1,5 +1,4 @@
 import { useUser } from '@clerk/clerk-expo';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -9,7 +8,7 @@ import { memberName, surname } from '@/lib/format';
 import { useOnboarding } from '@/lib/onboarding';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
-import { brand, radius, shadow, useTheme } from '@/theme';
+import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
@@ -92,11 +91,11 @@ function greeting(): string {
  * Discover: the home tab.
  *
  * Built like the apps people open without thinking: a search pill at the top,
- * a row of faces who just did something, a swipeable way to find more, cards
- * to scroll sideways, and then the feed itself, endless, one trade per row.
+ * a row of faces who just did something, cards to scroll sideways, and then
+ * the feed itself, endless, one trade per row.
  */
 export default function DiscoverScreen() {
-  const { c, scheme } = useTheme();
+  const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
   const { user } = useUser();
@@ -248,31 +247,6 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      <View style={styles.inset}>
-        <Tap onPress={() => router.push('/swipe')} feedback="commit" scaleTo={0.98}>
-          <LinearGradient
-            colors={[...brand.hero]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.swipeCard, scheme === 'light' ? shadow.raised : null]}>
-            <View style={styles.swipeText}>
-              <Text variant="label" color="rgba(255,255,255,0.7)">
-                FIND WHO TO FOLLOW
-              </Text>
-              <Text variant="headline" color="#FFFFFF">
-                Swipe through Congress
-              </Text>
-              <Text variant="callout" color="rgba(255,255,255,0.8)">
-                Right to follow, left to pass. Your picks land on your Watchlist.
-              </Text>
-            </View>
-            <View style={styles.swipeIcon}>
-              <Icon name="albums" size={30} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </Tap>
-      </View>
-
       <View style={styles.block}>
         <SectionHeader
           title="Trending in Congress"
@@ -407,16 +381,6 @@ const styles = StyleSheet.create({
   story: { width: 78, alignItems: 'center', gap: 6 },
   storyName: { fontWeight: '600', maxWidth: 76 },
   storyCount: { marginTop: -4 },
-  swipeCard: { borderRadius: radius.xxl, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  swipeText: { flex: 1, gap: 4 },
-  swipeIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   trendRow: { paddingHorizontal: 20, gap: 12, paddingBottom: 8 },
   trendCard: { width: 176, gap: 12, borderRadius: radius.xl, padding: 16, borderWidth: StyleSheet.hairlineWidth },
   trendTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

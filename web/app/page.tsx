@@ -246,6 +246,10 @@ export default function Home() {
           </div>
         </div>
 
+        {/* The best recent trades, the ranking /best-trades has in full,
+            straight after the trading panels and above the markets news. */}
+        <HomeTiming />
+
         {/* Markets sits between the trading panels and the breakdown
             cards: it is the market those trades were made into. */}
         <NewsRow sectionKey="cnbc-markets" title="Markets" showAllLink />
@@ -345,10 +349,6 @@ export default function Home() {
             )}
           </Card>
         </div>
-
-        {/* Below the trading panels: the best recent trades, the
-            ranking that /best-trades has in full. */}
-        <HomeTiming />
 
         {/* A column of prose beside the chart rather than a band above it: at
             full width the paragraphs stretch to a single unreadable line. */}

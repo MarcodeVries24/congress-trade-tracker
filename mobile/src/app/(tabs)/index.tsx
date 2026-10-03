@@ -9,7 +9,7 @@ import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
-import { IconButton } from '@/ui/button';
+import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
 import { Icon } from '@/ui/icon';
@@ -18,13 +18,13 @@ import { NotAdvice } from '@/ui/not-advice';
 import { SearchBar } from '@/ui/search-bar';
 import { SectionHeader } from '@/ui/section';
 import { SentimentBar } from '@/ui/sentiment-bar';
-import { Skeleton } from '@/ui/skeleton';
+import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { TickerLogo } from '@/ui/ticker-logo';
 import { FeaturedTiming, TimedTradeCard } from '@/ui/timing-feature';
-import { TradeCard } from '@/ui/trade-card';
+import { TradeRow } from '@/ui/trade-row';
 
 const TIMING_WINDOWS = [
   { key: '30', label: 'Past 30 days' },
@@ -34,6 +34,8 @@ type TimingKey = (typeof TIMING_WINDOWS)[number]['key'];
 
 // How many cards each sideways row shows before "See all".
 const ROW = 5;
+// How many of the latest trades Discover lists before "See all trades".
+const LATEST = 10;
 
 type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
 type Trending = { ticker: string; company: string | null; count: number; buys: number; sells: number; members: number };
@@ -92,10 +94,11 @@ function greeting(): string {
  * Discover: the home tab.
  *
  * Built like the apps people open without thinking: a search pill at the top,
- * a row of faces who just did something, and then rows of cards to scroll
- * sideways, each five long with a "See all" to the full list: the latest
- * trades, the stocks Congress keeps trading, its best recent trades, and the
- * markets news. Nothing here scrolls forever; the Trades tab and News do.
+ * a row of faces who just did something, the ten latest trades as a list,
+ * and then rows of cards to scroll sideways, each five long with a "See all"
+ * to the full list: the stocks Congress keeps trading, its best recent
+ * trades, and the markets news. Nothing here scrolls forever; the Trades tab
+ * and News do. The not-financial-advice note closes the page.
  */
 export default function DiscoverScreen() {
   const { c } = useTheme();
@@ -256,13 +259,23 @@ export default function DiscoverScreen() {
               Couldn&apos;t load the latest trades. Tap to try again.
             </Text>
           </Tap>
+        ) : loading ? (
+          <RowSkeleton count={5} />
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            {loading
-              ? Array.from({ length: 2 }, (_, i) => <Skeleton key={i} width={264} height={164} round={20} />)
-              : trades.slice(0, ROW).map((t) => <TradeCard key={t.id} trade={t} />)}
-            {!loading && trades.length > ROW ? <SeeAllCard label="All trades" onPress={() => router.push('/trades')} /> : null}
-          </ScrollView>
+          <View>
+            {trades.slice(0, LATEST).map((t, i) => (
+              <TradeRow key={t.id} trade={t} divider={i < Math.min(trades.length, LATEST) - 1} />
+            ))}
+            <View style={styles.inset}>
+              <Button
+                label="See all trades"
+                kind="secondary"
+                size="md"
+                icon="arrow-forward"
+                onPress={() => router.push('/trades')}
+              />
+            </View>
+          </View>
         )}
       </View>
 
@@ -335,11 +348,6 @@ export default function DiscoverScreen() {
               <SeeAllCard label="Full ranking" onPress={() => router.push('/timing')} compact />
             </ScrollView>
           ) : null}
-          {shownTiming ? (
-            <View style={styles.inset}>
-              <NotAdvice />
-            </View>
-          ) : null}
         </View>
       ) : null}
 
@@ -354,6 +362,11 @@ export default function DiscoverScreen() {
           </ScrollView>
         </View>
       ) : null}
+
+      {/* Once, at the foot of the page, for everything above it. */}
+      <View style={[styles.inset, styles.foot]}>
+        <NotAdvice />
+      </View>
     </ScrollView>
   );
 }
@@ -387,6 +400,7 @@ const styles = StyleSheet.create({
   inset: { paddingHorizontal: 16 },
   row: { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
   retry: { paddingHorizontal: 16, paddingVertical: 8 },
+  foot: { paddingTop: 28 },
   // Each face is centred in a tile wider than it; this puts the first ring,
   // not the tile, on the page margin.
   storiesRow: { paddingHorizontal: 13, gap: 10 },

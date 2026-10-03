@@ -54,7 +54,12 @@ export function CongMascot({ width = 190, wave = true }: { width?: number; wave?
   useEffect(() => {
     arm.set(wave ? RAISED : RESTING);
     if (reduce) return;
-    float.set(withRepeat(withSequence(withTiming(1, { duration: 1800, easing: EASE }), withTiming(0, { duration: 1800, easing: EASE })), -1));
+    float.set(
+      withRepeat(
+        withSequence(withTiming(1, { duration: 1800, easing: EASE }), withTiming(0, { duration: 1800, easing: EASE })),
+        -1
+      )
+    );
     // Three legs of the nod, mapped to position and tilt below.
     nod.set(
       withRepeat(
@@ -66,10 +71,31 @@ export function CongMascot({ width = 190, wave = true }: { width?: number; wave?
         -1
       )
     );
-    blink.set(withRepeat(withSequence(withDelay(3864, withTiming(0.1, { duration: 126 })), withTiming(1, { duration: 210 })), -1));
-    tail.set(withRepeat(withSequence(withTiming(8, { duration: 1200, easing: EASE }), withTiming(-10, { duration: 1200, easing: EASE })), -1));
+    blink.set(
+      withRepeat(
+        withSequence(withDelay(3864, withTiming(0.1, { duration: 126 })), withTiming(1, { duration: 210 })),
+        -1
+      )
+    );
+    tail.set(
+      withRepeat(
+        withSequence(
+          withTiming(8, { duration: 1200, easing: EASE }),
+          withTiming(-10, { duration: 1200, easing: EASE })
+        ),
+        -1
+      )
+    );
     if (wave) {
-      arm.set(withRepeat(withSequence(withTiming(-150, { duration: 800, easing: EASE }), withTiming(RAISED, { duration: 800, easing: EASE })), -1));
+      arm.set(
+        withRepeat(
+          withSequence(
+            withTiming(-150, { duration: 800, easing: EASE }),
+            withTiming(RAISED, { duration: 800, easing: EASE })
+          ),
+          -1
+        )
+      );
     }
     return () => {
       [float, nod, blink, arm, tail].forEach((v) => cancelAnimation(v));

@@ -9,6 +9,7 @@ import { useFollows } from '@/lib/follows';
 import { haptic } from '@/lib/haptics';
 import { LINKS, SITE, openPage } from '@/lib/links';
 import { useOnboarding } from '@/lib/onboarding';
+import { usePush } from '@/lib/push';
 import { useTheme } from '@/theme';
 import { ListRow } from '@/ui/list-row';
 import { Group } from '@/ui/section';
@@ -24,7 +25,9 @@ import { Text } from '@/ui/text';
 export default function SettingsScreen() {
   const { c } = useTheme();
   const router = useRouter();
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn } = useAuth();
+  const push = usePush();
+  const { signOut } = push;
   const { user } = useUser();
   const { status, renewing } = useAccess();
   const follows = useFollows();
@@ -93,17 +96,25 @@ export default function SettingsScreen() {
 
       <Group title="Notifications">
         <ListRow
-          icon="mail-outline"
-          label="Email alerts"
-          detail="Emailed when a filing matches"
+          icon="options-outline"
+          label="Your alerts"
+          detail="Push or email when a filing matches"
           onPress={() => router.push('/email-alerts')}
         />
         <ListRow
           icon="phone-portrait-outline"
           label="Push notifications"
-          detail="Coming soon. Email alerts work today."
+          detail={
+            push.unsupported
+              ? 'Not available on this device'
+              : push.enabled
+                ? 'On for this phone'
+                : push.permission === 'denied'
+                  ? 'Off in Settings'
+                  : 'Off for this phone'
+          }
+          onPress={() => router.push('/email-alerts')}
           last
-          chevron={false}
         />
       </Group>
 

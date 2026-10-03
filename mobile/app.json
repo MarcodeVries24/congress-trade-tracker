@@ -42,7 +42,14 @@
       ],
       "expo-secure-store",
       "expo-web-browser",
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-notifications",
+        {
+          "color": "#3A82C2",
+          "defaultChannel": "alerts"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

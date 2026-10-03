@@ -306,6 +306,26 @@ export function toAlertFilters(f: TradeFilters): AlertFilters {
   };
 }
 
+/** An alert's filters as a trades search, for opening "what this alert matches". */
+export function fromAlertFilters(a: AlertFilters): TradeFilters {
+  const chamber = (a.chambers ?? []).filter((c): c is 'house' | 'senate' => c === 'house' || c === 'senate');
+  return {
+    q: a.q || undefined,
+    chamber: chamber.length ? chamber : undefined,
+    members: a.members,
+    parties: a.parties,
+    states: a.states,
+    tickers: a.tickers,
+    assetTypes: a.assetTypes,
+    types: a.types,
+    owners: a.owners,
+    minAmount: a.minAmount,
+    amountRanges: a.amountRanges,
+    marketCapTiers: a.marketCapTiers,
+    filedStatus: a.filedStatus,
+  };
+}
+
 /** A name for the alert these filters would make, for the editor to start from. */
 export function suggestAlertName(f: TradeFilters): string {
   const chips = activeChips(f).filter((c) => c.key !== 'dateFrom');

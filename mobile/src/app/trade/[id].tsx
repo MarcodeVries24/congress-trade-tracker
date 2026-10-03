@@ -228,7 +228,7 @@ export default function TradeDetailScreen() {
       <Button label="View the original filing" icon="document-text-outline" onPress={() => openPage(trade.pdf_url)} />
       {trade.ticker ? (
         <Button
-          label={`Email me when ${trade.ticker} is traded`}
+          label={`Alert me when ${trade.ticker} is traded`}
           icon="notifications-outline"
           kind="secondary"
           onPress={() =>

@@ -124,7 +124,7 @@ export default function PoliticianScreen() {
           </View>
           <View style={styles.flex}>
             <Button
-              label="Email alert"
+              label="Get alerts"
               icon="notifications-outline"
               kind="secondary"
               size="md"

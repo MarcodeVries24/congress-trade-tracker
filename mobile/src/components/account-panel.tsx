@@ -7,6 +7,7 @@ import { useAccess } from '@/lib/access';
 import { API_BASE } from '@/lib/api';
 import { haptic } from '@/lib/haptics';
 import { LINKS, SITE, openPage } from '@/lib/links';
+import { usePush } from '@/lib/push';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
@@ -32,6 +33,7 @@ export function AccountPanel() {
   const { c } = useTheme();
   const router = useRouter();
   const { signOut, getToken } = useAuth();
+  const push = usePush();
   const { user } = useUser();
   const { status, renewing } = useAccess();
 
@@ -109,7 +111,7 @@ export function AccountPanel() {
             )
           }
         />
-        <ListRow icon="log-out-outline" label="Sign out" chevron={false} onPress={() => void signOut()} last />
+        <ListRow icon="log-out-outline" label="Sign out" chevron={false} onPress={() => void push.signOut()} last />
       </Group>
 
       {!confirming ? (

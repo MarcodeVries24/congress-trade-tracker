@@ -1,4 +1,3 @@
-import { memberDisplayName, memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -7,54 +6,26 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
 
-import {
-  createAlert,
-  deleteAlert,
-  fetchMemberOptions,
-  previewAlert,
-  updateAlert,
-  type AlertFilters,
-  type AlertFrequency,
-  type MemberOption,
-} from '@/lib/api';
+import { createAlert, deleteAlert, previewAlert, updateAlert, type AlertFilters, type AlertFrequency } from '@/lib/api';
 import { recallAlert } from '@/lib/alert-cache';
-import { activeChips } from '@/lib/trade-filters';
 import { haptic } from '@/lib/haptics';
+import { usePush } from '@/lib/push';
+import { countActive, fromAlertFilters, toAlertFilters, type TradeFilters } from '@/lib/trade-filters';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useDebounced } from '@/lib/use-paged';
 import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { ChipRow } from '@/ui/chip-row';
 import { EmptyState } from '@/ui/empty-state';
-import { Icon } from '@/ui/icon';
-import { Tap } from '@/ui/tap';
+import { FilterFields, parseTickers } from '@/ui/filter-fields';
+import { Icon, type IconName } from '@/ui/icon';
+import { PushPrimer } from '@/ui/push-primer';
 import { Text } from '@/ui/text';
-
-const CHAMBERS = [
-  { key: 'any', label: 'Both chambers' },
-  { key: 'house', label: 'House' },
-  { key: 'senate', label: 'Senate' },
-] as const;
-
-const TYPES = [
-  { key: 'any', label: 'Buys and sells' },
-  { key: 'P', label: 'Purchases' },
-  { key: 'S', label: 'Sales' },
-] as const;
-
-// A subset of the website's brackets: the thresholds people actually pick. An
-// alert saved on the website with another floor gets a chip of its own.
-const MIN_AMOUNTS: readonly { key: string; label: string }[] = [
-  { key: 'any', label: 'Any amount' },
-  { key: '15001', label: '$15K+' },
-  { key: '50001', label: '$50K+' },
-  { key: '250001', label: '$250K+' },
-  { key: '1000001', label: '$1M+' },
-];
 
 const FREQUENCIES = [
   { key: 'instant', label: 'As it happens' },
@@ -62,30 +33,79 @@ const FREQUENCIES = [
   { key: 'weekly', label: 'Weekly' },
 ] as const;
 
-type ChamberKey = (typeof CHAMBERS)[number]['key'];
-type TypeKey = (typeof TYPES)[number]['key'];
+const FREQUENCY_HINTS: Record<AlertFrequency, string> = {
+  instant: 'On the next check after a filing appears, at most a few hours later.',
+  daily: 'At most once a day, everything that matched in one go.',
+  weekly: 'At most once a week. Nothing matched, nothing sent.',
+};
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Heading({ children, hint }: { children: string; hint?: string }) {
   return (
-    <View style={styles.field}>
-      <Text variant="label" tone="faint" style={styles.fieldLabel}>
-        {label.toUpperCase()}
-      </Text>
-      {children}
+    <View style={styles.heading}>
+      <Text variant="headline">{children}</Text>
+      {hint ? (
+        <Text variant="caption" tone="muted">
+          {hint}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function Channel({
+  icon,
+  title,
+  detail,
+  value,
+  onChange,
+  divider,
+}: {
+  icon: IconName;
+  title: string;
+  detail: string;
+  value: boolean;
+  onChange: (on: boolean) => void;
+  divider?: boolean;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.channel, divider && { borderBottomColor: c.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+      <View style={[styles.channelIcon, { backgroundColor: value ? c.accentSoft : c.surfaceMuted }]}>
+        <Icon name={icon} size={18} color={value ? c.accent : c.textMuted} />
+      </View>
+      <View style={styles.flex}>
+        <Text variant="bodyStrong">{title}</Text>
+        <Text variant="caption" tone="muted">
+          {detail}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={(on) => {
+          haptic.select();
+          onChange(on);
+        }}
+        trackColor={{ true: c.accent, false: c.borderStrong }}
+        thumbColor="#FFFFFF"
+        accessibilityLabel={title}
+      />
     </View>
   );
 }
 
 /**
- * Making or changing one email alert.
+ * Making or changing one alert.
  *
- * Opened empty from the alerts list, or pre-filled from a member, a company or
- * a trade ("email me when NVDA is traded"). The app edits the criteria people
- * set on a phone; an alert made on the website can carry more (states,
- * parties, owners, market cap) and those are kept, because the editor starts
- * from the saved filters and only overwrites the fields it shows.
+ * Opened empty from the alerts list, or pre-filled from a member, a company, a
+ * trade ("tell me when NVDA is traded") or a whole search on the Trades tab.
+ * Every filter the website has is here, drawn by the same component as the
+ * Trades tab's filter sheet, so an alert can be exactly any search.
  *
- * The count underneath is the server running the same query the sender will.
+ * At the top, how it reaches you: a push notification on this phone, an
+ * email, or both. Push for an alert needs notifications on for the phone,
+ * and switching it on here asks for that first, with the same explanation as
+ * the Alerts tab. The count at the bottom is the server running the query the
+ * sender will.
  */
 export default function AlertEditorScreen() {
   const params = useLocalSearchParams<{
@@ -99,89 +119,49 @@ export default function AlertEditorScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
+  const push = usePush();
   const existing = id === 'new' ? undefined : recallAlert(id);
-  // A whole filter set handed over by the trades page ("get alerts for this
-  // search"); the editor starts from it exactly as it would from a saved alert.
-  const [preset] = useState<AlertFilters | undefined>(() => {
-    if (!params.filters) return undefined;
-    try {
-      return JSON.parse(params.filters) as AlertFilters;
-    } catch {
-      return undefined;
+
+  // Where the editor starts: a saved alert, or what the opening screen handed
+  // over (a whole filter set, or a member or a ticker).
+  const [initial] = useState<TradeFilters>(() => {
+    if (existing) return fromAlertFilters(existing.filters);
+    let preset: AlertFilters = {};
+    if (params.filters) {
+      try {
+        preset = JSON.parse(params.filters) as AlertFilters;
+      } catch {
+        // A malformed hand-over starts empty rather than failing.
+      }
     }
+    const members = params.members ? params.members.split('|').filter(Boolean) : undefined;
+    return fromAlertFilters({
+      ...preset,
+      members: preset.members ?? members,
+      tickers: preset.tickers ?? (params.tickers ? [params.tickers] : undefined),
+    });
   });
-  const base: AlertFilters | undefined = existing?.filters ?? preset;
 
   const [name, setName] = useState(existing?.name ?? params.name ?? '');
-  const [members, setMembers] = useState<string[]>(
-    base?.members ?? (params.members ? params.members.split('|').filter(Boolean) : [])
-  );
-  const [tickers, setTickers] = useState((base?.tickers ?? (params.tickers ? [params.tickers] : [])).join(', '));
-  const [chamber, setChamber] = useState<ChamberKey>(
-    base?.chambers?.length === 1 ? (base.chambers[0] as ChamberKey) : 'any'
-  );
-  const [type, setType] = useState<TypeKey>(base?.types?.length === 1 ? (base.types[0] as TypeKey) : 'any');
-  const savedMin = base?.minAmount;
-  const minOptions = useMemo(
-    () =>
-      savedMin && !MIN_AMOUNTS.some((m) => m.key === String(savedMin))
-        ? [...MIN_AMOUNTS, { key: String(savedMin), label: `$${savedMin.toLocaleString()}+` }]
-        : MIN_AMOUNTS,
-    [savedMin]
-  );
-  const [minAmount, setMinAmount] = useState<string>(savedMin ? String(savedMin) : 'any');
+  const [draft, setDraft] = useState<TradeFilters>(initial);
+  const [tickerText, setTickerText] = useState((initial.tickers ?? []).join(', '));
   const [frequency, setFrequency] = useState<AlertFrequency>(existing?.frequency ?? 'instant');
+  const [byEmail, setByEmail] = useState(existing ? existing.email_enabled !== false : true);
+  // A new alert notifies this phone when the phone already has notifications on.
+  const [byPush, setByPush] = useState(existing ? Boolean(existing.push_enabled) : push.enabled);
+  const [primer, setPrimer] = useState(false);
 
-  const [options, setOptions] = useState<MemberOption[]>([]);
-  const [memberQuery, setMemberQuery] = useState('');
   const [preview, setPreview] = useState<{ total: number; recent: number } | 'failed' | null>(null);
   const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchMemberOptions({ signal: controller.signal })
-      .then(setOptions)
-      .catch(() => {});
-    return () => controller.abort();
-  }, []);
-
-  const filters = useMemo<AlertFilters>(() => {
-    const tickerList = tickers
-      .split(/[\s,]+/)
-      .map((t) => t.trim().toUpperCase())
-      .filter(Boolean);
-    // Start from what was saved so criteria this screen does not show survive.
-    return {
-      ...(base ?? {}),
-      members: members.length ? members : undefined,
-      tickers: tickerList.length ? tickerList : undefined,
-      // "Any" here only means this screen's single choice is unset; a saved
-      // combination it cannot show (purchases and exchanges, say) is kept.
-      chambers:
-        chamber === 'any' ? (base?.chambers && base.chambers.length > 1 ? base.chambers : undefined) : [chamber],
-      types: type === 'any' ? (base?.types && base.types.length > 1 ? base.types : undefined) : [type],
-      minAmount: minAmount === 'any' ? undefined : Number(minAmount),
-    };
-  }, [base, members, tickers, chamber, type, minAmount]);
-
-  // Criteria the alert carries that this screen does not edit, listed so an
-  // alert made from a search, or on the website, says everything it matches.
-  const hidden = useMemo(
-    () =>
-      activeChips({
-        q: base?.q,
-        parties: base?.parties,
-        states: base?.states,
-        owners: base?.owners,
-        assetTypes: base?.assetTypes,
-        amountRanges: base?.amountRanges,
-        marketCapTiers: base?.marketCapTiers,
-        filedStatus: base?.filedStatus,
-      }),
-    [base]
+  const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
+  const filters = useMemo<AlertFilters>(
+    () => toAlertFilters({ ...draft, tickers: parseTickers(tickerText) }),
+    [draft, tickerText]
   );
+  const criteria = countActive({ ...draft, tickers: parseTickers(tickerText) }) + (draft.q ? 1 : 0);
 
   const settled = useDebounced(filters, 500);
   useEffect(() => {
@@ -199,33 +179,29 @@ export default function AlertEditorScreen() {
     };
   }, [settled, authed]);
 
-  // A member pre-filled from their page may not be in the loaded options yet,
-  // or may be filed under a spelling the options group differently; the chip
-  // falls back to the filed name so nothing picked is ever invisible.
-  const pickedOptions = options.filter((o) => o.names.some((n) => members.includes(n)));
-  const unmatchedGroups = useMemo(() => {
-    const groups = new Map<string, string[]>();
-    for (const n of members.filter((m) => !pickedOptions.some((o) => o.names.includes(m)))) {
-      const display = memberDisplayNameFromFiledName(n);
-      groups.set(display, [...(groups.get(display) ?? []), n]);
+  const togglePush = (on: boolean) => {
+    if (!on) {
+      if (!byEmail) {
+        setError('An alert needs a way to reach you. Keep email on, or pause the alert from the list.');
+        return;
+      }
+      setByPush(false);
+      return;
     }
-    return [...groups.entries()];
-  }, [members, pickedOptions]);
-  const matches = useMemo(() => {
-    const q = memberQuery.trim().toLowerCase();
-    if (!q) return [];
-    return options
-      .filter((o) => !o.names.some((n) => members.includes(n)))
-      .filter((o) => memberDisplayName(o).toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [options, memberQuery, members]);
-
-  const addMember = (o: MemberOption) => {
-    haptic.select();
-    setMembers((prev) => [...prev, ...o.names.filter((n) => !prev.includes(n))]);
-    setMemberQuery('');
+    setError(null);
+    // The phone itself must be able to receive them first.
+    if (push.enabled) setByPush(true);
+    else setPrimer(true);
   };
-  const removeNames = (names: string[]) => setMembers((prev) => prev.filter((n) => !names.includes(n)));
+
+  const toggleEmail = (on: boolean) => {
+    if (!on && !byPush) {
+      setError('An alert needs a way to reach you. Turn on push notifications first, or keep email.');
+      return;
+    }
+    setError(null);
+    setByEmail(on);
+  };
 
   const save = async () => {
     const trimmed = name.trim();
@@ -236,8 +212,9 @@ export default function AlertEditorScreen() {
     setError(null);
     setBusy('save');
     try {
-      if (existing) await updateAlert(existing.id, { name: trimmed, frequency, filters }, await authed());
-      else await createAlert({ name: trimmed, frequency, filters }, await authed());
+      const body = { name: trimmed, frequency, filters, email: byEmail, push: byPush };
+      if (existing) await updateAlert(existing.id, body, await authed());
+      else await createAlert(body, await authed());
       haptic.success();
       router.back();
     } catch (err) {
@@ -267,131 +244,67 @@ export default function AlertEditorScreen() {
     }
   };
 
-  const input = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
-
   if (id !== 'new' && !existing) {
     return (
       <View style={[styles.screen, { backgroundColor: c.background }]}>
-        <EmptyState icon="mail-outline" title="This alert isn't loaded" body="Open it from the email alerts list." />
+        <EmptyState icon="notifications-outline" title="This alert isn't loaded" body="Open it from your alerts." />
       </View>
     );
   }
+
+  const pushDetail = push.unsupported
+    ? push.unsupported
+    : byPush && !push.enabled
+      ? 'Notifications are off on this phone, so this goes to your other phones only.'
+      : 'A notification on this phone, and any other phone you have them on for.';
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       <Stack.Screen options={{ title: existing ? 'Edit alert' : 'New alert' }} />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Field label="Name">
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="e.g. Pelosi's options"
-              placeholderTextColor={c.textFaint}
-              maxLength={80}
-              style={input}
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Name it, e.g. Pelosi's options"
+            placeholderTextColor={c.textFaint}
+            maxLength={80}
+            style={[styles.name, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
+          />
+
+          <Heading>Notify me by</Heading>
+          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <Channel
+              icon="phone-portrait-outline"
+              title="Push notification"
+              detail={pushDetail}
+              value={byPush}
+              onChange={togglePush}
+              divider
             />
-          </Field>
-
-          <Field label="Members">
-            {pickedOptions.length || unmatchedGroups.length ? (
-              <View style={styles.picked}>
-                {pickedOptions.map((o) => (
-                  <Tap
-                    key={o.bioguide_id ?? o.member_name}
-                    onPress={() => removeNames(o.names)}
-                    scaleTo={0.94}
-                    style={[styles.token, { backgroundColor: c.primary }]}>
-                    <Text variant="callout" color={c.primaryText} style={styles.bold}>
-                      {memberDisplayName(o)}
-                    </Text>
-                    <Icon name="close" size={14} color={c.primaryText} />
-                  </Tap>
-                ))}
-                {unmatchedGroups.map(([display, names]) => (
-                  <Tap
-                    key={display}
-                    onPress={() => removeNames(names)}
-                    scaleTo={0.94}
-                    style={[styles.token, { backgroundColor: c.primary }]}>
-                    <Text variant="callout" color={c.primaryText} style={styles.bold}>
-                      {display}
-                    </Text>
-                    <Icon name="close" size={14} color={c.primaryText} />
-                  </Tap>
-                ))}
-              </View>
-            ) : null}
-            <TextInput
-              value={memberQuery}
-              onChangeText={setMemberQuery}
-              placeholder={pickedOptions.length ? 'Add another member' : 'Anyone, or search for a member'}
-              placeholderTextColor={c.textFaint}
-              autoCorrect={false}
-              style={input}
+            <Channel
+              icon="mail-outline"
+              title="Email"
+              detail={existing?.email ? `To ${existing.email}` : "To your account's email address"}
+              value={byEmail}
+              onChange={toggleEmail}
             />
-            {matches.length ? (
-              <View style={[styles.matches, { backgroundColor: c.surface, borderColor: c.border }]}>
-                {matches.map((o, i) => (
-                  <Tap
-                    key={o.bioguide_id ?? o.member_name}
-                    onPress={() => addMember(o)}
-                    scaleTo={0.99}
-                    style={[
-                      styles.match,
-                      i < matches.length - 1 && {
-                        borderBottomColor: c.border,
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                      },
-                    ]}>
-                    <Text variant="bodyStrong">{memberDisplayName(o)}</Text>
-                    <Text variant="caption" tone="muted">
-                      {o.trade_count.toLocaleString()} trades
-                    </Text>
-                  </Tap>
-                ))}
-              </View>
-            ) : null}
-          </Field>
+          </View>
 
-          <Field label="Tickers">
-            <TextInput
-              value={tickers}
-              onChangeText={setTickers}
-              placeholder="Any, or e.g. NVDA, TSLA"
-              placeholderTextColor={c.textFaint}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={input}
-            />
-          </Field>
+          <Heading hint={FREQUENCY_HINTS[frequency]}>How often</Heading>
+          <ChipRow options={FREQUENCIES} value={frequency} onChange={setFrequency} inset={0} />
 
-          <Field label="Chamber">
-            <ChipRow options={CHAMBERS} value={chamber} onChange={setChamber} inset={0} />
-          </Field>
-          <Field label="Type">
-            <ChipRow options={TYPES} value={type} onChange={setType} inset={0} />
-          </Field>
-          <Field label="Minimum amount">
-            <ChipRow options={minOptions} value={minAmount} onChange={setMinAmount} inset={0} />
-          </Field>
-          {hidden.length ? (
-            <Field label="Also matching">
-              <View style={styles.picked}>
-                {hidden.map((chip) => (
-                  <View key={chip.key} style={[styles.token, { backgroundColor: c.accentSoft }]}>
-                    <Text variant="callout" tone="accent" style={styles.bold}>
-                      {chip.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </Field>
-          ) : null}
-
-          <Field label="Email me">
-            <ChipRow options={FREQUENCIES} value={frequency} onChange={setFrequency} inset={0} />
-          </Field>
+          <Heading
+            hint={
+              criteria
+                ? 'A trade has to match every section you set; within one, any choice counts.'
+                : 'Nothing set yet, so this alert covers every new trade.'
+            }>
+            What to watch
+          </Heading>
+          <View style={styles.fields}>
+            <FilterFields draft={draft} set={set} tickerText={tickerText} setTickerText={setTickerText} mode="alert" />
+          </View>
 
           <View style={[styles.preview, { backgroundColor: c.surface, borderColor: c.border }]}>
             <View style={[styles.previewIcon, { backgroundColor: c.surfaceMuted }]}>
@@ -440,41 +353,29 @@ export default function AlertEditorScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PushPrimer visible={primer} onClose={() => setPrimer(false)} onEnabled={() => setByPush(true)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { padding: 16, gap: 20, paddingBottom: 56 },
-  flex: { flex: 1 },
-  field: { gap: 10 },
-  fieldLabel: { paddingHorizontal: 2 },
-  input: {
+  content: { padding: 16, gap: 14, paddingBottom: 56 },
+  flex: { flex: 1, gap: 2 },
+  heading: { gap: 2, paddingTop: 10, paddingHorizontal: 2 },
+  name: {
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    paddingVertical: 15,
+    fontSize: 17,
+    fontWeight: '600',
   },
-  picked: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  token: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-  },
-  bold: { fontWeight: '700' },
-  matches: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  match: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
+  card: { borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14 },
+  channel: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  channelIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  fields: { marginTop: -10 },
   preview: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,6 +384,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
     minHeight: 64,
+    marginTop: 6,
   },
   previewIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   strong: { fontWeight: '800' },

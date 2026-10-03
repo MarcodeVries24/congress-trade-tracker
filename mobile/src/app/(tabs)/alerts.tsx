@@ -13,6 +13,7 @@ import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
+import { PushSwitchCard } from '@/ui/push-primer';
 import { RowSkeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
@@ -36,8 +37,9 @@ function bucket(iso: string | null): string {
  * Assembled from each followed member's latest trades, which the detail cache
  * already holds for the Watchlist, rather than a fresh query per visit.
  *
- * Email alerts, the ones that arrive when you are not looking, are one tap
- * away at the top.
+ * Saved alerts, the ones that arrive when you are not looking, are one tap
+ * away at the top, with the switch for push notifications on this phone
+ * under them.
  */
 export default function AlertsScreen() {
   const { c } = useTheme();
@@ -46,6 +48,7 @@ export default function AlertsScreen() {
   const follows = useFollows();
   const [trades, setTrades] = useState<Trade[] | null>(null);
   const [emailCount, setEmailCount] = useState<number | null | 'signed-out'>(null);
+  const [devices, setDevices] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(
@@ -69,6 +72,7 @@ export default function AlertsScreen() {
       try {
         const list = await fetchAlerts(options);
         setEmailCount(list.alerts.filter((a) => a.active).length);
+        setDevices(list.pushDevices ?? null);
       } catch (err) {
         setEmailCount(err instanceof ApiError && err.status === 401 ? 'signed-out' : null);
       }
@@ -104,22 +108,23 @@ export default function AlertsScreen() {
           onPress={() => router.push(emailCount === 'signed-out' ? '/sign-in' : '/email-alerts')}
           style={[styles.emailCard, { backgroundColor: c.surface, borderColor: c.border }]}>
           <View style={[styles.emailIcon, { backgroundColor: c.accentSoft }]}>
-            <Icon name="mail-unread-outline" size={22} color={c.accent} />
+            <Icon name="options-outline" size={22} color={c.accent} />
           </View>
           <View style={styles.emailText}>
-            <Text variant="bodyStrong">Email alerts</Text>
+            <Text variant="bodyStrong">Your alerts</Text>
             <Text variant="caption" tone="muted">
               {emailCount === 'signed-out'
-                ? 'Sign in to get an email when a filing matches'
+                ? 'Sign in to be told when a filing matches your filters'
                 : emailCount === null
-                  ? 'An email the moment a filing matches'
+                  ? 'A notification or email the moment a filing matches'
                   : emailCount === 0
-                    ? 'None active yet. Set one up in a minute.'
-                    : `${emailCount} active, delivered by email`}
+                    ? 'None active yet. Set one up with any filter in a minute.'
+                    : `${emailCount} active, by push notification or email`}
             </Text>
           </View>
           <Icon name="chevron-forward" size={18} color={c.textFaint} />
         </Tap>
+        {emailCount !== 'signed-out' ? <PushSwitchCard devices={devices} /> : null}
       </View>
 
       {following ? (
@@ -207,7 +212,7 @@ export default function AlertsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40 },
-  inset: { paddingHorizontal: 16, paddingTop: 16 },
+  inset: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   emailCard: {
     flexDirection: 'row',
     alignItems: 'center',

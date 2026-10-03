@@ -251,8 +251,18 @@ export function AlertsManager() {
                   <dt>Frequency</dt>
                   <dd className="text-ink-muted">{frequencyLabel(alert.frequency)}</dd>
                 </div>
+                <div className="flex gap-1.5" title="Push notifications are switched on per alert in the CongTrade app">
+                  <dt>Delivered by</dt>
+                  <dd className="text-ink-muted">
+                    {alert.email_enabled && alert.push_enabled
+                      ? "Email and push"
+                      : alert.push_enabled
+                        ? "Push (app)"
+                        : "Email"}
+                  </dd>
+                </div>
                 <div className="flex gap-1.5">
-                  <dt>Emails sent</dt>
+                  <dt>Times sent</dt>
                   <dd className="text-ink-muted">{alert.sent_count.toLocaleString()}</dd>
                 </div>
                 <div className="flex gap-1.5">
@@ -260,7 +270,7 @@ export function AlertsManager() {
                   <dd className="text-ink-muted">{alert.matched_count.toLocaleString()}</dd>
                 </div>
                 <div className="flex gap-1.5">
-                  <dt>Last email</dt>
+                  <dt>Last sent</dt>
                   <dd className="text-ink-muted">{alert.last_sent_at ? formatDateFromTimestamp(alert.last_sent_at) : "never"}</dd>
                 </div>
               </dl>

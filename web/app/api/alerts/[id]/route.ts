@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters, summarizeAlert } from "@/lib/alertFilters";
-import { deleteAlert, updateAlert } from "@/lib/alerts";
+import { deleteAlert, getAlert, updateAlert } from "@/lib/alerts";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
 const MAX_NAME_LENGTH = 80;
@@ -22,7 +22,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
 
-  const patch: { name?: string; filters?: ReturnType<typeof normalizeAlertFilters>; frequency?: AlertFrequency; active?: boolean } = {};
+  const patch: {
+    name?: string;
+    filters?: ReturnType<typeof normalizeAlertFilters>;
+    frequency?: AlertFrequency;
+    active?: boolean;
+    emailEnabled?: boolean;
+    pushEnabled?: boolean;
+  } = {};
   const raw = body as Record<string, unknown>;
 
   // Pausing or deleting an alert stays available after a subscription lapses
@@ -30,8 +37,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // off. Everything else is the paid part, including *resuming*: the sender
   // pauses a lapsed subscriber's alerts, and without this they could simply
   // switch them back on.
+  // Switching a channel off is like pausing (always allowed); switching one
+  // on is the paid part.
   const needsPro =
-    raw.name !== undefined || raw.filters !== undefined || raw.frequency !== undefined || raw.active === true;
+    raw.name !== undefined ||
+    raw.filters !== undefined ||
+    raw.frequency !== undefined ||
+    raw.active === true ||
+    raw.email === true ||
+    raw.push === true;
   if (needsPro && !(await hasProServer())) {
     return NextResponse.json({ error: "Email alerts are a CongTrade Pro feature." }, { status: 403 });
   }
@@ -49,6 +63,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (raw.filters !== undefined) patch.filters = normalizeAlertFilters(raw.filters);
   if (raw.active !== undefined) patch.active = Boolean(raw.active);
+  if (raw.email !== undefined) patch.emailEnabled = Boolean(raw.email);
+  if (raw.push !== undefined) patch.pushEnabled = Boolean(raw.push);
+
+  // An alert has to arrive somehow. Checked against what is stored, since a
+  // patch may name only one of the two.
+  if (patch.emailEnabled === false || patch.pushEnabled === false) {
+    const current = await getAlert(userId, id);
+    if (!current) return NextResponse.json({ error: "Unknown alert." }, { status: 404 });
+    const email = patch.emailEnabled ?? current.email_enabled;
+    const push = patch.pushEnabled ?? current.push_enabled;
+    if (!email && !push) {
+      return NextResponse.json(
+        { error: "Choose email, push notifications, or both. To stop it altogether, pause the alert." },
+        { status: 400 }
+      );
+    }
+  }
 
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
 

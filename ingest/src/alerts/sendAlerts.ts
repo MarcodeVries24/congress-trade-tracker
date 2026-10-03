@@ -12,10 +12,12 @@ import {
 import type { AlertFilters, AlertTradeRow } from "../../../web/lib/alertFilters";
 import { alertEmailHtml, alertEmailSubject, alertEmailText } from "./renderAlertEmail.js";
 import { resolveEntitlements } from "./entitlements.js";
+import { pushMessageFor, pushTokensFor, sendPush } from "./push.js";
 import { SITE_URL } from "../lib/siteUrl.js";
 
 /**
- * Sends CongTrade Pro email alerts. Runs after every ingest
+ * Sends CongTrade Pro alerts, by email and as push notifications to the app,
+ * whichever each alert has switched on. Runs after every ingest
  * (.github/workflows/ingest.yml), so an "as it happens" alert is emailed at
  * most ~4 hours after a filing shows up — which is as fast as the source
  * disclosure sites are polled.
@@ -41,12 +43,11 @@ import { SITE_URL } from "../lib/siteUrl.js";
 
 
 /**
- * The address alerts are sent from. Unset means "alerts are not switched on
- * yet" and the job exits quietly rather than failing: Resend's sandbox
- * sender can only deliver to the account owner, so sending to real users
- * needs a verified domain first (see README). Wiring the workflow step up
- * before that is done is therefore safe — it starts working the moment this
- * is set.
+ * The address alerts are sent from. Unset means "email alerts are not
+ * switched on yet": nothing is emailed and the job says so, rather than
+ * failing. Resend's sandbox sender can only deliver to the account owner, so
+ * sending to real users needs a verified domain first (see README). Push
+ * notifications do not depend on it.
  */
 const ALERT_FROM = process.env.ALERT_FROM_EMAIL;
 
@@ -91,6 +92,8 @@ interface DueAlert {
   unsubscribe_token: string;
   created_at: string;
   last_sent_at: string | null;
+  email_enabled: boolean;
+  push_enabled: boolean;
 }
 
 type MatchRow = AlertTradeRow & { match_key: string };
@@ -109,16 +112,17 @@ async function loadDueAlerts(onlyId?: string): Promise<DueAlert[]> {
   if (onlyId) {
     return (await sql.query(
       `SELECT id::text AS id, user_id, email, name, filters, frequency, unsubscribe_token,
-              created_at, last_sent_at
+              created_at, last_sent_at, email_enabled, push_enabled
        FROM alerts WHERE id = $1::bigint`,
       [onlyId]
     )) as DueAlert[];
   }
   return (await sql.query(
     `SELECT id::text AS id, user_id, email, name, filters, frequency, unsubscribe_token,
-            created_at, last_sent_at
+            created_at, last_sent_at, email_enabled, push_enabled
      FROM alerts
      WHERE active
+       AND (email_enabled OR push_enabled)
        AND (
          frequency = 'instant'
          OR (frequency = 'daily'  AND (last_sent_at IS NULL OR last_sent_at < NOW() - INTERVAL '20 hours'))
@@ -216,12 +220,12 @@ async function main() {
   const dryRun = args.includes("--dry-run");
   const onlyId = args.find((a) => a.startsWith("--alert="))?.split("=")[1];
 
-  if (!ALERT_FROM && !dryRun) {
+  const emailOn = Boolean(ALERT_FROM) || dryRun;
+  if (!emailOn) {
     console.log(
-      "ALERT_FROM_EMAIL is not set — user alerts are not switched on yet, so nothing was sent.\n" +
+      "ALERT_FROM_EMAIL is not set, so no alert emails go out this run (push notifications still do).\n" +
         "Verify a sending domain in Resend and set ALERT_FROM_EMAIL (e.g. \"CongTrade <alerts@congtrade.com>\")."
     );
-    return;
   }
 
   await ensureSchema();
@@ -237,6 +241,7 @@ async function main() {
   const entitlements = await resolveEntitlements(alerts.map((a) => a.user_id));
 
   let sent = 0;
+  let pushed = 0;
   let matchedTotal = 0;
   let paused = 0;
   let unverified = 0;
@@ -257,6 +262,16 @@ async function main() {
         console.warn(`  #${alert.id} ${alert.name} — could not verify subscription (${entitlement.reason}); sending anyway.`);
       }
 
+      // How this alert can reach its owner this run. With neither, its
+      // matches are left unrecorded, so they still arrive once a way exists
+      // (email switched on, or a phone registered) within the ingest window.
+      const byEmail = alert.email_enabled && emailOn;
+      const tokens = alert.push_enabled ? await pushTokensFor(alert.user_id) : [];
+      if (!byEmail && tokens.length === 0) {
+        console.log(`  #${alert.id} ${alert.name} — no delivery channel available (push on, but no phone registered).`);
+        continue;
+      }
+
       const matches = await findNewMatches(alert);
       if (matches.length === 0) {
         console.log(`  #${alert.id} ${alert.name} — nothing new.`);
@@ -273,8 +288,11 @@ async function main() {
         unsubscribeUrl,
       };
 
+      const push = tokens.length ? pushMessageFor(alert, matches) : null;
+
       if (dryRun) {
-        console.log(`  #${alert.id} ${alert.name} → ${alert.email}: ${matches.length} match(es)`);
+        console.log(`  #${alert.id} ${alert.name} → ${byEmail ? alert.email : "(no email)"}: ${matches.length} match(es)`);
+        if (push) console.log(`      push (${tokens.length} device(s)): ${push.title} | ${push.body}`);
         console.log(`      watching: ${summarizeAlert(input.filters)}`);
         console.log(`      subject:  ${alertEmailSubject(input)}`);
         for (const m of matches.slice(0, 5)) {
@@ -285,24 +303,51 @@ async function main() {
         continue;
       }
 
-      await sendEmail({
-        to: alert.email,
-        from: ALERT_FROM,
-        subject: alertEmailSubject(input),
-        html: alertEmailHtml(input),
-        text: alertEmailText(input),
-        headers: {
-          // One-click unsubscribe, the way mailbox providers expect it: the
-          // URL carries the token, and the POST body they send is ignored.
-          "List-Unsubscribe": `<${SITE_URL}/api/alerts/unsubscribe?token=${encodeURIComponent(alert.unsubscribe_token)}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
-      });
-      await recordSent(alert, matches);
+      // Each channel on its own: a bounced email must not cost the push, nor
+      // the other way round. The matches are recorded once either got
+      // through, so a channel that failed is not retried with the same
+      // trades next run (the other already told them).
+      const delivered: string[] = [];
+      const errors: string[] = [];
+      if (byEmail) {
+        try {
+          await sendEmail({
+            to: alert.email,
+            from: ALERT_FROM!,
+            subject: alertEmailSubject(input),
+            html: alertEmailHtml(input),
+            text: alertEmailText(input),
+            headers: {
+              // One-click unsubscribe, the way mailbox providers expect it: the
+              // URL carries the token, and the POST body they send is ignored.
+              "List-Unsubscribe": `<${SITE_URL}/api/alerts/unsubscribe?token=${encodeURIComponent(alert.unsubscribe_token)}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+          });
+          delivered.push(alert.email);
+          sent++;
+        } catch (err) {
+          errors.push(`email: ${(err as Error).message}`);
+        }
+      }
+      if (push) {
+        try {
+          const accepted = await sendPush(tokens, push);
+          if (accepted) {
+            delivered.push(`${accepted} phone(s)`);
+            pushed++;
+          }
+        } catch (err) {
+          errors.push(`push: ${(err as Error).message}`);
+        }
+      }
 
-      sent++;
-      matchedTotal += matches.length;
-      console.log(`  #${alert.id} ${alert.name} → ${alert.email}: ${matches.length} match(es) sent.`);
+      if (delivered.length) {
+        await recordSent(alert, matches);
+        matchedTotal += matches.length;
+        console.log(`  #${alert.id} ${alert.name} → ${delivered.join(" and ")}: ${matches.length} match(es) sent.`);
+      }
+      if (errors.length) throw new Error(errors.join("; "));
     } catch (err) {
       // One bad alert must not stop the rest — a single malformed filter or
       // a bounced address would otherwise silence every other subscriber.
@@ -312,7 +357,7 @@ async function main() {
   }
 
   console.log(
-    `\n${sent} email(s) ${dryRun ? "would be sent" : "sent"}, ${matchedTotal} trade(s) matched` +
+    `\n${sent} email(s) and ${pushed} push alert(s) ${dryRun ? "would be sent" : "sent"}, ${matchedTotal} trade(s) matched` +
       `${paused ? `, ${paused} alert(s) paused (subscription ended)` : ""}` +
       `${unverified ? `, ${unverified} sent without a verified subscription` : ""}.`
   );

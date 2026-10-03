@@ -6,11 +6,11 @@ const OPTIONS: { value: Notify; label: string; hint: string; icon: IconName }[] 
   {
     value: 'push',
     label: 'Push notification',
-    hint: 'Coming soon. We will switch it on for you.',
+    hint: 'On this phone, the moment a filing matches',
     icon: 'phone-portrait',
   },
-  { value: 'email', label: 'Email', hint: 'Works today: the same alert the website sends', icon: 'mail' },
-  { value: 'both', label: 'Both', hint: 'Email now, push as soon as it launches', icon: 'notifications' },
+  { value: 'email', label: 'Email', hint: 'The same alert the website sends', icon: 'mail' },
+  { value: 'both', label: 'Both', hint: 'A notification and an email', icon: 'notifications' },
 ];
 
 export default function NotifyScreen() {

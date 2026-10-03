@@ -422,4 +422,27 @@ export const SCHEMA_STATEMENTS = [
   // before the source's history starts) is known to be unanswerable rather
   // than retried on every run.
   `ALTER TABLE price_latest ADD COLUMN IF NOT EXISTS first_day TEXT`,
+  // ---------------------------------------------------------------------
+  // Push notifications, from the app. An alert delivers by email, by push,
+  // or both: email stays the default so every alert made before push existed
+  // keeps arriving exactly as it did.
+  // ---------------------------------------------------------------------
+  `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS email_enabled BOOLEAN NOT NULL DEFAULT TRUE`,
+  `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN NOT NULL DEFAULT FALSE`,
+  // One row per phone that has said yes to notifications, keyed by its Expo
+  // push token. A token belongs to one install, not one person: signing in
+  // as someone else on the same phone moves the row to them, which is the
+  // upsert in /api/push/devices. Turning notifications off in the app, or
+  // Expo reporting the install gone (DeviceNotRegistered), deletes the row.
+  `CREATE TABLE IF NOT EXISTS push_devices (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    -- 'ios' | 'android'
+    platform TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Bumped each time the app re-registers on launch, so a row nobody has
+    -- opened the app on for months is recognisable.
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices(user_id)`,
 ];

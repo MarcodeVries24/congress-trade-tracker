@@ -36,13 +36,17 @@ export interface AlertRecord {
    * CongTrade Pro. The account screen turns it into an explanation.
    */
   paused_reason: string | null;
+  /** Delivered by email. On by default, and for every alert made before push. */
+  email_enabled: boolean;
+  /** Delivered as a push notification to each phone the owner has turned them on for. */
+  push_enabled: boolean;
 }
 
 // id is a bigint: node-postgres (and Neon's driver) hand those back as
 // strings to avoid silently losing precision, so it is selected as text
 // explicitly and treated as a string all the way to the client.
 const ALERT_COLUMNS = `id::text AS id, name, email, filters, frequency, active,
-  created_at, updated_at, last_sent_at, sent_count, matched_count, paused_reason`;
+  created_at, updated_at, last_sent_at, sent_count, matched_count, paused_reason, email_enabled, push_enabled`;
 
 export async function listAlerts(userId: string): Promise<AlertRecord[]> {
   return (await sql.query(
@@ -62,12 +66,23 @@ export async function createAlert(input: {
   name: string;
   filters: AlertFilters;
   frequency: AlertFrequency;
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
 }): Promise<AlertRecord> {
   const rows = (await sql.query(
-    `INSERT INTO alerts (user_id, email, name, filters, frequency, unsubscribe_token)
-     VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+    `INSERT INTO alerts (user_id, email, name, filters, frequency, unsubscribe_token, email_enabled, push_enabled)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
      RETURNING ${ALERT_COLUMNS}`,
-    [input.userId, input.email, input.name, JSON.stringify(input.filters), input.frequency, crypto.randomUUID()]
+    [
+      input.userId,
+      input.email,
+      input.name,
+      JSON.stringify(input.filters),
+      input.frequency,
+      crypto.randomUUID(),
+      input.emailEnabled ?? true,
+      input.pushEnabled ?? false,
+    ]
   )) as AlertRecord[];
   return rows[0];
 }
@@ -75,7 +90,14 @@ export async function createAlert(input: {
 export async function updateAlert(
   userId: string,
   id: string,
-  patch: { name?: string; filters?: AlertFilters; frequency?: AlertFrequency; active?: boolean }
+  patch: {
+    name?: string;
+    filters?: AlertFilters;
+    frequency?: AlertFrequency;
+    active?: boolean;
+    emailEnabled?: boolean;
+    pushEnabled?: boolean;
+  }
 ): Promise<AlertRecord | null> {
   const sets: string[] = ["updated_at = NOW()"];
   const params: unknown[] = [];
@@ -87,6 +109,8 @@ export async function updateAlert(
   if (patch.name !== undefined) sets.push(`name = ${addParam(patch.name)}`);
   if (patch.filters !== undefined) sets.push(`filters = ${addParam(JSON.stringify(patch.filters))}::jsonb`);
   if (patch.frequency !== undefined) sets.push(`frequency = ${addParam(patch.frequency)}`);
+  if (patch.emailEnabled !== undefined) sets.push(`email_enabled = ${addParam(patch.emailEnabled)}`);
+  if (patch.pushEnabled !== undefined) sets.push(`push_enabled = ${addParam(patch.pushEnabled)}`);
   if (patch.active !== undefined) {
     sets.push(`active = ${addParam(patch.active)}`);
     // Switching it back on clears the sender's explanation for switching it
@@ -101,6 +125,14 @@ export async function updateAlert(
     `UPDATE alerts SET ${sets.join(", ")} WHERE id = ${idParam}::bigint AND user_id = ${userParam} RETURNING ${ALERT_COLUMNS}`,
     params
   )) as AlertRecord[];
+  return rows[0] ?? null;
+}
+
+export async function getAlert(userId: string, id: string): Promise<AlertRecord | null> {
+  const rows = (await sql.query(`SELECT ${ALERT_COLUMNS} FROM alerts WHERE id = $1::bigint AND user_id = $2`, [
+    id,
+    userId,
+  ])) as AlertRecord[];
   return rows[0] ?? null;
 }
 

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,35 +8,20 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
 import { fetchTrades } from '@/lib/api';
-import { memberDisplayNameFromFiledName } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { rememberTrades } from '@/lib/trade-cache';
 import {
-  AMOUNT_RANGES,
-  ASSET_TYPES,
-  CHAMBERS,
-  FILED,
-  MARKET_CAPS,
-  MIN_AMOUNTS,
-  OWNERS,
-  PARTIES,
   SORTS,
-  TYPES,
-  US_STATES,
-  WINDOWS,
   activeChips,
   countActive,
-  daysAgo,
   suggestAlertName,
   toAlertFilters,
-  windowFor,
   type TradeFilters,
 } from '@/lib/trade-filters';
 import { useAuthedRequest } from '@/lib/use-api';
@@ -44,71 +29,19 @@ import { useDebounced, usePaged } from '@/lib/use-paged';
 import { radius, shadow, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
+import { FilterFields, parseTickers } from '@/ui/filter-fields';
 import { Icon } from '@/ui/icon';
-import { MemberPicker } from '@/ui/member-picker';
 import { SearchBar } from '@/ui/search-bar';
 import { TabHeader } from '@/ui/tab-header';
 import { RowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-import { ToggleChips } from '@/ui/toggle-chips';
 import { TradeRow } from '@/ui/trade-row';
 
 const PAGE = 40;
 
 function sortOf(f: TradeFilters) {
   return SORTS.find((s) => s.key === f.sort) ?? SORTS[0];
-}
-
-/** One section of the filter sheet. Long lists fold until asked for. */
-function Section({
-  title,
-  hint,
-  children,
-  foldable,
-  count,
-}: {
-  title: string;
-  hint?: string;
-  children: ReactNode;
-  foldable?: boolean;
-  count?: number;
-}) {
-  const { c } = useTheme();
-  const [open, setOpen] = useState(!foldable || Boolean(count));
-  const heading = (
-    <>
-      <View style={styles.flex}>
-        <Text variant="subhead">
-          {title}
-          {count ? (
-            <Text variant="subhead" tone="accent">
-              {'  '}
-              {count}
-            </Text>
-          ) : null}
-        </Text>
-        {hint ? (
-          <Text variant="caption" tone="muted">
-            {hint}
-          </Text>
-        ) : null}
-      </View>
-      {foldable ? <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} color={c.textMuted} /> : null}
-    </>
-  );
-  return (
-    <View style={[styles.section, { borderBottomColor: c.border }]}>
-      {foldable ? (
-        <Tap onPress={() => setOpen((o) => !o)} scaleTo={0.99} style={styles.sectionHead}>
-          {heading}
-        </Tap>
-      ) : (
-        <View style={styles.sectionHead}>{heading}</View>
-      )}
-      {open ? <View style={styles.sectionBody}>{children}</View> : null}
-    </View>
-  );
 }
 
 /**
@@ -133,15 +66,11 @@ function FilterSheet({
   const [count, setCount] = useState<number | null>(null);
 
   const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
-  const list = (values: string[]) => (values.length ? values : undefined);
 
-  const withTickers = useMemo<TradeFilters>(() => {
-    const tickers = tickerText
-      .split(/[\s,]+/)
-      .map((t) => t.trim().toUpperCase())
-      .filter(Boolean);
-    return { ...draft, tickers: tickers.length ? tickers : undefined };
-  }, [draft, tickerText]);
+  const withTickers = useMemo<TradeFilters>(
+    () => ({ ...draft, tickers: parseTickers(tickerText) }),
+    [draft, tickerText]
+  );
 
   const settled = useDebounced(withTickers, 400);
   useEffect(() => {
@@ -158,8 +87,6 @@ function FilterSheet({
       cancelled = true;
     };
   }, [settled, authed]);
-
-  const window = windowFor(draft.dateFrom);
 
   return (
     // Mounted only while open, so every opening starts from what is applied.
@@ -187,111 +114,13 @@ function FilterSheet({
         </View>
 
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <Section title="Sort by">
-            <ToggleChips
-              single
-              options={SORTS}
-              selected={[sortOf(draft).key]}
-              onChange={([key]) => {
-                const s = SORTS.find((x) => x.key === key) ?? SORTS[0];
-                set({ sort: s.key, order: s.order });
-              }}
-            />
-          </Section>
-
-          <Section title="Transaction">
-            <ToggleChips options={TYPES} selected={draft.types ?? []} onChange={(v) => set({ types: list(v) })} />
-          </Section>
-
-          <Section title="Chamber" hint="Both, if neither is picked">
-            <ToggleChips
-              options={CHAMBERS}
-              selected={draft.chamber ?? []}
-              onChange={(v) => set({ chamber: list(v) as ('house' | 'senate')[] | undefined })}
-            />
-          </Section>
-
-          <Section title="Party">
-            <ToggleChips options={PARTIES} selected={draft.parties ?? []} onChange={(v) => set({ parties: list(v) })} />
-          </Section>
-
-          <Section title="Members" count={new Set((draft.members ?? []).map(memberDisplayNameFromFiledName)).size}>
-            <MemberPicker value={draft.members ?? []} onChange={(v) => set({ members: list(v) })} />
-          </Section>
-
-          <Section title="Tickers" hint="Separate with commas">
-            <TextInput
-              value={tickerText}
-              onChangeText={setTickerText}
-              placeholder="e.g. NVDA, TSLA"
-              placeholderTextColor={c.textFaint}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={[styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }]}
-            />
-          </Section>
-
-          <Section title="Minimum amount" hint="The lowest value of the disclosed range">
-            <ToggleChips
-              single
-              options={MIN_AMOUNTS}
-              selected={draft.minAmount ? [String(draft.minAmount)] : []}
-              onChange={([v]) => set({ minAmount: v ? Number(v) : undefined })}
-            />
-          </Section>
-
-          <Section title="Filed" hint="By the date the disclosure was published">
-            <ToggleChips
-              single
-              options={WINDOWS.filter((w) => w.key !== 'any')}
-              selected={window === 'any' ? [] : [window]}
-              onChange={([v]) => {
-                const w = WINDOWS.find((x) => x.key === v);
-                set({ dateFrom: w && w.days ? daysAgo(w.days) : undefined, dateTo: undefined });
-              }}
-            />
-          </Section>
-
-          <Section title="Timeliness" hint="The law allows 45 days">
-            <ToggleChips
-              single
-              options={FILED.filter((f) => f.key !== 'any')}
-              selected={draft.filedStatus ? [draft.filedStatus] : []}
-              onChange={([v]) => set({ filedStatus: (v as 'late' | 'onTime' | undefined) || undefined })}
-            />
-          </Section>
-
-          <Section title="Asset type" foldable count={draft.assetTypes?.length}>
-            <ToggleChips
-              options={ASSET_TYPES}
-              selected={draft.assetTypes ?? []}
-              onChange={(v) => set({ assetTypes: list(v) })}
-            />
-          </Section>
-
-          <Section title="Owner" foldable count={draft.owners?.length}>
-            <ToggleChips options={OWNERS} selected={draft.owners ?? []} onChange={(v) => set({ owners: list(v) })} />
-          </Section>
-
-          <Section title="Company size" foldable count={draft.marketCapTiers?.length}>
-            <ToggleChips
-              options={MARKET_CAPS}
-              selected={draft.marketCapTiers ?? []}
-              onChange={(v) => set({ marketCapTiers: list(v) })}
-            />
-          </Section>
-
-          <Section title="Exact amount ranges" foldable count={draft.amountRanges?.length}>
-            <ToggleChips
-              options={AMOUNT_RANGES}
-              selected={draft.amountRanges ?? []}
-              onChange={(v) => set({ amountRanges: list(v) })}
-            />
-          </Section>
-
-          <Section title="State" foldable count={draft.states?.length}>
-            <ToggleChips options={US_STATES} selected={draft.states ?? []} onChange={(v) => set({ states: list(v) })} />
-          </Section>
+          <FilterFields
+            draft={draft}
+            set={set}
+            tickerText={tickerText}
+            setTickerText={setTickerText}
+            mode="search"
+          />
         </ScrollView>
 
         <View style={[styles.sheetFoot, { borderTopColor: c.border, paddingBottom: insets.bottom + 12 }]}>

@@ -20,6 +20,9 @@ export interface SavedAlert {
   sent_count: number;
   matched_count: number;
   paused_reason: string | null;
+  /** How it is delivered. Push is switched on from the app, which is where the phones are. */
+  email_enabled: boolean;
+  push_enabled: boolean;
 }
 
 export interface AlertsResponse {

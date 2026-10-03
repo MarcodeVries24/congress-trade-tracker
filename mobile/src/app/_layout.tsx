@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AccessProvider, useAccess } from '@/lib/access';
 import { FollowsProvider } from '@/lib/follows';
 import { OnboardingProvider, useOnboarding } from '@/lib/onboarding';
+import { PushProvider } from '@/lib/push';
 import { tokenCache } from '@/lib/token-cache';
 import { useTheme } from '@/theme';
 import { SplashOverlay } from '@/ui/splash-overlay';
@@ -61,7 +62,7 @@ function Navigation() {
         <Stack.Screen name="issuer/[slug]" options={pushed} />
         <Stack.Screen name="issuers" options={{ ...pushed, title: 'Companies' }} />
         <Stack.Screen name="news" options={{ ...pushed, title: 'News' }} />
-        <Stack.Screen name="email-alerts" options={{ ...pushed, title: 'Email alerts' }} />
+        <Stack.Screen name="email-alerts" options={{ ...pushed, title: 'Your alerts' }} />
         <Stack.Screen name="settings" options={{ ...pushed, title: 'Settings' }} />
         <Stack.Screen name="help" options={{ ...pushed, title: 'Help & Support' }} />
         <Stack.Screen
@@ -113,11 +114,13 @@ export default function RootLayout() {
         <AccessProvider>
           <OnboardingProvider>
             <FollowsProvider>
-              <ThemeProvider value={navTheme}>
-                <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                <Navigation />
-                <SplashOverlay />
-              </ThemeProvider>
+              <PushProvider>
+                <ThemeProvider value={navTheme}>
+                  <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+                  <Navigation />
+                  <SplashOverlay />
+                </ThemeProvider>
+              </PushProvider>
             </FollowsProvider>
           </OnboardingProvider>
         </AccessProvider>

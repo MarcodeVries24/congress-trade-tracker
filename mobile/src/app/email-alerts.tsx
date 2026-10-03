@@ -7,19 +7,30 @@ import { rememberAlerts } from '@/lib/alert-cache';
 import { memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { answersAsAlertFilters, useOnboarding } from '@/lib/onboarding';
+import { usePush } from '@/lib/push';
 import { useAuthedRequest } from '@/lib/use-api';
 import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
+import { PushSwitchCard } from '@/ui/push-primer';
 import { RowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 const FREQUENCY_LABELS = { instant: 'As it happens', daily: 'Daily digest', weekly: 'Weekly digest' } as const;
 
+/** How an alert reaches its owner, in a few words for the list. */
+function channels(alert: Alert): string {
+  const email = alert.email_enabled !== false;
+  const push = Boolean(alert.push_enabled);
+  return email && push ? 'Push and email' : push ? 'Push' : 'Email';
+}
+
 /**
- * Email alerts: each one a filter, emailed when a new filing matches it.
+ * Your alerts: each one a filter, sent as a push notification, an email, or
+ * both when a new filing matches it. The switch for push on this phone sits
+ * at the top; each alert says how it is delivered and can be paused in place.
  *
  * The same alerts as the website's account page, through the same routes, so
  * one made here shows up there. With none yet, it offers to save the one the
@@ -27,6 +38,7 @@ const FREQUENCY_LABELS = { instant: 'As it happens', daily: 'Daily digest', week
  */
 export default function EmailAlertsScreen() {
   const { c } = useTheme();
+  const push = usePush();
   const router = useRouter();
   const authed = useAuthedRequest();
   const { answers } = useOnboarding();
@@ -79,7 +91,19 @@ export default function EmailAlertsScreen() {
   const saveSuggested = async () => {
     setSaving(true);
     try {
-      await createAlert({ name: suggestedName, frequency: 'instant', filters: suggested }, await authed());
+      // As asked in setup, as far as this phone allows: push only once
+      // notifications are on here, and email whenever push cannot carry it.
+      const byPush = answers.notify !== 'email' && push.enabled;
+      await createAlert(
+        {
+          name: suggestedName,
+          frequency: 'instant',
+          filters: suggested,
+          push: byPush,
+          email: answers.notify !== 'push' || !byPush,
+        },
+        await authed()
+      );
       haptic.success();
       await load();
     } catch (err) {
@@ -93,8 +117,8 @@ export default function EmailAlertsScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: c.background }]}>
         <EmptyState
-          icon="mail-outline"
-          title="Sign in to use email alerts"
+          icon="notifications-outline"
+          title="Sign in to use alerts"
           body="Alerts belong to your account, so they work on the website too."
           action="Sign in"
           onAction={() => router.push('/sign-in')}
@@ -125,10 +149,11 @@ export default function EmailAlertsScreen() {
 
   const header = (
     <View style={styles.header}>
+      <PushSwitchCard devices={data.pushDevices} />
       <Text variant="callout" tone="muted">
-        {data.email
-          ? `Sent to ${data.email} when a new filing matches. We check the disclosure sites every few hours.`
-          : 'Add an email address to your account to receive alerts.'}
+        Each alert is a set of filters. When a new filing matches, you get a notification, an email to{' '}
+        {data.email ?? 'your account'}, or both, as you choose per alert. The disclosure sites are checked every few
+        hours.
       </Text>
       <Button
         label={full ? `Limit of ${data.maxAlerts} reached` : 'New alert'}
@@ -149,7 +174,7 @@ export default function EmailAlertsScreen() {
           </View>
           <Text variant="subhead">Your first alert</Text>
           <Text variant="callout" tone="muted">
-            From your answers when you set up the app: {suggestedName.toLowerCase()}, emailed as it happens.
+            From your answers when you set up the app: {suggestedName.toLowerCase()}, sent as it happens.
           </Text>
           <Button label="Save this alert" kind="secondary" size="md" loading={saving} onPress={saveSuggested} />
         </View>
@@ -178,7 +203,7 @@ export default function EmailAlertsScreen() {
           {item.summary}
         </Text>
         <Text variant="footnote" tone="faint">
-          {FREQUENCY_LABELS[item.frequency]} ·{' '}
+          {channels(item)} · {FREQUENCY_LABELS[item.frequency]} ·{' '}
           {item.sent_count
             ? `${item.sent_count} sent, last ${shortDate(item.last_sent_at?.slice(0, 10) ?? null)}`
             : 'nothing sent yet'}

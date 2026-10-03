@@ -32,7 +32,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'How do alerts work?',
-    a: 'The Alerts tab shows every recent trade by the politicians on your watchlist. Email alerts go further: they email you as soon as a new filing matches the criteria you set. Push notifications are on the way.',
+    a: 'The Alerts tab shows every recent trade by the politicians on your watchlist. Your own alerts go further: build one from any filter, and you get a push notification, an email, or both as soon as a new filing matches. Turn push on or off for this phone at the top of Your alerts, or per alert in its settings.',
   },
   {
     q: 'How do I cancel my subscription?',

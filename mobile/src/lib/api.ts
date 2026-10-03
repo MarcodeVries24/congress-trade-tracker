@@ -417,7 +417,7 @@ async function send<T>(
 
 export type AlertFrequency = "instant" | "daily" | "weekly";
 
-/** The subset of the website's alert criteria the app edits. The server keeps any others untouched. */
+/** Every criterion an alert can carry, the same as web/lib/alertFilters.ts. */
 export interface AlertFilters {
   q?: string;
   chambers?: string[];
@@ -446,6 +446,10 @@ export interface Alert {
   sent_count: number;
   matched_count: number;
   paused_reason: string | null;
+  /** Delivered by email. Absent from a server older than push: read as on. */
+  email_enabled?: boolean;
+  /** Delivered as a push notification to each phone with notifications on. */
+  push_enabled?: boolean;
   /** The server's one-line description, the same one the email uses. */
   summary: string;
 }
@@ -456,6 +460,8 @@ export interface AlertList {
   /** Where the emails go. */
   email: string | null;
   maxAlerts: number;
+  /** Phones this account gets push notifications on. */
+  pushDevices?: number;
 }
 
 export function fetchAlerts(options: RequestOptions = {}): Promise<AlertList> {
@@ -463,7 +469,7 @@ export function fetchAlerts(options: RequestOptions = {}): Promise<AlertList> {
 }
 
 export async function createAlert(
-  input: { name: string; frequency: AlertFrequency; filters: AlertFilters },
+  input: { name: string; frequency: AlertFrequency; filters: AlertFilters; email: boolean; push: boolean },
   options: RequestOptions = {}
 ): Promise<Alert> {
   return (await send<{ alert: Alert }>("POST", "/api/alerts", input, options)).alert;
@@ -471,7 +477,14 @@ export async function createAlert(
 
 export async function updateAlert(
   id: string,
-  patch: Partial<{ name: string; frequency: AlertFrequency; filters: AlertFilters; active: boolean }>,
+  patch: Partial<{
+    name: string;
+    frequency: AlertFrequency;
+    filters: AlertFilters;
+    active: boolean;
+    email: boolean;
+    push: boolean;
+  }>,
   options: RequestOptions = {}
 ): Promise<Alert> {
   return (await send<{ alert: Alert }>("PATCH", `/api/alerts/${id}`, patch, options)).alert;
@@ -479,6 +492,20 @@ export async function updateAlert(
 
 export async function deleteAlert(id: string, options: RequestOptions = {}): Promise<void> {
   await send<{ ok: boolean }>("DELETE", `/api/alerts/${id}`, undefined, options);
+}
+
+/** Turns push notifications on for this phone: its Expo push token, filed under the account. */
+export async function registerPushDevice(
+  token: string,
+  platform: "ios" | "android",
+  options: RequestOptions = {}
+): Promise<void> {
+  await send<{ ok: boolean }>("POST", "/api/push/devices", { token, platform }, options);
+}
+
+/** Turns them off again. */
+export async function unregisterPushDevice(token: string, options: RequestOptions = {}): Promise<void> {
+  await send<{ ok: boolean }>("DELETE", "/api/push/devices", { token }, options);
 }
 
 /** How many trades a draft would have matched: ever, and in the last 90 days. */

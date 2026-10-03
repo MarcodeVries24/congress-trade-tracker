@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { countAlerts, createAlert, listAlerts, MAX_ALERTS_PER_USER, recordEntitlement, syncAlertEmails } from "@/lib/alerts";
+import { countPushDevices } from "@/lib/pushDevices";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
 const MAX_NAME_LENGTH = 80;
@@ -18,9 +19,9 @@ function parseName(value: unknown): string | null {
 }
 
 /**
- * The caller's alerts, plus the two things the account screen needs to know
- * before it can render: whether they still hold CongTrade Pro, and the
- * address alerts will actually be delivered to.
+ * The caller's alerts, plus what the account screen and the app need to know
+ * before they can render: whether they still hold CongTrade Pro, the address
+ * alerts will be emailed to, and how many phones push notifications reach.
  */
 export async function GET() {
   const { userId } = await auth();
@@ -31,7 +32,11 @@ export async function GET() {
   // Keep the snapshot the sender relies on current — see syncAlertEmails.
   if (email) await syncAlertEmails(userId, email);
 
-  const [alerts, isPro] = await Promise.all([listAlerts(userId), hasProServer()]);
+  const [alerts, isPro, pushDevices] = await Promise.all([
+    listAlerts(userId),
+    hasProServer(),
+    countPushDevices(userId),
+  ]);
   // Cheap gift to the cron: it needs this same answer and has to pay a Clerk
   // round trip for it, whereas here it's already in the session.
   await recordEntitlement(userId, isPro);
@@ -42,6 +47,7 @@ export async function GET() {
     isPro,
     email,
     maxAlerts: MAX_ALERTS_PER_USER,
+    pushDevices,
   });
 }
 
@@ -72,6 +78,15 @@ export async function POST(req: NextRequest) {
   const frequency = parseFrequency((body as { frequency?: unknown }).frequency);
   if (!frequency) return NextResponse.json({ error: "Pick how often to be emailed." }, { status: 400 });
 
+  // Email unless told otherwise, so the website's form (which has no push
+  // option) keeps making the alerts it always made.
+  const raw = body as { email?: unknown; push?: unknown };
+  const emailEnabled = raw.email === undefined ? true : Boolean(raw.email);
+  const pushEnabled = Boolean(raw.push);
+  if (!emailEnabled && !pushEnabled) {
+    return NextResponse.json({ error: "Choose email, push notifications, or both." }, { status: 400 });
+  }
+
   if ((await countAlerts(userId)) >= MAX_ALERTS_PER_USER) {
     return NextResponse.json({ error: `You can have up to ${MAX_ALERTS_PER_USER} alerts. Delete one first.` }, { status: 400 });
   }
@@ -82,6 +97,8 @@ export async function POST(req: NextRequest) {
     name,
     frequency,
     filters: normalizeAlertFilters((body as { filters?: unknown }).filters),
+    emailEnabled,
+    pushEnabled,
   });
   return NextResponse.json({ alert: { ...alert, summary: summarizeAlert(alert.filters) } }, { status: 201 });
 }

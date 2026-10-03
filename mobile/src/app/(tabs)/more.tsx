@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAccess } from '@/lib/access';
 import { useFollows } from '@/lib/follows';
 import { LINKS, openPage } from '@/lib/links';
+import { usePush } from '@/lib/push';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
@@ -27,7 +28,8 @@ import { Text } from '@/ui/text';
 export default function MoreScreen() {
   const { c } = useTheme();
   const router = useRouter();
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn } = useAuth();
+  const { signOut } = usePush();
   const { user } = useUser();
   const { status } = useAccess();
   const follows = useFollows();
@@ -79,7 +81,7 @@ export default function MoreScreen() {
           />
           <ListRow
             icon="notifications-outline"
-            label="Email alerts"
+            label="Your alerts"
             onPress={() => router.push('/email-alerts')}
             last
           />

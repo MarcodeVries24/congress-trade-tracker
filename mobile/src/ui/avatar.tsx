@@ -87,3 +87,25 @@ export function Avatar({
 const styles = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
 });
+
+/**
+ * The signed-in person's own picture, or Cong's face when they have not set
+ * one. Clerk always gives an imageUrl, a generated placeholder when there is no
+ * photo, so `hasImage` is what tells the two apart.
+ */
+export function UserAvatar({
+  user,
+  size,
+}: {
+  user: { hasImage: boolean; imageUrl: string; fullName: string | null } | null | undefined;
+  size: number;
+}) {
+  if (user?.hasImage) return <Avatar uri={user.imageUrl} name={user.fullName ?? ''} size={size} />;
+  return (
+    <Image
+      source={require('../../assets/images/cong/avatar.png')}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
+      accessibilityLabel="Cong, the CongTrade monkey"
+    />
+  );
+}

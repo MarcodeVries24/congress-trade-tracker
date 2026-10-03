@@ -9,7 +9,7 @@ import { haptic } from '@/lib/haptics';
 import { LINKS, SITE, openPage } from '@/lib/links';
 import { usePush } from '@/lib/push';
 import { radius, useTheme } from '@/theme';
-import { Avatar } from '@/ui/avatar';
+import { UserAvatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { ListRow } from '@/ui/list-row';
@@ -72,7 +72,7 @@ export function AccountPanel() {
   return (
     <View style={styles.wrap}>
       <View style={styles.identity}>
-        <Avatar uri={user?.imageUrl} name={name} size={84} />
+        <UserAvatar user={user} size={84} />
         <Text variant="title" style={styles.center}>
           {name}
         </Text>

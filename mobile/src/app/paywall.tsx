@@ -110,10 +110,10 @@ export default function PaywallScreen() {
   const benefits = [
     "Every member's trades, the day they're filed",
     followed.length === 1
-      ? `Alerts for ${followed[0]}, and anyone else you follow`
+      ? `Alerts for ${followed[0]} and all of Congress`
       : followed.length > 1
-        ? 'Alerts for them, and anyone else you follow'
-        : 'Alerts for anyone you follow, by push or email',
+        ? 'Alerts for them and all of Congress'
+        : 'Alerts for anyone in Congress, by push or email',
     'The best-timed trades, and how they did since',
   ];
 
@@ -158,7 +158,11 @@ export default function PaywallScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {followed.length ? (
-          <CongSays pose="pro" title={`Ready to watch ${who} for you.`} subtitle="I'll tell you the day they trade." />
+          <CongSays
+            pose="pro"
+            title={`Ready to watch ${who} for you.`}
+            subtitle="And anyone else in Congress, the day they trade."
+          />
         ) : (
           <CongSays pose="pro" title="Every trade Congress makes, the day it's filed." subtitle="Cancel anytime." />
         )}
@@ -440,12 +444,12 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   semibold: { fontWeight: '600' },
   center: { textAlign: 'center' },
-  benefits: { gap: 10, paddingTop: 18, paddingHorizontal: 4 },
+  benefits: { gap: 8, paddingTop: 14, paddingHorizontal: 4 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   check: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  plans: { paddingTop: 22, gap: 10 },
+  plans: { paddingTop: 16, gap: 8 },
   price: { alignItems: 'flex-end', gap: 1 },
-  latest: { marginTop: 18, padding: 12, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
+  latest: { marginTop: 14, padding: 12, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
   latestHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
   latestRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -455,7 +459,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: radius.xl,
   },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

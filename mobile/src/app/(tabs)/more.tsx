@@ -8,7 +8,7 @@ import { useFollows } from '@/lib/follows';
 import { LINKS, openPage } from '@/lib/links';
 import { usePush } from '@/lib/push';
 import { radius, useTheme } from '@/theme';
-import { Avatar } from '@/ui/avatar';
+import { UserAvatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { ListRow } from '@/ui/list-row';
@@ -52,7 +52,7 @@ export default function MoreScreen() {
           onPress={() => router.push('/sign-in')}
           style={[styles.profile, { backgroundColor: c.surface, borderColor: c.border }]}>
           {isSignedIn ? (
-            <Avatar uri={user?.imageUrl} name={name} size={64} />
+            <UserAvatar user={user} size={64} />
           ) : (
             <View style={[styles.guest, { backgroundColor: c.surfaceMuted }]}>
               <Icon name="person" size={30} color={c.textMuted} />
@@ -79,12 +79,7 @@ export default function MoreScreen() {
             detail={`${follows.members.length} ${follows.members.length === 1 ? 'politician' : 'politicians'}`}
             onPress={() => router.push({ pathname: '/politicians', params: { view: 'watchlist' } })}
           />
-          <ListRow
-            icon="notifications-outline"
-            label="Your alerts"
-            onPress={() => router.push('/email-alerts')}
-            last
-          />
+          <ListRow icon="notifications-outline" label="Your alerts" onPress={() => router.push('/email-alerts')} last />
         </Group>
 
         <Group title="Browse">

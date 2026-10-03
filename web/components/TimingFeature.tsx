@@ -11,12 +11,11 @@ import type { TimedTrade, TimingLeader } from "@/lib/timing";
 import type { TimingSummary } from "@/lib/prices";
 
 /**
- * The pieces of "Before the public knew" as it is featured: the best-timed
- * trade with its chart, the runners-up, the members whose trades most often
- * move their way, and the figures for everyone. Plain components with no
- * data fetching of their own, so the home page (a client component, which
- * fetches /api/timing) and /before-disclosure (rendered on the server) show
- * the same thing.
+ * The pieces of "Before the public knew": the best-timed trade with its
+ * chart, the ranked list, the members whose trades most often move their
+ * way, and the figures for everyone. Plain components with no data fetching
+ * of their own, so the home page's card (a client component, which fetches
+ * /api/timing) and /before-disclosure (rendered on the server) share them.
  */
 
 export const NOT_ADVICE =
@@ -66,8 +65,11 @@ export function FeaturedTimedTrade({ trade: t, points }: { trade: TimedTrade; po
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-1">
-        <div className="text-4xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-5xl">
-          {formatMove(t.edge)}
+        <div>
+          <div className="text-4xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-5xl">
+            {formatMove(t.edge)}
+          </div>
+          <div className="text-xs font-semibold text-ink-muted">in the trader&rsquo;s favour</div>
         </div>
         <p className="max-w-md pb-1 text-sm leading-snug text-ink-muted">
           The stock {edgeWords(t)} {formatMove(Math.abs(t.edge)).replace("+", "")} in the {daysLabel(t.days_to_file)}{" "}

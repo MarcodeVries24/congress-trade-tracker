@@ -15,6 +15,6 @@ export async function GET(req: NextRequest) {
   const days = parseTimingWindow(req.nextUrl.searchParams.get("days"));
   const overview = await getTimingOverviewCached(days, { trades: 12, leaders: 10 });
   return NextResponse.json(overview, {
-    headers: { "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+    headers: { "cache-control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" },
   });
 }

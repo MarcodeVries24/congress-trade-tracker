@@ -34,6 +34,12 @@ const CHAMBERS = [
 ] as const;
 type ChamberKey = (typeof CHAMBERS)[number]['key'];
 
+const TIMING_WINDOWS = [
+  { key: '30', label: 'Past 30 days' },
+  { key: '90', label: 'Past 90 days' },
+] as const;
+type TimingKey = (typeof TIMING_WINDOWS)[number]['key'];
+
 const PAGE = 30;
 
 type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
@@ -105,7 +111,9 @@ export default function DiscoverScreen() {
 
   const [chamber, setChamber] = useState<ChamberKey>(answers.chamber === 'both' ? 'both' : answers.chamber);
   const [recent, setRecent] = useState<Trade[] | null>(null);
-  const [timing, setTiming] = useState<TimingOverview | null | 'failed'>(null);
+  // Both windows kept once loaded, so switching back is instant.
+  const [timingDays, setTimingDays] = useState<TimingKey>('90');
+  const [timing, setTiming] = useState<Partial<Record<TimingKey, TimingOverview>> | null | 'failed'>(null);
   const [feed, setFeed] = useState<Trade[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -127,15 +135,18 @@ export default function DiscoverScreen() {
 
   // The best-timed trades of the last 90 days, for the featured section.
   // Optional: on failure the section simply does not show.
-  const loadTiming = useCallback(async () => {
-    try {
-      const overview = await fetchTiming(90, await authed());
-      rememberTrades(overview.trades);
-      setTiming(overview);
-    } catch {
-      setTiming((prev) => (prev && prev !== 'failed' ? prev : 'failed'));
-    }
-  }, [authed]);
+  const loadTiming = useCallback(
+    async (days: TimingKey) => {
+      try {
+        const overview = await fetchTiming(Number(days) as 30 | 90, await authed());
+        rememberTrades(overview.trades);
+        setTiming((prev) => ({ ...(prev && prev !== 'failed' ? prev : {}), [days]: overview }));
+      } catch {
+        setTiming((prev) => (prev && prev !== 'failed' ? prev : 'failed'));
+      }
+    },
+    [authed]
+  );
 
   const loadFeed = useCallback(
     async (nextPage: number, replace: boolean) => {
@@ -177,8 +188,12 @@ export default function DiscoverScreen() {
     // Every state update in these is behind an await; the rule cannot see that.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRecent();
-    void loadTiming();
-  }, [loadRecent, loadTiming]);
+  }, [loadRecent]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadTiming(timingDays);
+  }, [loadTiming, timingDays]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -190,7 +205,7 @@ export default function DiscoverScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     void loadRecent();
-    void loadTiming();
+    void loadTiming(timingDays);
     void loadFeed(1, true);
   };
 
@@ -230,37 +245,6 @@ export default function DiscoverScreen() {
       <View style={styles.search}>
         <SearchBar onPress={() => router.push('/search')} />
       </View>
-
-      {timing !== 'failed' ? (
-        <View style={styles.block}>
-          <SectionHeader
-            title="Before the public knew"
-            subtitle="What the stock did before a trade was disclosed"
-            action="See all"
-            onAction={() => router.push('/timing')}
-          />
-          <View style={styles.timing}>
-            {timing === null ? (
-              <Skeleton width="100%" height={330} round={20} />
-            ) : timing.trades[0] ? (
-              <FeaturedTiming trade={timing.trades[0]} />
-            ) : null}
-          </View>
-          {timing && timing.trades.length > 1 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timingRow}>
-              {timing.trades.slice(1, 8).map((t, i) => (
-                <TimedTradeCard key={t.id} trade={t} rank={i + 2} />
-              ))}
-            </ScrollView>
-          ) : null}
-          {timing ? (
-            <View style={styles.timingFoot}>
-              {timing.summary ? <TimingFacts summary={timing.summary} days={timing.days} /> : null}
-              <NotAdvice />
-            </View>
-          ) : null}
-        </View>
-      ) : null}
 
       <View style={styles.block}>
         <SectionHeader title="Just filed" subtitle="Members with new disclosures" />
@@ -354,6 +338,49 @@ export default function DiscoverScreen() {
           </Tap>
         ))}
       </View>
+
+      {timing !== 'failed' ? (
+        <View style={styles.block}>
+          <SectionHeader
+            title="Best-timed trades"
+            subtitle="How far the stock moved their way before the public knew. Filed on time only."
+            action="See all"
+            onAction={() => router.push('/timing')}
+          />
+          <ChipRow options={TIMING_WINDOWS} value={timingDays} onChange={setTimingDays} />
+          {(() => {
+            const shown = timing?.[timingDays];
+            return (
+              <>
+                <View style={styles.timing}>
+                  {!shown ? (
+                    <Skeleton width="100%" height={330} round={20} />
+                  ) : shown.trades[0] ? (
+                    <FeaturedTiming trade={shown.trades[0]} />
+                  ) : (
+                    <Text variant="callout" tone="muted">
+                      No priced trades were disclosed on time in this window yet.
+                    </Text>
+                  )}
+                </View>
+                {shown && shown.trades.length > 1 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timingRow}>
+                    {shown.trades.slice(1, 8).map((t, i) => (
+                      <TimedTradeCard key={t.id} trade={t} rank={i + 2} />
+                    ))}
+                  </ScrollView>
+                ) : null}
+                {shown ? (
+                  <View style={styles.timingFoot}>
+                    {shown.summary ? <TimingFacts summary={shown.summary} days={shown.days} /> : null}
+                    <NotAdvice />
+                  </View>
+                ) : null}
+              </>
+            );
+          })()}
+        </View>
+      ) : null}
 
       <View style={styles.feedHead}>
         <SectionHeader

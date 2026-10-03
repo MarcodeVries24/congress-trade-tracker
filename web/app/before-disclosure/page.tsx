@@ -54,8 +54,8 @@ export default async function BeforeDisclosurePage({ searchParams }: { searchPar
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-muted">
           The STOCK Act gives members of Congress up to 45 days to disclose a trade, and some take far longer. For every
           trade in a listed stock, CongTrade shows what the price did between the day it was made and the day the public
-          could see it. These are the trades where it moved furthest the trader&rsquo;s way: up after a purchase, down
-          after a sale.
+          could see it. These are the trades where it moved furthest the trader&rsquo;s way (up after a purchase, down
+          after a sale), among those filed within the 45 days the law allows.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -96,7 +96,7 @@ export default async function BeforeDisclosurePage({ searchParams }: { searchPar
               <TimingLeaderList leaders={overview.leaders} />
               <p className="border-t border-line px-4 py-3 text-[11px] text-ink-faint">
                 Average move in their favour before disclosure, over the past year, for members with at least five
-                priced trades.
+                priced trades filed on time.
               </p>
             </section>
           </div>
@@ -127,7 +127,11 @@ export default async function BeforeDisclosurePage({ searchParams }: { searchPar
               Several lots of the same stock in one filing count once, at the largest. No member appears more than twice
               in a ranking, and moves over 400%, which are usually a mismatched listing, are left out.
             </li>
-            <li>Trades disclosed the same day they were made are left out: there was no gap to measure.</li>
+            <li>
+              Only trades disclosed within the 45 days the law allows are ranked; late filings are on each trade&rsquo;s
+              page and under the trades browser&rsquo;s &ldquo;Filed late&rdquo; filter. Trades disclosed the same day
+              they were made are left out too: there was no gap to measure.
+            </li>
             <li>
               Prices update every weekday evening after the US close, and new trades are priced within a few hours of
               being filed.

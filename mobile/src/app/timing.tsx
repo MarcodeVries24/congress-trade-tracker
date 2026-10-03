@@ -78,7 +78,8 @@ export default function TimingScreen() {
         <Text variant="body" tone="muted">
           Members of Congress can take up to 45 days to disclose a trade, and some take far longer. For every trade in a
           listed stock, this is what the price did before the public could see it. These moved furthest the
-          trader&apos;s way: up after a purchase, down after a sale.
+          trader&apos;s way (up after a purchase, down after a sale), among trades filed within the 45 days the law
+          allows.
         </Text>
       </View>
 
@@ -113,7 +114,7 @@ export default function TimingScreen() {
                 <Text variant="subhead">Whose trades move their way most</Text>
                 <Text variant="caption" tone="muted">
                   Average move in their favour before disclosure over the past year, for members with at least five
-                  priced trades.
+                  priced trades filed on time.
                 </Text>
               </View>
               {shown.leaders.map((l, i) => (
@@ -128,8 +129,9 @@ export default function TimingScreen() {
               Each trade is priced at the stock&apos;s daily close on the day it was made and on the day it was
               disclosed, split-adjusted. Filings give a value range, never the price paid, so this is the stock&apos;s
               move, not the member&apos;s profit. Several lots of one stock in a filing count once, no member appears
-              more than twice, and moves over 400% (usually a mismatched listing) are left out. Prices update every
-              weekday evening; new trades are priced within hours of being filed.
+              more than twice, and moves over 400% (usually a mismatched listing) are left out. Only trades filed on time
+              are ranked; late ones are on each trade&apos;s screen. Prices update every weekday evening; new trades are
+              priced within hours of being filed.
             </Text>
             <NotAdvice long />
           </View>

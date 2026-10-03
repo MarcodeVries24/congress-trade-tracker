@@ -24,7 +24,10 @@ const EDGE_SQL = `CASE WHEN t.transaction_type ILIKE 'P%' THEN ppf.close / ppt.c
 /**
  * Every trade the rankings consider: published, plausibly dated, a purchase
  * or sale, priced on both days, and disclosed after the day it was made (a
- * same-day disclosure has no stretch to measure).
+ * same-day disclosure has no stretch to measure) but within the 45 days the
+ * STOCK Act allows. A late filing's move is the filer's delay as much as
+ * their timing, and a ranking of rule-breakers is a different list; the
+ * trade pages and the "Filed late" filter cover those.
  *
  * One row per filing, asset and direction: a member who bought the same stock
  * in five lots across a filing made one decision, and five rows would fill a
@@ -35,6 +38,8 @@ const EDGE_SQL = `CASE WHEN t.transaction_type ILIKE 'P%' THEN ppf.close / ppt.c
  * or a thinly traded line, and a leaderboard topped by data errors would
  * discredit the rest.
  */
+const ON_TIME_DAYS = 45;
+
 function rankedTradesSql(windowParam: string): string {
   return `SELECT DISTINCT ON (t.doc_id, COALESCE(NULLIF(t.ticker, ''), t.asset_name), upper(left(t.transaction_type, 1)))
             ${TRADE_COLUMNS_SQL}, ${EDGE_SQL} AS edge
@@ -44,6 +49,7 @@ function rankedTradesSql(windowParam: string): string {
             AND ppt.close > 0 AND ppf.close > 0
             AND (t.transaction_type ILIKE 'P%' OR t.transaction_type ILIKE 'S%')
             AND f.filing_date <> t.transaction_date
+            AND NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date <= ${ON_TIME_DAYS}
             AND NULLIF(f.filing_date, '')::date >= CURRENT_DATE - ${windowParam}::int
             AND abs(ppf.close / ppt.close - 1) <= 4
           ORDER BY t.doc_id, COALESCE(NULLIF(t.ticker, ''), t.asset_name), upper(left(t.transaction_type, 1)), t.amount_low DESC NULLS LAST`;
@@ -163,4 +169,4 @@ export async function getTimingOverview(
  * The same, kept for an hour across requests: the page and the API both
  * read it, and the prices behind it change once a day.
  */
-export const getTimingOverviewCached = unstable_cache(getTimingOverview, ["timing-overview"], { revalidate: 3600 });
+export const getTimingOverviewCached = unstable_cache(getTimingOverview, ["timing-overview-on-time"], { revalidate: 3600 });

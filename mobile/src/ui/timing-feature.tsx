@@ -83,9 +83,14 @@ export function FeaturedTiming({ trade: t }: { trade: TimedTrade }) {
       </View>
 
       <View style={styles.featuredFigure}>
-        <Text variant="display" tone="gain">
-          {formatMove(t.edge)}
-        </Text>
+        <View style={styles.figureRow}>
+          <Text variant="display" tone="gain">
+            {formatMove(t.edge)}
+          </Text>
+          <Text variant="caption" tone="muted" style={styles.figureNote}>
+            in their favour
+          </Text>
+        </View>
         <Text variant="callout" tone="muted">
           The stock {buy ? 'rose' : 'fell'} in the {daysLabel(t.days_to_file)} between the trade and its disclosure
           {late ? ', well past the 45 days the law allows' : ''}.
@@ -217,6 +222,8 @@ const styles = StyleSheet.create({
   featured: { borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 14 },
   featuredHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   featuredFigure: { gap: 2 },
+  figureRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  figureNote: { fontWeight: '600' },
   card: { width: 150, padding: 12, gap: 4, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
   cardName: { fontWeight: '600' },

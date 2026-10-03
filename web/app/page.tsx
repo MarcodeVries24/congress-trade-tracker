@@ -106,8 +106,6 @@ export default function Home() {
           </div>
         )}
 
-        <HomeTiming />
-
         {error && (
           <div className="mb-6 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
             {error}. Check that DATABASE_URL is set and the database is reachable.
@@ -347,6 +345,10 @@ export default function Home() {
             )}
           </Card>
         </div>
+
+        {/* Below the trading panels: the best-timed recent trades, the
+            ranking that /before-disclosure has in full. */}
+        <HomeTiming />
 
         {/* A column of prose beside the chart rather than a band above it: at
             full width the paragraphs stretch to a single unreadable line. */}

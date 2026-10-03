@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { fetchNews, fetchPolicy, type NewsItem, type NewsSection } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
@@ -14,24 +15,21 @@ import { Text } from '@/ui/text';
 
 /**
  * A publisher's picture, or its name on a tint when there is none or it will
- * not load. CNBC's image server refuses clients that are not desktop browsers,
- * so failing is expected rather than rare, and the tile is never a grey hole.
+ * not load, so a card is never a grey hole. (CNBC's image server turns away
+ * some clients by user agent; a phone's own is not one of them.)
  */
 function NewsImage({
   uri,
   source,
   style,
-  hideOnFail,
 }: {
   uri: string | null;
   source: string;
   style: object;
-  hideOnFail?: boolean;
 }) {
   const { c } = useTheme();
   const [failed, setFailed] = useState(false);
   if (!uri || failed) {
-    if (hideOnFail) return null;
     return (
       <View style={[style, styles.fallback, { backgroundColor: c.surfaceMuted }]}>
         <Text variant="label" tone="muted" style={styles.fallbackLabel}>
@@ -44,13 +42,16 @@ function NewsImage({
 }
 
 /**
- * News: official announcements first, then the market press by publisher.
+ * News, laid out like the website's news page: the markets desk first, the
+ * agencies' own releases, then the economy desk. Each desk leads with one
+ * large picture story and the rest as a two-column grid of picture cards.
  *
  * Headlines open in the in-app browser; the story is the publisher's, and the
  * app only points at it.
  */
 export default function NewsScreen() {
   const { c } = useTheme();
+  const { width } = useWindowDimensions();
   const [sections, setSections] = useState<NewsSection[] | null>(null);
   const [policy, setPolicy] = useState<NewsItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -93,11 +94,18 @@ export default function NewsScreen() {
     );
   }
 
-  const header = policy.length ? (
+  // Markets first, as on the website: it is the half people come back for.
+  const ordered = [...sections].sort((a, b) => Number(b.key === 'cnbc-markets') - Number(a.key === 'cnbc-markets'));
+  const cardWidth = (width - 16 * 2 - GRID_GAP) / 2;
+
+  const agencies = policy.length ? (
     <View style={styles.policy}>
-      <Text variant="headline" style={styles.pad}>
-        From Washington
-      </Text>
+      <View style={styles.groupHead}>
+        <Text variant="headline">From Washington</Text>
+        <Text variant="caption" tone="muted">
+          Official releases, unedited
+        </Text>
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.policyRow}>
         {policy.slice(0, 8).map((p) => (
           <Tap
@@ -126,104 +134,118 @@ export default function NewsScreen() {
     </View>
   ) : null;
 
-  return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <SectionList
-        sections={sections.map((s) => ({ ...s, data: s.items }))}
-        keyExtractor={(item) => item.url}
-        renderItem={({ item, index }) =>
-          index === 0 ? (
+  const desk = (section: NewsSection) => {
+    const [lead, ...rest] = section.items;
+    if (!lead) return null;
+    return (
+      <View key={section.key} style={styles.group}>
+        <Tap onPress={() => openPage(section.homepage)} style={styles.groupHead}>
+          <Text variant="headline">
+            {section.publisher} · {section.blurb}
+          </Text>
+          <Text variant="caption" tone="muted">
+            Published by {section.publisher}
+          </Text>
+        </Tap>
+
+        <Tap
+          feedback="tap"
+          scaleTo={0.98}
+          onPress={() => openPage(lead.url)}
+          style={[styles.lead, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View>
+            <NewsImage uri={lead.image} source={lead.source} style={styles.leadImage} />
+            <LinearGradient
+              colors={['transparent', 'rgba(8,12,22,0.86)']}
+              style={styles.leadShade}
+              pointerEvents="none"
+            />
+            <View style={styles.leadText}>
+              <Text variant="label" color="#FFFFFF" style={styles.leadSource}>
+                {lead.source.toUpperCase()} · {timeAgo(lead.publishedAt)}
+              </Text>
+              <Text variant="headline" color="#FFFFFF" numberOfLines={3}>
+                {lead.title}
+              </Text>
+            </View>
+          </View>
+        </Tap>
+
+        <View style={styles.grid}>
+          {rest.map((item) => (
             <Tap
+              key={item.url}
               feedback="tap"
-              scaleTo={0.98}
+              scaleTo={0.97}
               onPress={() => openPage(item.url)}
-              style={[styles.lead, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <NewsImage uri={item.image} source={item.source} style={styles.leadImage} />
-              <View style={styles.leadText}>
-                <Text variant="subhead" numberOfLines={3}>
-                  {item.title}
-                </Text>
-                <Text variant="footnote" tone="faint">
-                  {item.source} · {timeAgo(item.publishedAt)}
-                </Text>
-              </View>
-            </Tap>
-          ) : (
-            <Tap
-              scaleTo={0.985}
-              onPress={() => openPage(item.url)}
-              style={[styles.item, { borderBottomColor: c.border }]}>
-              <View style={styles.itemText}>
-                <Text variant="bodyStrong" numberOfLines={3}>
+              style={[styles.card, { width: cardWidth, backgroundColor: c.surface, borderColor: c.border }]}>
+              <NewsImage uri={item.image} source={item.source} style={styles.cardImage} />
+              <View style={styles.cardText}>
+                <Text variant="callout" style={styles.bold} numberOfLines={4}>
                   {item.title}
                 </Text>
                 <Text variant="footnote" tone="faint">
                   {timeAgo(item.publishedAt)}
                 </Text>
               </View>
-              <NewsImage uri={item.image} source={item.source} style={styles.thumb} hideOnFail />
             </Tap>
-          )
-        }
-        renderSectionHeader={({ section }) => (
-          <Tap
-            onPress={() => openPage(section.homepage)}
-            style={[styles.sectionHead, { backgroundColor: c.background }]}>
-            <Text variant="headline">{section.publisher}</Text>
-            <Text variant="caption" tone="muted">
-              {section.blurb}
-            </Text>
-          </Tap>
-        )}
-        stickySectionHeadersEnabled={false}
-        ListHeaderComponent={header}
-        ListEmptyComponent={<EmptyState icon="newspaper-outline" title="No news right now" compact />}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load();
-            }}
-            tintColor={c.textMuted}
-          />
-        }
-        contentContainerStyle={styles.list}
-      />
-    </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ScrollView
+      style={[styles.screen, { backgroundColor: c.background }]}
+      contentContainerStyle={styles.list}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load();
+          }}
+          tintColor={c.textMuted}
+        />
+      }>
+      {ordered.length === 0 && !policy.length ? (
+        <EmptyState icon="newspaper-outline" title="No news right now" compact />
+      ) : null}
+      {ordered[0] ? desk(ordered[0]) : null}
+      {agencies}
+      {ordered.slice(1).map(desk)}
+    </ScrollView>
   );
 }
+
+const GRID_GAP = 12;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40 },
-  pad: { paddingHorizontal: 20 },
   bold: { fontWeight: '700' },
-  policy: { gap: 12, paddingTop: 8 },
+  group: { gap: 12, paddingTop: 22 },
+  groupHead: { paddingHorizontal: 20, gap: 2 },
+  policy: { gap: 12, paddingTop: 26 },
   policyRow: { paddingHorizontal: 16, gap: 10 },
   policyCard: { width: 230, padding: 14, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
   policyHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   policyIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  sectionHead: { paddingHorizontal: 20, paddingTop: 26, paddingBottom: 12, gap: 2 },
   lead: {
     marginHorizontal: 16,
     borderRadius: radius.xl,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
   },
-  leadImage: { width: '100%', aspectRatio: 16 / 9 },
-  leadText: { padding: 14, gap: 6 },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  itemText: { flex: 1, gap: 4 },
-  thumb: { width: 76, height: 76, borderRadius: radius.md },
+  leadImage: { width: '100%', aspectRatio: 4 / 3 },
+  leadShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%' },
+  leadText: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, gap: 6 },
+  leadSource: { opacity: 0.85 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, paddingHorizontal: 16 },
+  card: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
+  cardImage: { width: '100%', aspectRatio: 16 / 10 },
+  cardText: { padding: 12, gap: 6, flex: 1 },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackLabel: { letterSpacing: 2 },
 });

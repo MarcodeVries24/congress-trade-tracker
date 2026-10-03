@@ -25,6 +25,7 @@ import { Pill } from '@/ui/pill';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { TickerLogo } from '@/ui/ticker-logo';
+import { TradePriceCard } from '@/ui/trade-price-card';
 
 // The website's labels, so a code reads the same on both.
 const ASSET_TYPE_LABELS: Record<string, string> = Object.fromEntries(ASSET_TYPES.map((a) => [a.key, a.label]));
@@ -65,8 +66,8 @@ function Step({
 /**
  * One trade in full.
  *
- * Read top to bottom like a receipt: what happened and for how much, who did
- * it, the three dates whose gaps are the point of a disclosure, and the
+ * Read top to bottom like a receipt: what happened and for how much, what the
+ * stock did before anyone else knew, who did it, the three dates whose gaps are the point of a disclosure, and the
  * filing itself, which is the authority rather than us.
  */
 export default function TradeDetailScreen() {
@@ -138,6 +139,8 @@ export default function TradeDetailScreen() {
           <Text variant="title">{amountLabel(trade.amount_range)}</Text>
         </View>
       </View>
+
+      <TradePriceCard trade={trade} />
 
       <Tap
         disabled={!trade.member_slug}

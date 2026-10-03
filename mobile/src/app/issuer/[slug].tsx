@@ -17,14 +17,17 @@ import { SentimentBar } from '@/ui/sentiment-bar';
 import { RowSkeleton, Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
+import { IssuerPriceCard } from '@/ui/issuer-price-card';
 import { TickerLogo } from '@/ui/ticker-logo';
+import { TimingCard } from '@/ui/timing-card';
 import { TradeRow } from '@/ui/trade-row';
 
 const RECENT_DAYS = 90;
 
 /**
- * One company: how much Congress has traded it, which way it is leaning, who
- * traded it, and the latest trades by month.
+ * One company: how much Congress has traded it, its price with their trades
+ * on it, how the stock moved before those trades were public, which way
+ * Congress is leaning, who traded it, and the latest trades by month.
  *
  * The traders row is the way across to a member, which is how people actually
  * explore this: from a stock to who holds it, and from them to what else.
@@ -159,6 +162,11 @@ export default function IssuerScreen() {
             </Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.cards}>
+        <IssuerPriceCard ticker={i.ticker} trades={trades} />
+        <TimingCard timing={detail.timing} who="the trader's" />
       </View>
 
       <View style={[styles.lean, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -298,6 +306,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   leanBlock: { gap: 6 },
+  cards: { marginHorizontal: 16, marginTop: 12, gap: 12 },
   block: { paddingTop: 26, gap: 12 },
   blockTitle: { paddingHorizontal: 20 },
   blockRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingRight: 20 },

@@ -9,9 +9,11 @@
  * workspace package lands they become an import instead; until then, treat
  * web/lib/api.ts as the original and this as the copy that follows it.
  */
+import type { TimingSummary, TradePrices } from "@/lib/prices";
+
 export const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "https://www.congtrade.com";
 
-export interface Trade {
+export interface Trade extends TradePrices {
   id: number;
   doc_id: string;
   member_name: string;
@@ -257,7 +259,7 @@ export function fetchPoliticians(
 }
 
 /** The trade fields the member and issuer pages carry, a subset of Trade. */
-export interface DetailTrade {
+export interface DetailTrade extends TradePrices {
   id: number;
   asset_name: string;
   ticker: string | null;
@@ -296,6 +298,8 @@ export interface PoliticianDetail {
   trades: DetailTrade[];
   /** Set when the slug was an old spelling: ask again under this one. */
   redirectTo: string | null;
+  /** Over all of the member's trades; absent from an older server. */
+  timing?: TimingSummary | null;
 }
 
 export function fetchPolitician(slug: string, options: RequestOptions = {}): Promise<PoliticianDetail> {
@@ -340,6 +344,8 @@ export interface IssuerDetail {
     photo_url: string | null;
     chamber: "house" | "senate";
   })[];
+  /** Over every trade in the company; absent from an older server. */
+  timing?: TimingSummary | null;
 }
 
 export function fetchIssuer(slug: string, options: RequestOptions = {}): Promise<IssuerDetail> {
@@ -369,7 +375,8 @@ export interface NewsSection {
  * a browser forgives inside an attribute and an image loader does not.
  */
 export async function fetchNews(options: RequestOptions = {}): Promise<NewsSection[]> {
-  const raw = await get<{ sections: NewsSection[] }>("/api/news", undefined, options);
+  // Nine a desk, as many as the website's news page shows.
+  const raw = await get<{ sections: NewsSection[] }>("/api/news", new URLSearchParams({ limit: "9" }), options);
   return raw.sections.map((section) => ({
     ...section,
     items: section.items.map((item) => ({ ...item, image: item.image ? item.image.replace(/&amp;/g, "&") : null })),

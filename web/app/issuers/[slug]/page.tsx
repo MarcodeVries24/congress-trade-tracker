@@ -16,11 +16,12 @@ import {
   ownerLabel,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
-import { compactUSD, formatDate, typeBadge } from "@/lib/format";
+import { compactUSD, formatDate, isPartialSale, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
+import { RowLink } from "@/components/RowLink";
 import { getIssuerBySlug, getIssuerTradeFlow, ISSUER_PAGE_TRADE_LIMIT } from "@/lib/issuers";
 import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { memberDisplayName } from "@/lib/memberDisplay";
-import { PriceMove } from "@/components/PriceMove";
+import { DisclosureMove, DisclosureMoveHeader } from "@/components/DisclosureMove";
 import { PriceTradesChart } from "@/components/PriceTradesChart";
 import { TickerLogo } from "@/components/TickerLogo";
 import { TimingPanel } from "@/components/TimingPanel";
@@ -207,8 +208,8 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Traded</th>
                 <th className="px-4 py-3">Filed</th>
-                <th className="px-4 py-3" title="The stock's close on the trade date against its close on the disclosure date">
-                  Before disclosure
+                <th className="px-4 py-3">
+                  <DisclosureMoveHeader />
                 </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
@@ -217,7 +218,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
               {trades.map((t) => {
                 const badge = typeBadge(t.transaction_type);
                 return (
-                  <tr key={t.id} className="border-b border-line/50">
+                  <RowLink key={t.id} href={`/trades/${t.id}`} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                     <td className="px-4 py-3">
                       {t.member_slug ? (
                         <Link href={`/politicians/${t.member_slug}`} className="text-ink hover:underline">
@@ -229,13 +230,13 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                       <div className={`mt-0.5 text-xs ${partyColor(t.party)}`}>{t.party ?? "Unknown party"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-ink-muted">{displayAssetName(t)}</div>
+                      <Link href={`/trades/${t.id}`} className="text-ink-muted hover:underline">{displayAssetName(t)}</Link>
                       {t.asset_type_code && (
                         <div className="mt-0.5 text-xs text-ink-faint">{ASSET_TYPE_LABELS[t.asset_type_code] ?? t.asset_type_code}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
+                      <span title={badge.title} className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-muted">{ownerLabel(t.owner)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{amountLabel(t.amount_range)}</td>
@@ -249,14 +250,14 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <PriceMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} />
+                      <DisclosureMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} days={t.days_to_file} />
                     </td>
                     <td className="px-4 py-3">
                       <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline decoration-line-strong hover:decoration-current">
                         PTR PDF
                       </a>
                     </td>
-                  </tr>
+                  </RowLink>
                 );
               })}
             </tbody>
@@ -267,7 +268,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
           {trades.map((t) => {
             const badge = typeBadge(t.transaction_type);
             return (
-              <div key={t.id} className={`rounded-lg border border-line border-l-2 bg-panel p-3 ${badge.accent}`}>
+              <RowLink as="div" key={t.id} href={`/trades/${t.id}`} className={`rounded-lg border border-line border-l-2 bg-panel p-3 transition-colors hover:border-line-strong ${badge.accent}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     {t.member_slug ? (
@@ -282,7 +283,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                       {t.owner && ` · ${ownerLabel(t.owner)}`}
                     </div>
                   </div>
-                  <span className={`shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium ${badge.className}`}>
+                  <span title={badge.title} className={`shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium ${badge.className}`}>
                     {badge.label}
                   </span>
                 </div>
@@ -294,18 +295,22 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                     {t.days_to_file !== null && t.days_to_file > 45 && <span className="ml-1 text-amber-500">late</span>}
                   </span>
                   {moveBeforeDisclosure(t) !== null && (
-                    <span>
-                      <PriceMove move={moveBeforeDisclosure(t)} /> before disclosure
+                    <span className="basis-full">
+                      <DisclosureMove move={moveBeforeDisclosure(t)} transactionType={t.transaction_type} days={t.days_to_file} inline />
                     </span>
                   )}
                   <a href={t.pdf_url} target="_blank" rel="noreferrer" className="text-accent underline decoration-line-strong">
                     PTR PDF
                   </a>
                 </div>
-              </div>
+              </RowLink>
             );
           })}
         </div>
+
+        {trades.some((t) => isPartialSale(t.transaction_type)) && (
+          <p className="mt-3 text-xs text-ink-faint">{PARTIAL_SALE_NOTE}</p>
+        )}
 
         <IssuerNews items={news} name={name} />
 

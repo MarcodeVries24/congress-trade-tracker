@@ -28,7 +28,8 @@ import {
 } from "@/lib/api";
 import Link from "next/link";
 import { issuerSlug } from "@/lib/issuerSlug";
-import { PriceMove } from "@/components/PriceMove";
+import { DisclosureMove, DisclosureMoveHeader } from "@/components/DisclosureMove";
+import { RowLink } from "@/components/RowLink";
 import { TickerLogo } from "@/components/TickerLogo";
 import { change } from "@/lib/priceMath";
 import { memberDisplayName } from "@/lib/memberDisplay";
@@ -45,7 +46,7 @@ import { GatedFilter } from "@/components/GatedFilter";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { AlertCta } from "@/components/AlertCta";
 import { MemberPhoto } from "@/components/MemberPhoto";
-import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, memberLocation, typeBadge } from "@/lib/format";
+import { compactUSD, formatDate, formatDateFromTimestamp, formatTimeWithZone, isPartialSale, memberLocation, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";
 
 // Rough magnitude tier so the eye can scan trade size without reading text.
@@ -870,11 +871,8 @@ export default function Home() {
                 <SortHeader label="Traded" sortKey="transaction_date" />
                 <SortHeader label="Filed" sortKey="filing_date" />
                 <SortHeader label="Days to file" sortKey="days_to_file" />
-                <th
-                  className="px-4 py-3"
-                  title="How the stock moved between the trade and the day it was disclosed: the stretch only the member knew about"
-                >
-                  Before disclosure
+                <th className="px-4 py-3">
+                  <DisclosureMoveHeader />
                 </th>
                 <th className="px-4 py-3">Source</th>
               </tr>
@@ -904,7 +902,7 @@ export default function Home() {
                       : null;
                   const late = trade.days_to_file !== null && trade.days_to_file > 45;
                   return (
-                    <tr key={trade.id} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
+                    <RowLink key={trade.id} href={`/trades/${trade.id}`} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                       <td className={`min-w-[170px] border-l-2 px-4 py-3 ${badge.accent}`}>
                         <div className="flex items-center gap-2.5">
                           <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
@@ -929,7 +927,9 @@ export default function Home() {
                           {trade.ticker ? <TickerLogo ticker={trade.ticker} size={30} /> : null}
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5" title={trade.asset_name}>
-                              {displayAssetName(trade)}
+                              <Link href={`/trades/${trade.id}`} className="hover:underline">
+                                {displayAssetName(trade)}
+                              </Link>
                               {trade.parse_status === "ocr" && <OcrBadge />}
                             </div>
                             <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
@@ -951,7 +951,7 @@ export default function Home() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                        <span title={badge.title} className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
                           {badge.label}
                         </span>
                       </td>
@@ -973,10 +973,11 @@ export default function Home() {
                           <span className="text-ink-faint">—</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <PriceMove
+                      <td className="px-4 py-3">
+                        <DisclosureMove
                           move={change(trade.price_at_trade, trade.price_at_filing)}
                           transactionType={trade.transaction_type}
+                          days={trade.days_to_file}
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -992,7 +993,7 @@ export default function Home() {
                           {trade.chamber === "senate" && <SenateSourceInfo align="right" />}
                         </span>
                       </td>
-                    </tr>
+                    </RowLink>
                   );
                 })}
             </tbody>
@@ -1017,7 +1018,7 @@ export default function Home() {
                   : null;
               const late = trade.days_to_file !== null && trade.days_to_file > 45;
               return (
-                <div key={trade.id} className={`rounded-lg border border-line border-l-4 bg-panel p-4 ${badge.accent}`}>
+                <RowLink as="div" key={trade.id} href={`/trades/${trade.id}`} className={`rounded-lg border border-line border-l-4 bg-panel p-4 transition-colors hover:border-line-strong ${badge.accent}`}>
                   <div className="flex items-start justify-between gap-2">
                     {trade.member_slug ? (
                       <Link href={`/politicians/${trade.member_slug}`} className="flex items-center gap-2.5 text-left">
@@ -1036,14 +1037,14 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
+                    <span title={badge.title} className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${badge.className}`}>
                       {badge.label}
                     </span>
                   </div>
 
                   <div className="mt-3 flex items-center gap-2 text-sm" title={trade.asset_name}>
                     {trade.ticker ? <TickerLogo ticker={trade.ticker} size={24} /> : null}
-                    {displayAssetName(trade)}
+                    <Link href={`/trades/${trade.id}`}>{displayAssetName(trade)}</Link>
                     {trade.parse_status === "ocr" && <OcrBadge />}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
@@ -1081,14 +1082,13 @@ export default function Home() {
                       </div>
                     </div>
                     {change(trade.price_at_trade, trade.price_at_filing) !== null && (
-                      <div className="col-span-2">
-                        <div className="text-ink-faint">Stock move before disclosure</div>
-                        <div className="mt-0.5">
-                          <PriceMove
-                            move={change(trade.price_at_trade, trade.price_at_filing)}
-                            transactionType={trade.transaction_type}
-                          />
-                        </div>
+                      <div className="col-span-2 text-ink-muted">
+                        <DisclosureMove
+                          move={change(trade.price_at_trade, trade.price_at_filing)}
+                          transactionType={trade.transaction_type}
+                          days={trade.days_to_file}
+                          inline
+                        />
                       </div>
                     )}
                   </div>
@@ -1104,10 +1104,14 @@ export default function Home() {
                     </a>
                     {trade.chamber === "senate" && <SenateSourceInfo />}
                   </span>
-                </div>
+                </RowLink>
               );
             })}
         </div>
+
+        {result?.data.some((t) => isPartialSale(t.transaction_type)) && (
+          <p className="mt-3 text-xs text-ink-faint">{PARTIAL_SALE_NOTE}</p>
+        )}
 
         {result && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-muted">

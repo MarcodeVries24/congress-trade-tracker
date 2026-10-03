@@ -143,7 +143,7 @@ export function FilterFields({
         </FilterSection>
       )}
 
-      <FilterSection title="Transaction">
+      <FilterSection title="Transaction" hint="Sales include partial sales, marked Sold (P)">
         <ToggleChips options={TYPES} selected={draft.types ?? []} onChange={(v) => set({ types: list(v) })} />
       </FilterSection>
 

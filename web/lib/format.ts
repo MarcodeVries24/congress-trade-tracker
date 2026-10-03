@@ -51,15 +51,28 @@ export function compactAmountRange(amountLow: number | null, amountHigh: number 
   return `${compactUSD.format(amountLow)}-${compactUSD.format(amountHigh)}`;
 }
 
-export function typeBadge(type: string): { label: string; className: string; accent: string } {
+/** What the "(P)" on a sale chip means, said once beside any list that shows one. */
+export const PARTIAL_SALE_NOTE = "Sale (P) is a partial sale: the member sold part of the holding, not all of it.";
+
+export function isPartialSale(type: string): boolean {
+  return /^S.*partial/i.test(type);
+}
+
+/**
+ * A trade type as a chip. A partial sale is "Sale (P)", short enough to sit
+ * in a table column; `title` spells it out on hover, and PARTIAL_SALE_NOTE
+ * explains it under the list.
+ */
+export function typeBadge(type: string): { label: string; className: string; accent: string; title?: string } {
   const t = type.toUpperCase();
   if (t.startsWith("P"))
     return { label: "Purchase", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", accent: "border-l-emerald-500" };
   if (t.startsWith("S"))
     return {
-      label: type.includes("partial") ? "Sale (partial)" : "Sale",
+      label: isPartialSale(type) ? "Sale (P)" : "Sale",
       className: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
       accent: "border-l-rose-500",
+      title: isPartialSale(type) ? "Partial sale: part of the holding was sold, not all of it" : undefined,
     };
   if (t.startsWith("E"))
     return { label: "Exchange", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30", accent: "border-l-amber-500" };

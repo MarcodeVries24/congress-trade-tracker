@@ -151,9 +151,16 @@ export function tradeTone(code: string): "gain" | "loss" | "warn" {
 }
 
 /** "Bought" / "Sold" / "Partial" / "Exchange" as a short pill label. */
+/** What the "(P)" on a sold chip means, said wherever one can be read closely. */
+export const PARTIAL_SALE_NOTE = "Sold (P) is a partial sale: the member sold part of the holding, not all of it.";
+
+export function isPartialSale(code: string): boolean {
+  return /^S.*partial/i.test(code);
+}
+
 export function tradePill(code: string): string {
   if (code.startsWith("P")) return "Bought";
-  if (/^S.*partial/i.test(code)) return "Sold part";
+  if (isPartialSale(code)) return "Sold (P)";
   if (code.startsWith("S")) return "Sold";
   if (code.startsWith("E")) return "Exchange";
   return code;

@@ -157,7 +157,7 @@ export default function Home() {
                   return (
                     <li key={trade.id}>
                       <Link
-                        href={memberHref(trade)}
+                        href={`/trades/${trade.id}`}
                         className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5"
                       >
                         <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
@@ -169,7 +169,7 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="shrink-0 whitespace-nowrap text-right">
-                          <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
+                          <span title={badge.title} className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
                           <div className="mt-1 text-xs text-ink-muted">{compactAmountRange(trade.amount_low, trade.amount_high, amountLabel(trade.amount_range))}</div>
                         </div>
                       </Link>
@@ -282,7 +282,7 @@ export default function Home() {
               <ul className="divide-y divide-line/60">
                 {dashboard.biggestTrades.map((trade) => (
                   <li key={trade.id}>
-                    <Link href={memberHref(trade)} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
+                    <Link href={`/trades/${trade.id}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm text-ink">{memberDisplayName(trade)}</div>

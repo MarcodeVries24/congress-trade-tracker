@@ -349,7 +349,7 @@ export function AlertEditor({
                   const badge = typeBadge(row.transaction_type);
                   return (
                     <li key={row.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-muted">
-                      <span className={`rounded border px-1.5 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
+                      <span title={badge.title} className={`rounded border px-1.5 py-0.5 font-medium ${badge.className}`}>{badge.label}</span>
                       <span className="font-medium text-ink">{memberDisplayName(row)}</span>
                       <span>{row.ticker || displayAssetName(row)}</span>
                       <span>{compactAmountRange(row.amount_low, row.amount_high, amountLabel(row.amount_range))}</span>

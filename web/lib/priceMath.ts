@@ -18,17 +18,17 @@ export function change(from: number | null | undefined, to: number | null | unde
 }
 
 /** From the trade to its disclosure: the move the public could not see. */
-export function moveBeforeDisclosure(t: TradePrices): number | null {
+export function moveBeforeDisclosure(t: Partial<TradePrices>): number | null {
   return change(t.price_at_trade, t.price_at_filing);
 }
 
 /** From the disclosure to the latest close: what acting on it would have done. */
-export function moveSinceDisclosure(t: TradePrices): number | null {
+export function moveSinceDisclosure(t: Partial<TradePrices>): number | null {
   return change(t.price_at_filing, t.price_now);
 }
 
 /** From the trade to the latest close. */
-export function moveSinceTrade(t: TradePrices): number | null {
+export function moveSinceTrade(t: Partial<TradePrices>): number | null {
   return change(t.price_at_trade, t.price_now);
 }
 
@@ -51,3 +51,8 @@ export function formatMove(move: number | null, digits = 1): string {
   const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
   return `${sign}${Math.abs(pct).toFixed(digits)}%`;
 }
+
+/** The explanation behind every "before disclosure" figure, for its ⓘ. */
+export const DISCLOSURE_MOVE_NOTE =
+  "How the stock's price moved between the day of the trade and the day it was publicly disclosed: the stretch when only the member knew about it. " +
+  "“Their way” means the price rose after a purchase or fell after a sale. Daily closing prices, split-adjusted. It describes timing, not profit or intent.";

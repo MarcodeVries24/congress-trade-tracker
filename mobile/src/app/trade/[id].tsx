@@ -6,7 +6,9 @@ import {
   amountLabel,
   assetLabel,
   filedAgo,
+  isPartialSale,
   memberName,
+  PARTIAL_SALE_NOTE,
   shortDate,
   tradePill,
   tradeTone,
@@ -138,6 +140,11 @@ export default function TradeDetailScreen() {
           </Text>
           <Text variant="title">{amountLabel(trade.amount_range)}</Text>
         </View>
+        {isPartialSale(trade.transaction_type) ? (
+          <Text variant="caption" tone="muted">
+            {PARTIAL_SALE_NOTE}
+          </Text>
+        ) : null}
       </View>
 
       <TradePriceCard trade={trade} />

@@ -43,7 +43,7 @@ export default function MoreScreen() {
       style={{ backgroundColor: c.background }}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
-      <TabHeader />
+      <TabHeader title="More" />
 
       <View style={styles.inset}>
         <Tap

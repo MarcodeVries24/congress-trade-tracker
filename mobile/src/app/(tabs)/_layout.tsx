@@ -8,7 +8,7 @@ import { useTheme } from '@/theme';
 import { Icon, type IconName } from '@/ui/icon';
 
 const TABS: { name: string; title: string; icon: IconName; active: IconName }[] = [
-  { name: 'index', title: 'Discover', icon: 'flame-outline', active: 'flame' },
+  { name: 'index', title: 'Discover', icon: 'compass-outline', active: 'compass' },
   { name: 'trades', title: 'Trades', icon: 'swap-vertical-outline', active: 'swap-vertical' },
   { name: 'politicians', title: 'Politicians', icon: 'people-outline', active: 'people' },
   { name: 'alerts', title: 'Alerts', icon: 'notifications-outline', active: 'notifications' },

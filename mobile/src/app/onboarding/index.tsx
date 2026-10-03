@@ -13,7 +13,7 @@ import { radius, shadow, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { Icon, type IconName } from '@/ui/icon';
-import { Logo } from '@/ui/logo';
+import { Brand } from '@/ui/logo';
 import { Pill } from '@/ui/pill';
 import { Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
@@ -76,7 +76,7 @@ export default function WelcomeScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={FadeInDown.duration(400)} style={styles.logo}>
-          <Logo size={26} />
+          <Brand size={24} />
         </Animated.View>
 
         <View style={styles.stack}>

@@ -219,6 +219,7 @@ export default function DiscoverScreen() {
   const header = (
     <View>
       <TabHeader
+        brand
         right={
           user ? (
             <Tap onPress={() => router.push('/sign-in')} scaleTo={0.9} accessibilityLabel="Account" hitSlop={8}>

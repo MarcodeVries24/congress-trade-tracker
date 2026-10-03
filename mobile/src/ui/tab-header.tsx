@@ -3,37 +3,48 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GUTTER } from '@/theme';
-import { Logo } from '@/ui/logo';
+import { Brand } from '@/ui/logo';
 import { Text } from '@/ui/text';
 
 /**
- * The top of every tab: the mark centred, optional actions either side, and a
- * large title with a line under it saying what the screen is for.
+ * The top of a tab.
+ *
+ * Discover, the home screen, carries the brand: the Capitol mark and the
+ * wordmark at the left of the page margin, with actions on the right, the way
+ * Instagram and Airbnb open. Every other tab opens on its own large title
+ * with the actions beside it, as iOS does: one brand on screen at a time,
+ * not a wordmark floating over every page.
  */
 export function TabHeader({
   title,
   subtitle,
-  left,
+  brand = false,
   right,
   children,
 }: {
   title?: string;
   subtitle?: string;
-  left?: ReactNode;
+  brand?: boolean;
   right?: ReactNode;
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top + 6 }]}>
-      <View style={styles.bar}>
-        <View style={styles.side}>{left}</View>
-        <Logo size={22} />
-        <View style={[styles.side, styles.right]}>{right}</View>
-      </View>
+    <View style={[styles.wrap, { paddingTop: insets.top + (brand ? 4 : 10) }]}>
+      {brand ? (
+        <View style={styles.bar}>
+          <Brand size={21} />
+          {right ? <View style={styles.right}>{right}</View> : null}
+        </View>
+      ) : null}
       {title ? (
         <View style={styles.titles}>
-          <Text variant="title">{title}</Text>
+          <View style={styles.titleRow}>
+            <Text variant="title" style={styles.flex}>
+              {title}
+            </Text>
+            {!brand && right ? <View style={styles.right}>{right}</View> : null}
+          </View>
           {subtitle ? (
             <Text variant="callout" tone="muted">
               {subtitle}
@@ -48,14 +59,15 @@ export function TabHeader({
 
 const styles = StyleSheet.create({
   wrap: { paddingBottom: 8 },
+  flex: { flex: 1 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: GUTTER,
     height: 48,
   },
-  side: { width: 88, flexDirection: 'row', alignItems: 'center' },
-  right: { justifyContent: 'flex-end' },
-  titles: { paddingHorizontal: GUTTER, paddingTop: 14, gap: 4 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  titles: { paddingHorizontal: GUTTER, paddingTop: 6, gap: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

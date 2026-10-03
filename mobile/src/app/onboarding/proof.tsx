@@ -45,7 +45,8 @@ export default function ProofScreen() {
       continueLabel="See the plans"
       onContinue={async () => {
         await finish();
-        nav.replace('/paywall');
+        // Pushed, not replaced, so the plans screen can go back to the steps.
+        nav.go('/paywall');
       }}>
       <View style={styles.grid}>
         {figures.map((f) => (

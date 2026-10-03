@@ -64,7 +64,7 @@ export function OnboardingStep({
         {back && router.canGoBack() ? (
           <IconButton name="chevron-back" label="Back" onPress={() => router.back()} size={36} />
         ) : (
-          <View style={{ width: 36 }} />
+          <View style={styles.slot} />
         )}
         <View style={[styles.track, { backgroundColor: c.surfaceMuted }]}>
           <Animated.View style={[styles.fill, { backgroundColor: c.accent }, fill]} />
@@ -76,7 +76,7 @@ export function OnboardingStep({
             </Text>
           </Tap>
         ) : (
-          <View style={{ width: 36 }} />
+          <View style={styles.slot} />
         )}
       </View>
 
@@ -200,6 +200,9 @@ export function useOnboardingNav() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 8 },
+  // Holds the bar's height when there is no back button or Skip, so Cong
+  // sits at the same height on every step.
+  slot: { width: 36, height: 36 },
   track: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3 },
   skip: { fontWeight: '600' },

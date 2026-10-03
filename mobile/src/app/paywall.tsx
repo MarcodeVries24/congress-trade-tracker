@@ -12,7 +12,7 @@ import type { BillingPeriod } from '@/lib/products';
 import { usePurchases } from '@/lib/use-purchases';
 import { CongSays, STEP_TOP_BAR } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
-import { Button } from '@/ui/button';
+import { Button, IconButton } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -91,8 +91,16 @@ export default function PaywallScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      {/* The height of a setup step's top bar, so Cong sits where he did. */}
-      <View style={{ height: insets.top + STEP_TOP_BAR.paddingTop + STEP_TOP_BAR.row + STEP_TOP_BAR.paddingBottom }} />
+      {/* A setup step's top bar, so Cong sits where he did and the way back is
+          where it was. Only with somewhere to go back to: opened at launch for
+          an account without Pro, this is the first screen. */}
+      <View style={[styles.top, { paddingTop: insets.top + STEP_TOP_BAR.paddingTop }]}>
+        <View style={styles.topRow}>
+          {router.canGoBack() ? (
+            <IconButton name="chevron-back" label="Back" onPress={() => router.back()} size={STEP_TOP_BAR.row} />
+          ) : null}
+        </View>
+      </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <CongSays title="Unlock everything with Pro." subtitle="Cancel anytime." />
 
@@ -251,6 +259,8 @@ export default function PaywallScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  top: { paddingHorizontal: 16, paddingBottom: STEP_TOP_BAR.paddingBottom },
+  topRow: { height: STEP_TOP_BAR.row, flexDirection: 'row', alignItems: 'center' },
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 },
   flex: { flex: 1 },
   bold: { fontWeight: '700' },

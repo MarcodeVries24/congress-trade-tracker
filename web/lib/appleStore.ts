@@ -1,4 +1,5 @@
 import {
+  APIException,
   AppStoreServerAPIClient,
   Environment,
   SignedDataVerifier,
@@ -22,6 +23,22 @@ import {
  * them.
  */
 const BUNDLE_ID = "com.congtrade.app";
+
+/**
+ * The environments to try, in order.
+ *
+ * Production first, then sandbox, as Apple advises: App Review buys with a
+ * sandbox account inside the production build, and TestFlight purchases are
+ * sandbox too. A server that only knew production would never grant the
+ * reviewer Pro, and the app would be rejected for a paywall that "does not
+ * work". Both environments are signed by Apple's own chain, so trying the
+ * second is no weaker a check than the first. APPLE_ENVIRONMENT=sandbox keeps
+ * a development deployment to sandbox alone.
+ */
+const ENVIRONMENTS: Environment[] =
+  process.env.APPLE_ENVIRONMENT === "sandbox"
+    ? [Environment.SANDBOX]
+    : [Environment.PRODUCTION, Environment.SANDBOX];
 
 /** Apple's root CAs, base64 DER, newline or comma separated. */
 function rootCertificates(): Buffer[] {
@@ -56,29 +73,42 @@ export function appleApiConfigured(): boolean {
   return Boolean(process.env.APPLE_ISSUER_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY);
 }
 
-let verifier: SignedDataVerifier | null = null;
+const verifiers = new Map<Environment, SignedDataVerifier>();
 
-function signedDataVerifier(): SignedDataVerifier {
-  if (verifier) return verifier;
+function signedDataVerifier(environment: Environment): SignedDataVerifier {
+  const existing = verifiers.get(environment);
+  if (existing) return existing;
   const certs = rootCertificates();
   if (certs.length === 0) throw new Error("APPLE_ROOT_CERTS is not set");
-  // Sandbox and production notifications are signed by the same chain but
-  // carry different environments; the library checks the payload's own
-  // environment against this one, so the flag follows the deployment.
-  const environment =
-    process.env.APPLE_ENVIRONMENT === "sandbox" ? Environment.SANDBOX : Environment.PRODUCTION;
-  verifier = new SignedDataVerifier(certs, true, environment, BUNDLE_ID);
+  // Sandbox and production are signed by the same chain but carry their
+  // environment inside; the library checks it against this one, which is why
+  // there is one verifier per environment.
+  const verifier = new SignedDataVerifier(certs, true, environment, BUNDLE_ID);
+  verifiers.set(environment, verifier);
   return verifier;
+}
+
+/** The first environment's answer that verifies; the first failure if none does. */
+async function inAnyEnvironment<T>(verify: (v: SignedDataVerifier) => Promise<T>): Promise<T> {
+  let firstError: unknown = null;
+  for (const environment of ENVIRONMENTS) {
+    try {
+      return await verify(signedDataVerifier(environment));
+    } catch (err) {
+      firstError ??= err;
+    }
+  }
+  throw firstError;
 }
 
 /** The decoded notification, or a throw if it is not genuinely from Apple. */
 export async function verifyNotification(signedPayload: string): Promise<ResponseBodyV2DecodedPayload> {
-  return signedDataVerifier().verifyAndDecodeNotification(signedPayload);
+  return inAnyEnvironment((v) => v.verifyAndDecodeNotification(signedPayload));
 }
 
 /** The decoded transaction inside a notification, verified the same way. */
 export async function verifyTransaction(signedTransaction: string): Promise<JWSTransactionDecodedPayload> {
-  return signedDataVerifier().verifyAndDecodeTransaction(signedTransaction);
+  return inAnyEnvironment((v) => v.verifyAndDecodeTransaction(signedTransaction));
 }
 
 /**
@@ -110,7 +140,7 @@ export function statusForNotification(type: string, subtype: string | undefined)
   return APPLE_STATUS[type] ?? null;
 }
 
-let apiClient: AppStoreServerAPIClient | null = null;
+const apiClients = new Map<Environment, AppStoreServerAPIClient>();
 
 /**
  * Apple's server API, for asking rather than being told.
@@ -120,16 +150,16 @@ let apiClient: AppStoreServerAPIClient | null = null;
  * produces a signing error several layers down, which is not a fun thing to
  * debug at the point where someone's purchase is not going through.
  */
-export function appStoreApi(): AppStoreServerAPIClient {
-  if (apiClient) return apiClient;
+export function appStoreApi(environment: Environment): AppStoreServerAPIClient {
+  const existing = apiClients.get(environment);
+  if (existing) return existing;
   const issuerId = process.env.APPLE_ISSUER_ID;
   const keyId = process.env.APPLE_KEY_ID;
   const key = process.env.APPLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   if (!issuerId || !keyId || !key) throw new Error("App Store Server API credentials are not set");
-  const environment =
-    process.env.APPLE_ENVIRONMENT === "sandbox" ? Environment.SANDBOX : Environment.PRODUCTION;
-  apiClient = new AppStoreServerAPIClient(key, keyId, issuerId, BUNDLE_ID, environment);
-  return apiClient;
+  const client = new AppStoreServerAPIClient(key, keyId, issuerId, BUNDLE_ID, environment);
+  apiClients.set(environment, client);
+  return client;
 }
 
 /**
@@ -143,8 +173,19 @@ export async function subscriptionStatusFor(originalTransactionId: string): Prom
   status: string;
   transaction: JWSTransactionDecodedPayload;
 } | null> {
-  const statuses = await appStoreApi().getAllSubscriptionStatuses(originalTransactionId);
-  for (const group of statuses.data ?? []) {
+  // Production first; a sandbox purchase is "not found" there (404), and is
+  // then asked of the sandbox.
+  let statuses = null;
+  for (const environment of ENVIRONMENTS) {
+    try {
+      statuses = await appStoreApi(environment).getAllSubscriptionStatuses(originalTransactionId);
+      break;
+    } catch (err) {
+      const notFound = err instanceof APIException && err.httpStatusCode === 404;
+      if (!notFound || environment === ENVIRONMENTS[ENVIRONMENTS.length - 1]) throw err;
+    }
+  }
+  for (const group of statuses?.data ?? []) {
     for (const item of group.lastTransactions ?? []) {
       if (!item.signedTransactionInfo) continue;
       const transaction = await verifyTransaction(item.signedTransactionInfo);

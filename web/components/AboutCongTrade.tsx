@@ -40,7 +40,6 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
         every filing the House Clerk and the Senate publish, and is updated daily
         {trades && members ? (
           <>
-            {" "}
             : <span className="text-ink">{trades.toLocaleString("en-US")}</span> trades by{" "}
             <span className="text-ink">{members.toLocaleString("en-US")}</span> members so far
           </>

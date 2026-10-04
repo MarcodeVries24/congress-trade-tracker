@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { FeaturedTimedTrade, NOT_ADVICE, TimedTradeList, TimingLeaderList } from "@/components/TimingFeature";
 import { getPriceSeries } from "@/lib/priceSeries";
-import { getTimingOverviewCached, parseTimingWindow, TIMING_WINDOWS } from "@/lib/timing";
+import { DEFAULT_TIMING_WINDOW, getTimingOverviewCached, parseTimingWindow, TIMING_WINDOWS } from "@/lib/timing";
 import { Cong } from "@/components/Cong";
 
 /**
@@ -63,7 +63,7 @@ export default async function BestTradesPage({ searchParams }: { searchParams: P
           {TIMING_WINDOWS.map((d) => (
             <Link
               key={d}
-              href={d === 90 ? "/best-trades" : `/best-trades?days=${d}`}
+              href={d === DEFAULT_TIMING_WINDOW ? "/best-trades" : `/best-trades?days=${d}`}
               className={`rounded-full border px-3.5 py-1.5 text-sm ${
                 d === days
                   ? "border-ink bg-ink text-panel"

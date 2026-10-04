@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { NOT_ADVICE, TimedTradeList } from "@/components/TimingFeature";
 import type { TimingOverview } from "@/lib/timing";
 
-const WINDOWS = [30, 90] as const;
+const WINDOWS = [30, 90, 365] as const;
 type Window = (typeof WINDOWS)[number];
 const SHOWN = 6;
 
@@ -13,14 +13,14 @@ const SHOWN = 6;
  * The home page's "Congress's best trades": the recently disclosed trades
  * that have done best since the day they were made (a rise since a purchase,
  * a fall since a sale), all filed within the 45 days the law allows, with a
- * switch between the past 30 and 90 days. The full ranking, with its chart
+ * switch between the past 30 days, 90 days and year, a year first. The full ranking, with its chart
  * and the members, is at /best-trades.
  *
  * Styled as one of the home page's cards. Renders nothing if the data fails
  * to load: nothing else on the page depends on it.
  */
 export function HomeTiming() {
-  const [days, setDays] = useState<Window>(90);
+  const [days, setDays] = useState<Window>(365);
   const [data, setData] = useState<Partial<Record<Window, TimingOverview>>>({});
   const [failed, setFailed] = useState(false);
 
@@ -45,7 +45,7 @@ export function HomeTiming() {
     <section className="mt-4 flex flex-col overflow-hidden rounded-lg border border-line bg-panel lg:mt-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Congress&rsquo;s best trades, disclosed in the past {days} days</h2>
+          <h2 className="text-sm font-semibold text-ink">Congress&rsquo;s best trades, disclosed in the past {days === 365 ? "year" : `${days} days`}</h2>
           <p className="text-xs text-ink-faint">
             What each trade has returned since the day it was made, to the latest close. Only trades filed on time.
           </p>
@@ -61,7 +61,7 @@ export function HomeTiming() {
                   days === w ? "border-accent/40 bg-accent/15 text-accent" : "border-line text-ink-faint hover:text-ink-muted"
                 }`}
               >
-                {w} days
+                {w === 365 ? "Year" : `${w} days`}
               </button>
             ))}
           </div>

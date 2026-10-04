@@ -84,9 +84,12 @@ export interface TimingOverview {
 export const TIMING_WINDOWS = [30, 90, 365] as const;
 export type TimingWindow = (typeof TIMING_WINDOWS)[number];
 
+/** What the website shows first: a year, the most telling ranking. */
+export const DEFAULT_TIMING_WINDOW: TimingWindow = 365;
+
 export function parseTimingWindow(value: unknown): TimingWindow {
   const n = Number(value);
-  return (TIMING_WINDOWS as readonly number[]).includes(n) ? (n as TimingWindow) : 90;
+  return (TIMING_WINDOWS as readonly number[]).includes(n) ? (n as TimingWindow) : DEFAULT_TIMING_WINDOW;
 }
 
 // At most this many of one member's trades in a ranking, so one well-timed

@@ -1,14 +1,12 @@
 import { memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { getProPricing } from '@congtrade/shared/plans';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
-import { fetchPolitician, fetchTrades, type Trade } from '@/lib/api';
-import { assetLabel, compactAmount, memberName, tradeVerb } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod } from '@/lib/products';
@@ -16,12 +14,10 @@ import { useOnboarding } from '@/lib/onboarding';
 import { usePurchases } from '@/lib/use-purchases';
 import { CongSays, ONBOARDING_STEPS, STEP_TOP_BAR, useStepBack } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
-import { Avatar } from '@/ui/avatar';
 import { Button, IconButton } from '@/ui/button';
 import { Icon } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-import { TickerLogo } from '@/ui/ticker-logo';
 
 // Weeks in each billing period, for the per-week figure under the longer
 // plans; the same 52 / 12 the shared pricing uses for its savings.
@@ -117,8 +113,6 @@ export default function PaywallScreen() {
     'The best-timed trades, and how they did since',
   ];
 
-  const latest = useLatestFiling(answers.members);
-
   const plans: { key: BillingPeriod; title: string; price: string; badge?: string }[] = [
     {
       key: 'weekly',
@@ -162,36 +156,6 @@ export default function PaywallScreen() {
         ) : (
           <CongSays pose="pro" title="Every trade Congress makes, updated daily." subtitle="Cancel anytime." />
         )}
-
-        {latest ? (
-          <Animated.View
-            entering={FadeInDown.duration(380).delay(60)}
-            style={[styles.latest, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={styles.latestHead}>
-              <View style={[styles.liveDot, { backgroundColor: c.gain }]} />
-              <Text variant="caption" tone="muted" style={styles.semibold}>
-                Latest filing
-              </Text>
-            </View>
-            <View style={styles.latestRow}>
-              <Avatar uri={latest.photo} name={latest.name} party={latest.party} size={36} />
-              <View style={styles.flex}>
-                <Text variant="callout" style={styles.bold} numberOfLines={1}>
-                  {latest.name}
-                </Text>
-                <View style={styles.asset}>
-                  <TickerLogo ticker={latest.ticker} size={16} />
-                  <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.flex}>
-                    {latest.what}
-                  </Text>
-                </View>
-              </View>
-              <Text variant="footnote" style={styles.bold}>
-                {latest.amount}
-              </Text>
-            </View>
-          </Animated.View>
-        ) : null}
 
         <View style={styles.benefits}>
           {benefits.map((b, i) => (
@@ -331,99 +295,6 @@ export default function PaywallScreen() {
   );
 }
 
-/** A filed trade as the card shows it, from either source below. */
-type Filing = {
-  name: string;
-  photo: string | null;
-  party: string | null;
-  ticker: string;
-  what: string;
-  amount: string;
-};
-
-// Picked members whose recent trades are looked through, at most: one request
-// each, and the card shows only one trade.
-const MEMBERS_ASKED = 5;
-
-// A stock bought or sold: options (OP) carry the underlying's ticker too, but
-// read as "Sold PUT/XSP @ 730 EXP 11/20/2026".
-const isStockBuyOrSale = (t: { ticker: string | null; transaction_type: string; asset_type_code?: string | null }) =>
-  !!t.ticker && /^[PS]/i.test(t.transaction_type) && (t.asset_type_code ?? 'ST') === 'ST';
-
-/**
- * The most recent stock purchase or sale filed by the members picked during
- * setup, or by anyone when nobody was picked or none of them has one; null
- * until it loads (and if it cannot), as the screen is complete without it.
- *
- * Each member comes from their page's free endpoint rather than a member
- * filter on /api/trades, which is a Pro filter the API drops for everyone
- * else, and everyone on this screen is someone else.
- */
-function useLatestFiling(filedNames: string[]): Filing | null {
-  const [latest, setLatest] = useState<Filing | null>(null);
-  // Spellings of one person can differ; their slugs mostly do not.
-  const slugs = [...new Set(filedNames.map(memberSlug))].slice(0, MEMBERS_ASKED);
-  const key = slugs.join(',');
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
-    const anyone = () =>
-      fetchTrades({ limit: 20, assetTypes: ['ST'] }, { signal }).then((res) => {
-        const t = res.data.find(isStockBuyOrSale);
-        return t ? asFiling(memberName(t), t.photo_url, t.party, t) : null;
-      });
-    const theirs = async () => {
-      const pages = await Promise.all(
-        key.split(',').map((slug) => fetchPolitician(slug, { signal }).catch(() => null))
-      );
-      let best: { filing: Filing; filed: string } | null = null;
-      for (const page of pages) {
-        const t = page?.trades.find(isStockBuyOrSale);
-        if (!page || !t) continue;
-        const filed = t.filing_date ?? '';
-        if (!best || filed > best.filed) {
-          best = { filing: asFiling(page.profile.display, page.profile.photo_url, page.profile.party, t), filed };
-        }
-      }
-      return best?.filing ?? null;
-    };
-    (key ? theirs() : Promise.resolve(null))
-      .then((filing) => filing ?? anyone())
-      .then(setLatest)
-      .catch(() => {});
-    return () => controller.abort();
-  }, [key]);
-  return latest;
-}
-
-function asFiling(
-  name: string,
-  photo: string | null,
-  party: string | null,
-  t: Pick<Trade, 'asset_name' | 'ticker' | 'company_name' | 'transaction_type' | 'amount_range'>
-): Filing {
-  return {
-    name,
-    photo,
-    party,
-    ticker: t.ticker!,
-    what: `${tradeVerb(t.transaction_type)} ${assetLabel(t)} (${t.ticker})`,
-    amount: compactAmount(t.amount_range),
-  };
-}
-
-/** A member's page slug from a filed spelling: web/lib/memberSlug.ts, which the API resolves. */
-function memberSlug(name: string): string {
-  return name
-    .replace(/^Hon\.\s+/i, '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 function FinePrintLink({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Tap onPress={onPress} hitSlop={8}>
@@ -448,16 +319,11 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   semibold: { fontWeight: '600' },
   center: { textAlign: 'center' },
-  benefits: { gap: 8, paddingTop: 14, paddingHorizontal: 4 },
+  benefits: { gap: 10, paddingTop: 22, paddingHorizontal: 4 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   check: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  plans: { paddingTop: 16, gap: 8 },
+  plans: { paddingTop: 22, gap: 10 },
   price: { alignItems: 'flex-end', gap: 1 },
-  latest: { marginTop: 14, padding: 12, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
-  latestHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: { width: 7, height: 7, borderRadius: 4 },
-  latestRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  asset: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   plan: {
     flexDirection: 'row',
     alignItems: 'center',

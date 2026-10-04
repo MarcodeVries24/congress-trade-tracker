@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { LatestFilingCard } from '@/components/latest-filing';
 import { OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
 import { Icon, type IconName } from '@/ui/icon';
@@ -16,7 +17,7 @@ import { useOnboarding } from '@/lib/onboarding';
  */
 export default function ProofScreen() {
   const nav = useOnboardingNav();
-  const { finish } = useOnboarding();
+  const { answers, finish } = useOnboarding();
   const { c } = useTheme();
   const [stats, setStats] = useState<SiteStats | null>(null);
 
@@ -62,6 +63,8 @@ export default function ProofScreen() {
             </View>
           </View>
         ))}
+        {/* Proof the feed is live: the latest filing by whoever was picked, or anyone. */}
+        <LatestFilingCard filedNames={answers.members} />
       </View>
     </OnboardingStep>
   );

@@ -20,6 +20,10 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 /**
  * Sends a first run through onboarding, and everyone else straight to the app.
+ * Anyone without Pro starts again at the welcome screen: someone whose
+ * subscription has run out (kept to the end of the period they paid for) as
+ * much as someone who has never had one, and from there through the questions
+ * to the plans.
  *
  * Held back until storage has been read, because redirecting on a default would
  * show the flow again to someone who finished it last week.
@@ -51,8 +55,7 @@ function Navigation() {
 
   return (
     <>
-      {loaded && !done && !inFlow && !onSignIn ? <Redirect href="/onboarding" /> : null}
-      {loaded && done && locked && !inFlow && !onSignIn ? <Redirect href="/paywall" /> : null}
+      {loaded && (!done || locked) && !inFlow && !onSignIn ? <Redirect href="/onboarding" /> : null}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.background } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />

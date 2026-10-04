@@ -118,7 +118,11 @@ export function assetLabel(row: { asset_name: string; ticker?: string | null; co
       .replace(/\s+-\s+(Class [A-Z] )?(Common|Ordinary|Preferred)( Stock| Shares)?.*$/i, "")
       .replace(/\s+(Common Stock|Ordinary Shares)$/i, "")
       .trim();
-  const cleaned = base.replace(/,?\s+(Inc\.?|Corp\.?|Corporation|Co\.?|Ltd\.?|plc|N\.V\.|S\.A\.)$/i, "").trim();
+  // "JPMorgan Chase & Co." loses the "& Co." together, not just the "Co.".
+  const cleaned = base
+    .replace(/,?\s+(Inc\.?|Corp\.?|Corporation|Co\.?|Ltd\.?|plc|N\.V\.|S\.A\.)$/i, "")
+    .replace(/\s*&$/, "")
+    .trim();
   return cleaned || row.asset_name;
 }
 

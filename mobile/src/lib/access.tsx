@@ -1,4 +1,5 @@
 import { useAuth } from '@clerk/clerk-expo';
+import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { API_BASE } from '@/lib/api';
@@ -75,6 +76,20 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     if (!isLoaded || !isSignedIn) return;
     void refresh();
   }, [isLoaded, isSignedIn, userId, refresh]);
+
+  // And whenever the app comes back to the front: a subscription that ran out
+  // while it sat in the background locks it then, not at the next cold start.
+  // At most once every few minutes, so flicking between apps costs nothing.
+  const askedAt = useRef(0);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || Date.now() - askedAt.current < 5 * 60_000) return;
+      askedAt.current = Date.now();
+      void refresh();
+    });
+    return () => sub.remove();
+  }, [isLoaded, isSignedIn, refresh]);
 
   // Signed out needs no request, so it is derived rather than stored.
   const current = answer && answer.userId === userId ? answer : null;

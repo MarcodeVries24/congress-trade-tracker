@@ -268,20 +268,24 @@ export default function WelcomeScreen() {
             router.push('/onboarding/goal');
           }}
         />
-        <Tap
-          onPress={() => {
-            signingIn.current = true;
-            router.push('/sign-in');
-          }}
-          hitSlop={8}
-          style={styles.signIn}>
-          <Text variant="callout" tone="muted">
-            Already have an account?{' '}
-            <Text variant="callout" style={styles.bold}>
-              Sign in
+        {/* Not for someone already signed in, back here because their
+            subscription ran out: "Get started" is their way to the plans. */}
+        {status === 'signed-out' ? (
+          <Tap
+            onPress={() => {
+              signingIn.current = true;
+              router.push('/sign-in');
+            }}
+            hitSlop={8}
+            style={styles.signIn}>
+            <Text variant="callout" tone="muted">
+              Already have an account?{' '}
+              <Text variant="callout" style={styles.bold}>
+                Sign in
+              </Text>
             </Text>
-          </Text>
-        </Tap>
+          </Tap>
+        ) : null}
       </View>
     </View>
   );

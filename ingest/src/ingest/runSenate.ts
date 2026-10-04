@@ -1,5 +1,7 @@
 import "../loadEnv.js";
 import { sql, ensureSchema, KEEP_APPROVAL_SQL } from "../db/index.js";
+import { applyCorrections } from "../db/corrections.js";
+import { cleanParsedAsset } from "./assetName.js";
 import { launchSenateBrowser } from "./senate/browser.js";
 import { acceptAgreementAndOpenSearch, searchPeriodicTransactionReports } from "./senate/search.js";
 import { parseSenateReportPage } from "./senate/parseReport.js";
@@ -120,7 +122,7 @@ async function main() {
               ]
             ),
             tx.query(`DELETE FROM transactions WHERE doc_id = $1`, [result.reportId]),
-            ...transactions.map((t) =>
+            ...transactions.map(cleanParsedAsset).map((t) =>
               tx.query(
                 `INSERT INTO transactions
                    (doc_id, member_name, state_district, asset_name, ticker, asset_type_code, owner, transaction_type, transaction_date, notification_date, amount_range, amount_low, amount_high)
@@ -144,6 +146,7 @@ async function main() {
           ];
           return queries;
         });
+        await applyCorrections(result.reportId);
 
         totalTransactions += transactions.length;
         ocrCount++;
@@ -204,7 +207,7 @@ async function main() {
             ]
           ),
           tx.query(`DELETE FROM transactions WHERE doc_id = $1`, [result.reportId]),
-          ...transactions.map((t) =>
+          ...transactions.map(cleanParsedAsset).map((t) =>
             tx.query(
               `INSERT INTO transactions
                  (doc_id, member_name, state_district, asset_name, ticker, asset_type_code, owner, transaction_type, transaction_date, notification_date, amount_range, amount_low, amount_high)
@@ -228,6 +231,7 @@ async function main() {
         ];
         return queries;
       });
+      await applyCorrections(result.reportId);
 
       totalTransactions += transactions.length;
       console.log(`  [${i + 1}/${toProcess.length}] ${result.filerName} (${result.reportId}): ${transactions.length} transactions`);

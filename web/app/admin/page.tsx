@@ -53,6 +53,37 @@ interface ReviewFiling {
   pdf_url: string;
 }
 
+// Words that say what kind of security or company something is, not which.
+const GENERIC = new Set(
+  "the inc incorporated corp corporation co company companies ltd limited plc sa nv ag se lp llc holding holdings group common stock shares share class ordinary adr ads sponsored unsponsored new trust fund etf reit cmn cl series".split(" ")
+);
+const nameWords = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !GENERIC.has(w))
+  );
+
+/**
+ * Whether the company a ticker belongs to *now* looks like a different
+ * company from the one filed. Tickers get reused: after ChemoCentryx was
+ * acquired, CCXI went to Churchill Capital Corp XI, and the site showed the
+ * wrong company, logo and price until the 2026-10 audit caught it. Renames
+ * (Raytheon to RTX) trip this too; that is fine for a prompt to look.
+ */
+function tickerLooksReused(filed: string, company: string | null): boolean {
+  if (!company) return false;
+  const a = nameWords(filed);
+  const b = nameWords(company);
+  if (!a.size || !b.size) return false;
+  for (const w of a) if (b.has(w)) return false;
+  const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return !flat(filed).includes(flat(company)) && !flat(company).includes(flat(filed));
+}
+
 const OWNER_LABEL: Record<string, string> = { SP: "Spouse", JT: "Joint", DC: "Child" };
 
 const REVIEW_LABEL: Record<string, string> = {
@@ -196,7 +227,10 @@ export default async function AdminPage() {
                       {rows.map((t) => {
                         const badge = typeBadge(t.transaction_type);
                         return (
-                          <li key={t.id} className={`px-3 py-2.5 ${t.plausible ? "" : "bg-amber-500/10"}`}>
+                          <li
+                            key={t.id}
+                            className={`px-3 py-2.5 ${t.plausible && !tickerLooksReused(t.asset_name, t.company_name) ? "" : "bg-amber-500/10"}`}
+                          >
                             <div className="flex items-center gap-3">
                               <MemberPhoto name={t.member_name} photoUrl={t.photo_url} />
                               <div className="min-w-0 flex-1">
@@ -225,6 +259,12 @@ export default async function AdminPage() {
                               {memberLocation(t) ?? "no state"}
                               {t.asset_type_code && t.asset_type_code !== "ST" ? ` · ${t.asset_type_code}` : ""}
                               {t.ticker ? "" : " · no ticker"} · as filed: {t.asset_name}
+                              {tickerLooksReused(t.asset_name, t.company_name) ? (
+                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                  {" "}
+                                  · ticker {t.ticker} now belongs to {t.company_name}: check it is the same company
+                                </span>
+                              ) : null}
                               {t.plausible ? null : (
                                 <span className="font-semibold text-amber-700 dark:text-amber-300">
                                   {" "}

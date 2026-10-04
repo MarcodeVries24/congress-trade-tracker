@@ -18,7 +18,9 @@ export const SCHEMA_STATEMENTS = [
     -- and never let a routine/forced re-ingest run overwrite it without
     -- deliberately re-auditing first) | 'flagged' (sent to manual review
     -- from /admin: its parsed rows are a draft until a human has checked
-    -- the scan, like 'ocr').
+    -- the scan, like 'ocr') | 'duplicate' (the same trades as an earlier
+    -- filing, typically an amendment stored next to the original: hidden so
+    -- they aren't counted twice; see data_corrections).
     parse_status TEXT NOT NULL DEFAULT 'pending',
     transaction_count INTEGER NOT NULL DEFAULT 0,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -36,6 +38,19 @@ export const SCHEMA_STATEMENTS = [
   // (PUBLISHED_FILING_SQL in web/lib/sql.ts) requires it alongside an
   // 'ok'/'manual' parse_status. approved_by is the Clerk user id, or 'cli'
   // for review:approve, or 'backfill' for what was live before the gate.
+  // Hand corrections, re-applied after a filing is re-read (db/corrections.ts).
+  `CREATE TABLE IF NOT EXISTS data_corrections (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    doc_id TEXT NOT NULL,
+    target TEXT NOT NULL,
+    match_asset_name TEXT,
+    field TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    reason TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_data_corrections_doc ON data_corrections(doc_id)`,
   `ALTER TABLE filings ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`,
   `ALTER TABLE filings ADD COLUMN IF NOT EXISTS approved_by TEXT`,
   `CREATE INDEX IF NOT EXISTS idx_filings_awaiting_approval ON filings(ingested_at) WHERE approved_at IS NULL`,

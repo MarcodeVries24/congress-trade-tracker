@@ -32,6 +32,16 @@ import { FINNHUB, FX_RATES_URL } from "../config.js";
  * written in the wrong unit.
  */
 
+/**
+ * Company names the provider has wrong for a ticker, found by the 2026-10
+ * data audit: Liberty Media's Liberty Live tracking stocks come back as
+ * "Formula One Group", another of its tracking stocks.
+ */
+export const COMPANY_NAME_OVERRIDES: Record<string, string> = {
+  LLYVK: "Liberty Live Group",
+  LLYVA: "Liberty Live Group",
+};
+
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 if (!FINNHUB_API_KEY) {
   throw new Error("FINNHUB_API_KEY is not set. Get a free key at https://finnhub.io/register and set it in ingest/.env (or as a GitHub Actions secret).");
@@ -394,7 +404,7 @@ async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Pro
          ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, company_name = EXCLUDED.company_name,
            source_currency = EXCLUDED.source_currency, logo_url = EXCLUDED.logo_url, logo_checked_at = NOW(),
            updated_at = NOW()`,
-        [ticker, marketCap, data.name ?? null, (data.currency ?? "").toUpperCase() || null, logo]
+        [ticker, marketCap, COMPANY_NAME_OVERRIDES[ticker] ?? data.name ?? null, (data.currency ?? "").toUpperCase() || null, logo]
       );
     } catch (err) {
       failed++;

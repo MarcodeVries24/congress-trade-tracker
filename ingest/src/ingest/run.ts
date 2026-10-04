@@ -1,5 +1,7 @@
 import "../loadEnv.js";
 import { sql, ensureSchema, KEEP_APPROVAL_SQL } from "../db/index.js";
+import { applyCorrections } from "../db/corrections.js";
+import { cleanParsedAsset } from "./assetName.js";
 import { fetchYearIndex } from "./fetchIndex.js";
 import { getPtrPdfBuffer, getPdfText } from "./pdfText.js";
 import { parsePtrText } from "./parsePtr.js";
@@ -135,7 +137,7 @@ async function main() {
           ),
           tx.query(`DELETE FROM transactions WHERE doc_id = $1`, [filing.docId]),
           tx.query(`DELETE FROM parse_issues WHERE doc_id = $1`, [filing.docId]),
-          ...transactions.map((t) =>
+          ...transactions.map(cleanParsedAsset).map((t) =>
             tx.query(
               `INSERT INTO transactions
                  (doc_id, member_name, state_district, asset_name, ticker, asset_type_code, owner, transaction_type, transaction_date, notification_date, amount_range, amount_low, amount_high)
@@ -167,6 +169,8 @@ async function main() {
         ];
         return queries;
       });
+      // Hand corrections to this filing survive a re-read (db/corrections.ts).
+      await applyCorrections(filing.docId);
 
       totalTransactions += transactions.length;
       console.log(

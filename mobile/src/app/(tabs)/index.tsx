@@ -30,6 +30,7 @@ import { TradeRow } from '@/ui/trade-row';
 const TIMING_WINDOWS = [
   { key: '30', label: 'Past 30 days' },
   { key: '90', label: 'Past 90 days' },
+  { key: '365', label: 'Past year' },
 ] as const;
 type TimingKey = (typeof TIMING_WINDOWS)[number]['key'];
 
@@ -108,7 +109,7 @@ export default function DiscoverScreen() {
   const { user } = useUser();
 
   const [recent, setRecent] = useState<Trade[] | null | 'failed'>(null);
-  // Both windows kept once loaded, so switching back is instant.
+  // Each window kept once loaded, so switching back is instant.
   const [timingDays, setTimingDays] = useState<TimingKey>('90');
   const [timing, setTiming] = useState<Partial<Record<TimingKey, TimingOverview>> | null | 'failed'>(null);
   const [news, setNews] = useState<NewsItem[] | null | 'failed'>(null);
@@ -129,7 +130,7 @@ export default function DiscoverScreen() {
   const loadTiming = useCallback(
     async (days: TimingKey) => {
       try {
-        const overview = await fetchTiming(Number(days) as 30 | 90, await authed());
+        const overview = await fetchTiming(Number(days) as 30 | 90 | 365, await authed());
         rememberTrades(overview.trades);
         setTiming((prev) => ({ ...(prev && prev !== 'failed' ? prev : {}), [days]: overview }));
       } catch {

@@ -58,6 +58,12 @@ export default function TermsPage() {
             format.
           </p>
           <p>
+            CongTrade publishes these disclosures as a news and information service for the general public. Every
+            disclosed trade is free to read on the website, without an account or a subscription, together with a
+            link to the original filing. CongTrade Pro does not sell access to the reports: it pays for tools built
+            around them, namely filters, alerts by email and push notification, an ad-free view, and the apps.
+          </p>
+          <p>
             CongTrade is not affiliated with, endorsed by, sponsored by, or operated on behalf of the U.S. Congress,
             the House Clerk, the Senate, or any other government body or agency. All underlying filing data referenced
             by the Site is a matter of public record, produced by the U.S. government.
@@ -174,6 +180,13 @@ export default function TermsPage() {
             <li>Attempt to interfere with, disrupt, or gain unauthorized access to the Site or its underlying systems;</li>
             <li>Share your account credentials, or let other people use your subscription as if it were their own;</li>
             <li>Misrepresent data from the Site as official government data, or as investment advice from a licensed professional;</li>
+            <li>
+              Use the disclosure data for a purpose U.S. law prohibits: under 5 U.S.C. &sect; 13107, a financial
+              disclosure report may not be obtained or used for any unlawful purpose, for any commercial purpose other
+              than by news and communications media for dissemination to the general public, to determine or
+              establish anyone&rsquo;s credit rating, or to solicit money for any political, charitable or other
+              purpose;
+            </li>
             <li>Use the Site for any unlawful purpose.</li>
           </ul>
           <p>

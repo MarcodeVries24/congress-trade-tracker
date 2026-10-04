@@ -294,6 +294,14 @@ export default function PaywallScreen() {
           {chosen.price} a {PERIOD_WORD[chosen.key]}, renews automatically. Cancel in your {STORE} settings at least 24
           hours before it renews.
         </Text>
+        {/* The disclosures themselves are published free, as news (the U.S.
+            law on these reports allows commercial use only by news media
+            publishing to the general public); Pro pays for the tools. Plain
+            text rather than a link: Apple rejects links from an app to a
+            site that sells subscriptions outside the App Store. */}
+        <Text variant="caption" tone="faint" style={styles.legal}>
+          Every trade is free to read on congtrade.com. Pro adds the app, filters and alerts.
+        </Text>
         <View style={styles.links}>
           {/* Apple requires a visible way to restore a purchase: someone who
               paid and reinstalled has no other route back in. */}

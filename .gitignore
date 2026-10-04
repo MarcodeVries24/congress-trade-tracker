@@ -28,3 +28,6 @@ web/tmp-*.ts
 
 # ...but the documented placeholder file is meant to be committed
 !web/.env.example
+
+# The Vercel CLI link (project id only)
+.vercel

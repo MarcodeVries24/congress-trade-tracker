@@ -21,6 +21,10 @@ const FAQ: { q: string; a: string }[] = [
     a: 'From the Periodic Transaction Reports members of Congress are required to file. We read them from the House Clerk and the Senate’s electronic disclosure system, and every trade links to the filing it came from.',
   },
   {
+    q: 'Is CongTrade connected to Congress?',
+    a: 'No. CongTrade is an independent, unofficial service. It is not affiliated with, endorsed by, sponsored by, or operated on behalf of the U.S. Congress, the House Clerk, the Senate, or any government agency. The disclosures are public records published by the government; CongTrade collects, reads and presents them.',
+  },
+  {
     q: 'How quickly do new trades appear?',
     a: 'CongTrade is updated daily: we check both disclosure sites and review every new filing before it goes live, so a filing usually shows up within a day of being published. Members have up to 45 days after they are notified of a trade to report it, so the trade itself can be several weeks old by then. Each trade shows both dates.',
   },

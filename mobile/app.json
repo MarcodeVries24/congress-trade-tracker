@@ -11,7 +11,10 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.congtrade.app",
       "supportsTablet": true,
-      "requireFullScreen": true
+      "requireFullScreen": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

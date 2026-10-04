@@ -135,7 +135,10 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const router = useRouter();
-  const { status } = useAccess();
+  const { status, endedAt } = useAccess();
+  // Back here because their Pro ran out, not new: told so, and sent straight
+  // to the plans, since they have been through the questions before.
+  const ended = status === 'free' && endedAt ? endedAt : null;
   const { finish } = useOnboarding();
   const [examples, setExamples] = useState<{
     rows: Example[];
@@ -195,10 +198,21 @@ export default function WelcomeScreen() {
       </View>
 
       <Animated.View entering={FadeInDown.duration(450).delay(150)} style={styles.copy}>
-        <Text variant="title">Every trade Congress makes, in one place.</Text>
-        <Text variant="body" tone="muted">
-          Follow the stock trades of House and Senate members, updated daily.
-        </Text>
+        {ended ? (
+          <>
+            <Text variant="title">Your Pro subscription has ended.</Text>
+            <Text variant="body" tone="muted">
+              It ran until {shortDate(ended.slice(0, 10))}. Renew to switch your filters and saved alerts back on.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text variant="title">Every trade Congress makes, in one place.</Text>
+            <Text variant="body" tone="muted">
+              Follow the stock trades of House and Senate members, updated daily.
+            </Text>
+          </>
+        )}
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(450).delay(300)} style={styles.examples}>
@@ -261,15 +275,14 @@ export default function WelcomeScreen() {
 
       <View style={styles.footer}>
         <Button
-          label="Get started"
+          label={ended ? 'Renew Pro' : 'Get started'}
           kind="accent"
           onPress={() => {
             haptic.tap();
-            router.push('/onboarding/goal');
+            router.push(ended ? '/paywall' : '/onboarding/goal');
           }}
         />
-        {/* Not for someone already signed in, back here because their
-            subscription ran out: "Get started" is their way to the plans. */}
+        {/* Not for someone already signed in: their way on is the button. */}
         {status === 'signed-out' ? (
           <Tap
             onPress={() => {

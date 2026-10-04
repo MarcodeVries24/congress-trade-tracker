@@ -23,6 +23,11 @@ type Access = {
   status: AccessStatus;
   /** Subscriptions that will charge again, for the account deletion warning. */
   renewing: RenewingProvider[];
+  /**
+   * For someone without Pro who had it before: when it ended (ISO). The
+   * welcome screen says so, rather than greeting them as if they were new.
+   */
+  endedAt: string | null;
   /** Whether the paywall must be shown: a definite no from the server. */
   locked: boolean;
   /** Asks again, after a purchase or a restore. */
@@ -41,9 +46,12 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   // The server's answer, tagged with whose it is. An answer for someone who
   // has since signed out or switched accounts is not an answer for this person.
-  const [answer, setAnswer] = useState<{ userId: string; status: AccessStatus; renewing: RenewingProvider[] } | null>(
-    null
-  );
+  const [answer, setAnswer] = useState<{
+    userId: string;
+    status: AccessStatus;
+    renewing: RenewingProvider[];
+    endedAt: string | null;
+  } | null>(null);
   const [devSkipped, setDevSkipped] = useState(false);
   const getTokenRef = useRef(getToken);
   const userIdRef = useRef(userId);
@@ -55,16 +63,16 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const forUser = userIdRef.current;
     if (!forUser) return;
-    const settle = (status: AccessStatus, renewing: RenewingProvider[] = []) =>
-      setAnswer({ userId: forUser, status, renewing });
+    const settle = (status: AccessStatus, renewing: RenewingProvider[] = [], endedAt: string | null = null) =>
+      setAnswer({ userId: forUser, status, renewing, endedAt });
     try {
       const token = await getTokenRef.current();
       if (!token) return settle('signed-out');
       const res = await fetch(`${API_BASE}/api/account`, { headers: { authorization: `Bearer ${token}` } });
       if (res.status === 401) return settle('signed-out');
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { pro?: boolean; renewing?: RenewingProvider[] };
-      settle(data.pro ? 'pro' : 'free', data.renewing ?? []);
+      const data = (await res.json()) as { pro?: boolean; renewing?: RenewingProvider[]; endedAt?: string | null };
+      settle(data.pro ? 'pro' : 'free', data.renewing ?? [], data.pro ? null : (data.endedAt ?? null));
     } catch {
       settle('unknown');
     }
@@ -95,12 +103,20 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const current = answer && answer.userId === userId ? answer : null;
   const status: AccessStatus = !isLoaded ? 'loading' : !isSignedIn ? 'signed-out' : (current?.status ?? 'loading');
   const renewing = useMemo(() => current?.renewing ?? [], [current]);
+  const endedAt = current?.endedAt ?? null;
 
   const locked = !devSkipped && (status === 'signed-out' || status === 'free');
   const skipForDevelopment = useCallback(() => setDevSkipped(true), []);
   const value = useMemo(
-    () => ({ status, renewing, locked, refresh, skipForDevelopment: __DEV__ ? skipForDevelopment : undefined }),
-    [status, renewing, locked, refresh, skipForDevelopment]
+    () => ({
+      status,
+      renewing,
+      endedAt,
+      locked,
+      refresh,
+      skipForDevelopment: __DEV__ ? skipForDevelopment : undefined,
+    }),
+    [status, renewing, endedAt, locked, refresh, skipForDevelopment]
   );
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }

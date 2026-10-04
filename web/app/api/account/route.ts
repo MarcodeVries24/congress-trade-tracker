@@ -15,13 +15,17 @@ import { PAYING_STATUSES, type SubscriptionProvider, type SubscriptionRow } from
  *
  * `renewing` lists the providers that will charge again, so the deletion
  * screen can say which subscription has to be cancelled and where.
+ *
+ * `endedAt` is set for someone without Pro who had it before: when the last
+ * of their subscriptions ran out, so the app can tell them why it is asking
+ * them to subscribe again.
  */
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
   const [pro, rows] = await Promise.all([hasProServer(), getSubscriptions(userId)]);
-  return NextResponse.json({ pro, renewing: renewingProviders(rows) });
+  return NextResponse.json({ pro, renewing: renewingProviders(rows), endedAt: pro ? null : lastEnded(rows) });
 }
 
 /**
@@ -72,6 +76,16 @@ export async function DELETE() {
   }
 
   return NextResponse.json({ deleted: true });
+}
+
+/**
+ * When Pro last ended, or null for someone who never subscribed. Never later
+ * than now: a refunded subscription can carry a period end still to come.
+ */
+function lastEnded(rows: readonly SubscriptionRow[]): string | null {
+  if (!rows.length) return null;
+  const ends = rows.map((row) => (row.current_period_end ? new Date(row.current_period_end).getTime() : 0));
+  return new Date(Math.min(Math.max(...ends) || Date.now(), Date.now())).toISOString();
 }
 
 /** Providers that will charge again: paying, and not set to end at the period's close. */

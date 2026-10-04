@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -157,10 +157,20 @@ export default function WelcomeScreen() {
 
   // Someone who signs in here with an account that already has Pro (from the
   // website, or a store reviewer) has nothing to set up or buy: straight in.
+  // An account without Pro (made on the website, say) has already met the
+  // app, so it skips this screen and goes on to the questions, then the
+  // plans. Only right after a sign-in started here: someone signed in who
+  // goes back from the first question to this screen stays on it.
+  const signingIn = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (status !== 'pro') return;
-      void finish().then(() => router.replace('/'));
+      if (status === 'pro') {
+        signingIn.current = false;
+        void finish().then(() => router.replace('/'));
+      } else if (signingIn.current && status !== 'loading') {
+        signingIn.current = false;
+        if (status === 'free') router.push('/onboarding/goal');
+      }
     }, [status, finish, router])
   );
 
@@ -258,7 +268,13 @@ export default function WelcomeScreen() {
             router.push('/onboarding/goal');
           }}
         />
-        <Tap onPress={() => router.push('/sign-in')} hitSlop={8} style={styles.signIn}>
+        <Tap
+          onPress={() => {
+            signingIn.current = true;
+            router.push('/sign-in');
+          }}
+          hitSlop={8}
+          style={styles.signIn}>
           <Text variant="callout" tone="muted">
             Already have an account?{' '}
             <Text variant="callout" style={styles.bold}>

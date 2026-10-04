@@ -204,15 +204,17 @@ export default function DiscoverScreen() {
         }
       />
 
-      <View style={styles.helloRow}>
-        <View style={styles.hello}>
+      <View style={styles.hello}>
+        {/* Cong beside the greeting, not the heading, so the heading keeps
+            its one line. */}
+        <View style={styles.greetingRow}>
           <Text variant="callout" tone="muted">
             {greeting()}
             {firstName ? `, ${firstName}` : ''}
           </Text>
-          <Text variant="title">What is Congress trading?</Text>
+          <Cong mood={moodOfTheHour()} width={34} />
         </View>
-        <Cong mood={moodOfTheHour()} width={58} />
+        <Text variant="title">What is Congress trading?</Text>
       </View>
 
       <View style={styles.search}>
@@ -407,8 +409,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40 },
   bold: { fontWeight: '700' },
-  helloRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 6, gap: 8 },
-  hello: { flex: 1, gap: 2 },
+  hello: { paddingHorizontal: 16, paddingTop: 6, gap: 2 },
+  // Cong is taller than the line; the negative margin lets him stand beside
+  // it without pushing the heading down.
+  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: -10 },
   search: { paddingHorizontal: 16, paddingTop: 16 },
   block: { paddingTop: 26, gap: 14 },
   inset: { paddingHorizontal: 16 },

@@ -65,16 +65,66 @@ const INTERIM_PHOTO_OVERRIDES: Record<string, string> = {
   A000383: "https://upload.wikimedia.org/wikipedia/commons/5/55/Alan_S_Armstrong_official_portrait_%28cropped_2%29.jpg",
 };
 
-async function resolvePhotoUrl(bioguideId: string): Promise<string> {
-  const official = MEMBERS_REFERENCE.photoUrl(bioguideId);
-  const override = INTERIM_PHOTO_OVERRIDES[bioguideId.toUpperCase()];
-  if (!override) return official;
+// The community-run unitedstates/images mirror, which often has a portrait
+// the Bioguide does not: Josh Gottheimer (G000583) has none at the Bioguide
+// and a good one here. The website's MemberPhoto and the app's Avatar try the
+// same mirror in the browser, but only after the official photo has failed,
+// and that browser fallback can lose the race and settle on initials. Storing
+// the address that works means every page gets it right first time.
+const mirrorPhotoUrl = (bioguideId: string) =>
+  `https://raw.githubusercontent.com/unitedstates/images/gh-pages/congress/450x550/${bioguideId.toUpperCase()}.jpg`;
+
+/**
+ * Whether a photo address serves an image: true, false only for a clear "not
+ * there" (a 404, or a page that is not an image), and null when the answer
+ * says nothing either way (a refusal, a server error, the network).
+ *
+ * A GET whose body is dropped unread, not a HEAD: the Bioguide answers HEAD
+ * with 403 for every photo, which once made all 1,014 look missing.
+ */
+async function photoExists(url: string): Promise<boolean | null> {
   try {
-    const res = await fetch(official, { method: "HEAD" });
-    return res.ok ? official : override;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    await res.body?.cancel();
+    if (res.ok) return (res.headers.get("content-type") ?? "").startsWith("image/");
+    return res.status === 404 ? false : null;
   } catch {
-    return override;
+    return null;
   }
+}
+
+/**
+ * The photo address to store for a member: the Bioguide's when it has one;
+ * otherwise a hand-picked interim portrait, then the mirror's copy. A check
+ * that fails on the network keeps the official address rather than swapping
+ * on a hiccup. Memoized: a member is resolved once per sync however many of
+ * the tables below ask.
+ */
+const photoCache = new Map<string, Promise<string>>();
+function resolvePhotoUrl(bioguideId: string): Promise<string> {
+  const id = bioguideId.toUpperCase();
+  let pending = photoCache.get(id);
+  if (!pending) {
+    pending = (async () => {
+      const official = MEMBERS_REFERENCE.photoUrl(id);
+      // Only a definite "not there" swaps it; anything unclear keeps it.
+      if ((await photoExists(official)) !== false) return official;
+      const override = INTERIM_PHOTO_OVERRIDES[id];
+      if (override) return override;
+      return (await photoExists(mirrorPhotoUrl(id))) ? mirrorPhotoUrl(id) : official;
+    })();
+    photoCache.set(id, pending);
+  }
+  return pending;
+}
+
+/** Checks every member's photo up front, a few at a time, so the table writes below don't wait one by one. */
+async function prefetchPhotos(bioguideIds: string[], concurrency = 8): Promise<void> {
+  const queue = [...new Set(bioguideIds.map((b) => b.toUpperCase()))];
+  const workers = Array.from({ length: concurrency }, async () => {
+    for (let id = queue.shift(); id; id = queue.shift()) await resolvePhotoUrl(id);
+  });
+  await Promise.all(workers);
 }
 
 async function syncCurrentMembers(legislators: Legislator[]): Promise<void> {
@@ -394,6 +444,17 @@ async function main() {
   console.log("Fetching historical members of Congress...");
   const historicalLegislators = await fetchLegislators(MEMBERS_REFERENCE.legislatorsHistoricalYamlUrl);
   const allLegislators = [...currentLegislators, ...historicalLegislators];
+
+  // Only members whose terms matter here: everyone current, and former
+  // members who served recently enough to have filed (see syncMembersHistoryAndTerms).
+  const relevant = allLegislators.filter((l) =>
+    l.terms.some((t) => t.start && (!t.end || t.end >= EARLIEST_RELEVANT_TERM_END))
+  );
+  console.log(`Checking ${relevant.length} member photos...`);
+  await prefetchPhotos(relevant.map((l) => l.id.bioguide));
+  const resolved = await Promise.all([...photoCache].map(async ([id, url]) => [id, await url] as const));
+  const swapped = resolved.filter(([id, url]) => url !== MEMBERS_REFERENCE.photoUrl(id)).map(([id]) => id);
+  console.log(`${swapped.length} without a Bioguide photo, stored from elsewhere: ${swapped.join(", ") || "none"}`);
 
   await syncCurrentMembers(currentLegislators);
   await backfillFormerMembers(currentLegislators, historicalLegislators);

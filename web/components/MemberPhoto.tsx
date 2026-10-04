@@ -98,7 +98,12 @@ export function MemberPhoto({
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
+    // Keyed by stage, so the fallback gets a fresh element. Swapping src on
+    // the same one let Safari report the new image as already "complete"
+    // with no width while it was still loading, and the check above then
+    // gave up on the mirror too: Josh Gottheimer kept landing on initials.
     <img
+      key={stage}
       ref={imgRef}
       src={src}
       alt=""

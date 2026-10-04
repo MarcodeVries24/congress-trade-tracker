@@ -1,11 +1,11 @@
 import { useAuth } from '@clerk/clerk-expo';
-import { useIAP } from 'expo-iap';
+import { isEligibleForIntroOfferIOS, useIAP } from 'expo-iap';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { API_BASE } from '@/lib/api';
 import type { Purchases } from '@/lib/purchases-types';
-import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct } from '@/lib/products';
+import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct, type Trial } from '@/lib/products';
 
 /**
  * Buying CongTrade Pro through the App Store or Play.
@@ -20,11 +20,67 @@ import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct } 
  * reported to it and the answer comes back from Apple, never from this device.
  */
 
+type Subscription = ReturnType<typeof useIAP>['subscriptions'][number];
+
+// "14 days", "1 month": a trial's length as the paywall says it. Weeks are
+// counted in days, the way trials are usually advertised.
+function lengthOf(unit: string, count: number): string | null {
+  if (!(count > 0)) return null;
+  if (unit === 'day' || unit === 'week') {
+    const days = unit === 'week' ? count * 7 : count;
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+  if (unit === 'month' || unit === 'year') return `${count} ${unit}${count === 1 ? '' : 's'}`;
+  return null;
+}
+
+// Play writes periods in ISO 8601: "P14D", "P2W", "P1M".
+const ISO_UNIT: Record<string, string> = { D: 'day', W: 'week', M: 'month', Y: 'year' };
+function lengthOfIso(period: string, cycles: number): string | null {
+  const m = /^P(\d+)([DWMY])$/.exec(period);
+  return m ? lengthOf(ISO_UNIT[m[2]], Number(m[1]) * Math.max(cycles, 1)) : null;
+}
+
+/**
+ * The free trial the store offers on a subscription, if any. Play lists only
+ * the offers this person is eligible for, so a free pricing phase there is a
+ * trial they will get. Apple lists the introductory offer to everyone, and
+ * eligibility is asked separately.
+ */
+function freeTrialOf(s: Subscription): Trial | null {
+  for (const o of s.subscriptionOffers ?? []) {
+    const free = o.pricingPhasesAndroid?.pricingPhaseList.find((ph) => Number(ph.priceAmountMicros) === 0);
+    if (free) {
+      const length = lengthOfIso(free.billingPeriod, free.billingCycleCount);
+      if (length) return { length, offerToken: o.offerTokenAndroid ?? null };
+    }
+    if (o.type === 'introductory' && o.paymentMode === 'free-trial' && o.period) {
+      const length = lengthOf(o.period.unit, o.period.value * (o.periodCount ?? 1));
+      if (length) return { length, offerToken: o.offerTokenAndroid ?? null };
+    }
+  }
+  if ('introductoryPricePaymentModeIOS' in s && s.introductoryPricePaymentModeIOS === 'free-trial') {
+    const length = lengthOf(
+      s.introductoryPriceSubscriptionPeriodIOS ?? '',
+      Number(s.introductoryPriceNumberOfPeriodsIOS ?? 1)
+    );
+    if (length) return { length, offerToken: null };
+  }
+  return null;
+}
+
 export function usePurchases(onEntitled: () => void): Purchases {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, userId, getToken } = useAuth();
   const [busy, setBusy] = useState<BillingPeriod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accountToken = useRef<string | null>(null);
+  // Whose token accountToken holds, so a sign-out and a sign-in as someone
+  // else never reads as ready before their own token has arrived.
+  const [tokenFor, setTokenFor] = useState<string | null>(null);
+  const accountReady = Boolean(isSignedIn && userId && tokenFor === userId);
+  // Whether Apple will still give this Apple Account an introductory offer in
+  // the subscription group; null until asked, and no trial is shown until then.
+  const [introEligibleIOS, setIntroEligibleIOS] = useState<boolean | null>(null);
 
   /**
    * Tells the server about a purchase and lets it decide.
@@ -110,7 +166,10 @@ export function usePurchases(onEntitled: () => void): Purchases {
           headers: session ? { authorization: `Bearer ${session}` } : {},
         });
         const data = (await res.json()) as { token?: string };
-        if (!cancelled) accountToken.current = data.token ?? null;
+        if (!cancelled) {
+          accountToken.current = data.token ?? null;
+          setTokenFor(data.token ? (userId ?? null) : null);
+        }
       } catch {
         // Left null, and buy() refuses rather than starting a purchase that
         // could not be attributed to anyone.
@@ -119,19 +178,40 @@ export function usePurchases(onEntitled: () => void): Purchases {
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, userId, getToken]);
+
+  // Apple answers per subscription group, and all three plans share one.
+  const groupIdIOS = subscriptions.find((s) => 'subscriptionGroupIdIOS' in s && s.subscriptionGroupIdIOS);
+  const groupId = groupIdIOS && 'subscriptionGroupIdIOS' in groupIdIOS ? groupIdIOS.subscriptionGroupIdIOS : null;
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !groupId) return;
+    let cancelled = false;
+    isEligibleForIntroOfferIOS(groupId)
+      .then((eligible) => !cancelled && setIntroEligibleIOS(eligible))
+      .catch(() => !cancelled && setIntroEligibleIOS(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId]);
 
   const products = useMemo<StoreProduct[]>(
     () =>
       subscriptions
         .map((s) => {
           const period = periodForProduct(s.id);
-          return period
-            ? { id: s.id, period, displayPrice: s.displayPrice, price: s.price ?? null, currency: s.currency || null }
-            : null;
+          if (!period) return null;
+          const trial = Platform.OS === 'ios' && introEligibleIOS !== true ? null : freeTrialOf(s);
+          return {
+            id: s.id,
+            period,
+            displayPrice: s.displayPrice,
+            price: s.price ?? null,
+            currency: s.currency || null,
+            trial,
+          };
         })
         .filter((p): p is StoreProduct => p !== null),
-    [subscriptions]
+    [subscriptions, introEligibleIOS]
   );
 
   const buy = useCallback(
@@ -142,23 +222,26 @@ export function usePurchases(onEntitled: () => void): Purchases {
         setError('That plan is not available from the store right now.');
         return;
       }
+      // The paywall sends anyone signed out to sign in first and comes back
+      // here once this is set; reaching it unset means the fetch failed.
       if (!accountToken.current) {
-        setError('Sign in before subscribing, so the purchase reaches your account.');
+        setError('Could not reach your account. Check your connection and try again.');
         return;
       }
       setBusy(period);
       try {
-        // Play requires the offer token for the base plan being bought; a
-        // subscription purchase without one is rejected outright. Apple has no
-        // equivalent, which is why this is built per platform.
+        // Play requires exactly one offer token, and the offer it names is
+        // what is bought: the free-trial offer when there is one, otherwise the
+        // base plan itself (the offer with a single, paid pricing phase). Apple
+        // applies an introductory offer on its own, which is why this is built
+        // per platform.
         const found = subscriptions.find((s) => s.id === product.id);
-        const offers =
-          Platform.OS === 'android' && found && 'subscriptionOffers' in found
-            ? (found.subscriptionOffers ?? [])
-                .map((o) => o.offerTokenAndroid)
-                .filter((token): token is string => Boolean(token))
-                .map((offerToken) => ({ sku: product.id, offerToken }))
-            : [];
+        const listed = Platform.OS === 'android' ? (found?.subscriptionOffers ?? []) : [];
+        const basePlan =
+          listed.find((o) => o.offerTokenAndroid && o.pricingPhasesAndroid?.pricingPhaseList.length === 1) ??
+          listed.find((o) => o.offerTokenAndroid);
+        const offerToken = product.trial?.offerToken ?? basePlan?.offerTokenAndroid ?? null;
+        const offers = offerToken ? [{ sku: product.id, offerToken }] : [];
         await requestPurchase({
           type: 'subs',
           request: {
@@ -189,5 +272,5 @@ export function usePurchases(onEntitled: () => void): Purchases {
     }
   }, [restorePurchases, getAvailablePurchases]);
 
-  return { available: true, ready: connected, products, busy, error, buy, restore };
+  return { available: true, ready: connected, products, busy, error, accountReady, buy, restore };
 }

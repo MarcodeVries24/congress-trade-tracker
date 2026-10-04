@@ -15,4 +15,18 @@ export type StoreProduct = {
   /** The same price as a number, in `currency`, for working out a per-week figure. */
   price: number | null;
   currency: string | null;
+  /**
+   * The free trial the store will give this person on this plan, or null.
+   * Read from the store, never assumed: Apple and Play only give a trial to
+   * someone who has not had one in the subscription before, and promising one
+   * they will not get is both misleading and a rejection.
+   */
+  trial: Trial | null;
+};
+
+export type Trial = {
+  /** How long, ready to show: "14 days", "1 month". */
+  length: string;
+  /** Play's token for the offer that carries the trial. Null on iOS, where the trial applies on its own. */
+  offerToken: string | null;
 };

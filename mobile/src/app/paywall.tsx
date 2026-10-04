@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAccess } from '@/lib/access';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
-import type { BillingPeriod } from '@/lib/products';
+import type { BillingPeriod, Trial } from '@/lib/products';
 import { useOnboarding } from '@/lib/onboarding';
 import { usePurchases } from '@/lib/use-purchases';
 import { CongSays, ONBOARDING_STEPS, STEP_TOP_BAR, useStepBack } from '@/components/onboarding-step';
@@ -28,6 +28,11 @@ const STORE = Platform.select({ ios: 'App Store', android: 'Google Play', defaul
 
 const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'month', annual: 'year' };
 
+// What the web preview and Expo Go show for the yearly plan, which have no
+// store to ask. In the apps the trial is whatever the store says this person
+// gets, and none at all when they have had one before.
+const PREVIEW_TRIAL: Trial = { length: '14 days', offerToken: null };
+
 /**
  * The paywall.
  *
@@ -38,9 +43,9 @@ const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'm
  * ones priced per week so the saving is plain. Nothing here is invented: no
  * reviews, no counts of other subscribers.
  *
- * Weekly is preselected because it is what someone who has just met the app
- * will commit to, and the longer plans carry the saving so they argue for
- * themselves.
+ * Yearly is preselected, with its free trial: the trial removes the risk of
+ * the larger commitment, and the weekly and monthly plans are cheap enough to
+ * start on without one, so they have none.
  *
  * Prices come from the store, not from us: the store's figure is what will be
  * charged, in the person's own currency. @congtrade/shared is the fallback for
@@ -48,7 +53,12 @@ const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'm
  *
  * Apple's guideline 3.1.2 wants the length, the price per period, working
  * links to the terms and the privacy policy, and a restore control on this
- * screen itself. All four are here, and none is hidden behind a tap.
+ * screen itself. All four are here, and none is hidden behind a tap. With a
+ * trial, the price stays the biggest figure on the plan and the fine print
+ * says what is charged when the trial ends.
+ *
+ * Someone signed out who taps the button is sent to sign in, and the purchase
+ * carries on by itself once they are back, so it is credited to their account.
  *
  * Nothing on this screen decides whether anyone is entitled to anything: a
  * purchase is reported to the server, which asks the store.
@@ -59,7 +69,7 @@ export default function PaywallScreen() {
   const router = useRouter();
 
   const pricing = getProPricing('eur');
-  const [period, setPeriod] = useState<BillingPeriod>('weekly');
+  const [period, setPeriod] = useState<BillingPeriod>('annual');
   const goBack = useStepBack(ONBOARDING_STEPS + 1);
   const access = useAccess();
   const { refresh } = access;
@@ -74,7 +84,38 @@ export default function PaywallScreen() {
     }, [access.status, router])
   );
 
+  // The plan picked before being sent to sign in, bought once they are back
+  // signed in. Never for an account that turns out to have Pro already (the
+  // effect above takes it away instead), and dropped if they come back
+  // without signing in.
+  const [pending, setPending] = useState<BillingPeriod | null>(null);
+  const { accountReady, buy } = purchases;
+  useFocusEffect(
+    useCallback(() => {
+      if (!pending) return;
+      if (access.status === 'signed-out' || access.status === 'unknown') setPending(null);
+      else if (access.status === 'free' && accountReady) {
+        setPending(null);
+        void buy(pending);
+      }
+    }, [pending, access.status, accountReady, buy])
+  );
+
+  const subscribe = () => {
+    haptic.commit();
+    if (access.status === 'signed-out') {
+      setPending(period);
+      router.push('/sign-in');
+    } else void buy(period);
+  };
+
   const storePrice = (p: BillingPeriod) => purchases.products.find((x) => x.period === p)?.displayPrice;
+  const trialFor = (p: BillingPeriod): Trial | null =>
+    purchases.available
+      ? (purchases.products.find((x) => x.period === p)?.trial ?? null)
+      : p === 'annual'
+        ? PREVIEW_TRIAL
+        : null;
 
   // The longer plans' price per week: in the store's currency when it gives a
   // number, from the shared euro pricing in the preview with no store.
@@ -133,6 +174,7 @@ export default function PaywallScreen() {
     },
   ];
   const chosen = plans.find((p) => p.key === period)!;
+  const chosenTrial = trialFor(chosen.key);
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
@@ -197,14 +239,21 @@ export default function PaywallScreen() {
                   ]}>
                   {selected ? <Icon name="checkmark" size={14} color="#FFFFFF" /> : null}
                 </View>
-                <View style={[styles.flex, styles.planHead]}>
-                  <Text variant="subhead">{p.title}</Text>
-                  {p.badge ? (
-                    <View style={[styles.badge, { backgroundColor: c.accent }]}>
-                      <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-                        {p.badge}
-                      </Text>
-                    </View>
+                <View style={[styles.flex, styles.planText]}>
+                  <View style={styles.planHead}>
+                    <Text variant="subhead">{p.title}</Text>
+                    {p.badge ? (
+                      <View style={[styles.badge, { backgroundColor: c.accent }]}>
+                        <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
+                          {p.badge}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {trialFor(p.key) ? (
+                    <Text variant="caption" tone="accent" style={styles.semibold}>
+                      {trialFor(p.key)!.length} free
+                    </Text>
                   ) : null}
                 </View>
                 <View style={styles.price}>
@@ -243,21 +292,27 @@ export default function PaywallScreen() {
         <Button
           kind="accent"
           label={
-            purchases.available
-              ? `Start Pro for ${chosen.price} a ${PERIOD_WORD[chosen.key]}`
-              : (purchases.unavailableReason ?? 'Not available here')
+            !purchases.available
+              ? (purchases.unavailableReason ?? 'Not available here')
+              : chosenTrial
+                ? `Try free for ${chosenTrial.length}`
+                : `Start Pro for ${chosen.price} a ${PERIOD_WORD[chosen.key]}`
           }
-          loading={purchases.busy !== null}
+          loading={purchases.busy !== null || pending !== null}
           disabled={!purchases.available}
-          onPress={() => {
-            haptic.commit();
-            void purchases.buy(period);
-          }}
+          onPress={subscribe}
         />
-        <Text variant="caption" tone="faint" style={styles.legal}>
-          {chosen.price} a {PERIOD_WORD[chosen.key]}, renews automatically. Cancel in your {STORE} settings at least 24
-          hours before it renews.
-        </Text>
+        {chosenTrial ? (
+          <Text variant="caption" tone="faint" style={styles.legal}>
+            {chosenTrial.length} free, then {chosen.price} a {PERIOD_WORD[chosen.key]}, renewing automatically. Cancel
+            in your {STORE} settings at least 24 hours before the trial ends and you pay nothing.
+          </Text>
+        ) : (
+          <Text variant="caption" tone="faint" style={styles.legal}>
+            {chosen.price} a {PERIOD_WORD[chosen.key]}, renews automatically. Cancel in your {STORE} settings at least
+            24 hours before it renews.
+          </Text>
+        )}
         {/* The disclosures themselves are published free, as news (the U.S.
             law on these reports allows commercial use only by news media
             publishing to the general public); Pro pays for the tools. Plain
@@ -333,6 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
   },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  planText: { gap: 2 },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill },
   footer: { paddingHorizontal: 16, paddingTop: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },

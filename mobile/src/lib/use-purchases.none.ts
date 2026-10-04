@@ -14,6 +14,7 @@ export function noStore(reason: string): Purchases {
     products: [],
     busy: null as BillingPeriod | null,
     error: null,
+    accountReady: false,
     buy: async () => {},
     restore: async () => {},
     unavailableReason: reason,

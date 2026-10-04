@@ -5,6 +5,7 @@ import { haptic } from '@/lib/haptics';
 import { LINKS, SUPPORT_EMAIL, emailSupport, openPage } from '@/lib/links';
 import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
+import { Cong } from '@/ui/cong';
 import { Icon } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -41,7 +42,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'What does "Before the public knew" show?',
-    a: "For every trade in a listed stock, how the price moved between the day the member traded and the day the trade was disclosed: the stretch when only they knew about it. \"Their way\" means it rose after a purchase or fell after a sale. Prices are daily closes, updated every weekday evening, and new trades are priced once they are published. It shows timing, not profit: filings give a value range, never the price paid.",
+    a: 'For every trade in a listed stock, how the price moved between the day the member traded and the day the trade was disclosed: the stretch when only they knew about it. "Their way" means it rose after a purchase or fell after a sale. Prices are daily closes, updated every weekday evening, and new trades are priced once they are published. It shows timing, not profit: filings give a value range, never the price paid.',
   },
   {
     q: 'Is this financial advice?',
@@ -90,7 +91,7 @@ export default function HelpScreen() {
       </View>
 
       <View style={[styles.contact, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <Icon name="chatbubbles-outline" size={28} color={c.primary} />
+        <Cong mood="support" width={84} />
         <Text variant="subhead">Still stuck?</Text>
         <Text variant="callout" tone="muted" style={styles.centerText}>
           Email {SUPPORT_EMAIL}. We read every message and reply as soon as we can.

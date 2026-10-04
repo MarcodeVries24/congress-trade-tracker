@@ -7,6 +7,7 @@ import { haptic } from '@/lib/haptics';
 import { usePush } from '@/lib/push';
 import { radius, shadow, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
+import { Cong } from '@/ui/cong';
 import { Icon, type IconName } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -36,7 +37,15 @@ function Point({ icon, children }: { icon: IconName; children: string }) {
  * they have said yes here. If the system has already been refused, this says
  * so and offers Settings instead of a button that would silently do nothing.
  */
-export function PushPrimer({ visible, onClose, onEnabled }: { visible: boolean; onClose: () => void; onEnabled?: () => void }) {
+export function PushPrimer({
+  visible,
+  onClose,
+  onEnabled,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onEnabled?: () => void;
+}) {
   const { c, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -70,9 +79,13 @@ export function PushPrimer({ visible, onClose, onEnabled }: { visible: boolean; 
         </View>
 
         <View style={styles.body}>
-          <View style={[styles.bell, { backgroundColor: c.accentSoft }]}>
-            <Icon name={denied ? 'notifications-off' : 'notifications'} size={34} color={c.accent} />
-          </View>
+          {denied || push.unsupported ? (
+            <View style={[styles.bell, { backgroundColor: c.accentSoft }]}>
+              <Icon name={denied ? 'notifications-off' : 'notifications'} size={34} color={c.accent} />
+            </View>
+          ) : (
+            <Cong mood="turn-on-alerts" width={104} />
+          )}
 
           {push.unsupported ? (
             <>
@@ -89,9 +102,8 @@ export function PushPrimer({ visible, onClose, onEnabled }: { visible: boolean; 
                 Notifications are off for CongTrade
               </Text>
               <Text variant="body" tone="muted" style={styles.center}>
-                {SYSTEM} won&apos;t ask again once notifications have been turned down, so this is switched in
-                Settings: open Notifications, then CongTrade, and turn on Allow Notifications. Come back here and
-                they&apos;re on.
+                {SYSTEM} won&apos;t ask again once notifications have been turned down, so this is switched in Settings:
+                open Notifications, then CongTrade, and turn on Allow Notifications. Come back here and they&apos;re on.
               </Text>
             </>
           ) : (

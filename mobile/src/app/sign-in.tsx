@@ -9,7 +9,7 @@ import { EmailSignIn } from '@/components/email-sign-in';
 import { LINKS, openPage } from '@/lib/links';
 import { radius, useTheme } from '@/theme';
 import { Icon, type IconName } from '@/ui/icon';
-import { Brand } from '@/ui/logo';
+import { Cong } from '@/ui/cong';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
@@ -95,7 +95,7 @@ export default function SignInScreen() {
       <Stack.Screen options={{ title: 'Sign in' }} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.head}>
-          <Brand size={26} />
+          <Cong mood="welcome-back" width={96} />
           <Text variant="title" style={styles.center}>
             Welcome back
           </Text>

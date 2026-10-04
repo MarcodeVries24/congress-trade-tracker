@@ -10,6 +10,7 @@ import { useAuthedRequest } from '@/lib/use-api';
 import { useRefresh } from '@/lib/use-refresh';
 import { radius, useTheme } from '@/theme';
 import { Avatar, UserAvatar } from '@/ui/avatar';
+import { Cong, type CongMood } from '@/ui/cong';
 import { Button, IconButton } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { ChipRow } from '@/ui/chip-row';
@@ -81,6 +82,14 @@ function digest(trades: Trade[]): { stories: Story[]; trending: Trending[] } {
       .sort((a, b) => b.members - a.members || b.count - a.count)
       .slice(0, 10),
   };
+}
+
+/** Cong at the hour's work: coffee and the morning brief, the desk, the evening's filings. */
+function moodOfTheHour(): CongMood {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'morning-brief';
+  if (h >= 12 && h < 18) return 'desk-mode';
+  return 'reading-filings';
 }
 
 function greeting(): string {
@@ -195,12 +204,15 @@ export default function DiscoverScreen() {
         }
       />
 
-      <View style={styles.hello}>
-        <Text variant="callout" tone="muted">
-          {greeting()}
-          {firstName ? `, ${firstName}` : ''}
-        </Text>
-        <Text variant="title">What is Congress trading?</Text>
+      <View style={styles.helloRow}>
+        <View style={styles.hello}>
+          <Text variant="callout" tone="muted">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ''}
+          </Text>
+          <Text variant="title">What is Congress trading?</Text>
+        </View>
+        <Cong mood={moodOfTheHour()} width={58} />
       </View>
 
       <View style={styles.search}>
@@ -395,7 +407,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40 },
   bold: { fontWeight: '700' },
-  hello: { paddingHorizontal: 16, paddingTop: 6, gap: 2 },
+  helloRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 6, gap: 8 },
+  hello: { flex: 1, gap: 2 },
   search: { paddingHorizontal: 16, paddingTop: 16 },
   block: { paddingTop: 26, gap: 14 },
   inset: { paddingHorizontal: 16 },

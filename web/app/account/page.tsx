@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
+import { Cong } from "@/components/Cong";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AlertsManager } from "@/components/AlertsManager";
@@ -28,6 +29,7 @@ export default async function AccountPage() {
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Your account</h1>
 
         <SignedOut>
+          <Cong mood="welcome-back" width={96} className="mt-5" />
           <p className="mt-3 text-sm leading-relaxed text-ink-muted">
             Sign in to manage your plan and your email alerts.
           </p>

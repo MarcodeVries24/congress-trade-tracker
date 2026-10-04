@@ -27,6 +27,7 @@ import {
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
 import Link from "next/link";
+import { Cong } from "@/components/Cong";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { RowLink } from "@/components/RowLink";
 import { TickerLogo } from "@/components/TickerLogo";
@@ -883,6 +884,7 @@ export default function Home() {
               {!loading && result?.data.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-ink-faint">
+                    <Cong mood="no-results" width={96} className="mx-auto mb-2" />
                     No trades match these filters.
                   </td>
                 </tr>
@@ -993,6 +995,7 @@ export default function Home() {
           {loading && <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">Loading…</div>}
           {!loading && result?.data.length === 0 && (
             <div className="rounded-lg border border-line bg-panel px-4 py-8 text-center text-sm text-ink-faint">
+              <Cong mood="no-results" width={88} className="mx-auto mb-2" />
               No trades match these filters.
             </div>
           )}

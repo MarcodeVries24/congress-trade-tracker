@@ -8,6 +8,7 @@ import { AlertsResponse, SavedAlert, alertUpgradeHref, createAlert, deleteAlert,
 import { formatDateFromTimestamp } from "@/lib/format";
 import { ALERT_FROM_ADDRESS } from "@/lib/site";
 import { AlertDraft, AlertEditor } from "./AlertEditor";
+import { Cong } from "@/components/Cong";
 
 function frequencyLabel(value: string): string {
   return ALERT_FREQUENCIES.find((f) => f.value === value)?.label ?? value;
@@ -172,6 +173,7 @@ export function AlertsManager() {
 
       {state.isPro && state.alerts.length === 0 && (
         <div className="mt-4 rounded-lg border border-dashed border-line p-8 text-center">
+          <Cong mood="turn-on-alerts" width={88} className="mx-auto mb-2" />
           <p className="text-sm text-ink-muted">No alerts yet.</p>
           <p className="mt-1 text-xs text-ink-faint">
             Try “House purchases over $50,001”, or every trade in a ticker you follow.

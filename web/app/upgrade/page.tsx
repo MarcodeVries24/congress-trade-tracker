@@ -12,6 +12,7 @@ import { getProPricing } from "@/lib/plans";
 import { currencyForRequest } from "@/lib/currency";
 import { ALERT_DRAFT_PARAM } from "@/lib/alertsClient";
 import { formatDateFromTimestamp } from "@/lib/format";
+import { Cong } from "@/components/Cong";
 
 export const metadata: Metadata = {
   title: "Upgrade | CongTrade",
@@ -64,11 +65,16 @@ export default async function UpgradePage({
     <>
       <Header />
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Upgrade to CongTrade Pro</h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
-          Every trade on CongTrade is free to read. Pro is for following it closely: filter the whole archive down to
-          what you care about, and get an email when a new filing matches.
-        </p>
+        <div className="flex items-center justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Upgrade to CongTrade Pro</h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
+              Every trade on CongTrade is free to read. Pro is for following it closely: filter the whole archive down
+              to what you care about, and get an email when a new filing matches.
+            </p>
+          </div>
+          <Cong mood="go-premium" width={104} className="hidden sm:block" />
+        </div>
 
         {proof && proof.faces.length > 0 && (
           <div className="mt-5">

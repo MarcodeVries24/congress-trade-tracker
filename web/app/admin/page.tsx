@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { FilingDecision, ApproveAll } from "@/components/admin/FilingDecision";
+import { Cong } from "@/components/Cong";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { adminUserId } from "@/lib/admin";
 import { ALERT_FROM_SQL } from "@/lib/alertFilters";
@@ -137,6 +138,8 @@ export default async function AdminPage() {
           </div>
           {pending.length > 1 ? <ApproveAll docIds={docIds} /> : null}
         </div>
+
+        {pendingTotal === 0 ? <Cong mood="all-quiet" width={110} className="mx-auto mt-8" /> : null}
 
         <div className="mt-6 space-y-4">
           {pending.map((f) => {

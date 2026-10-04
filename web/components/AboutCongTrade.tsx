@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Cong } from "./Cong";
 import { Logo } from "./Logo";
 
 /**
@@ -16,13 +17,16 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
   return (
     <section className="rounded-xl border border-line bg-panel px-5 py-5">
       <div className="flex items-center gap-2.5">
-        <span className="text-ink">
-          <Logo size={24} />
-        </span>
-        <span className="text-base font-bold tracking-tight">
-          <span className="text-ink">Cong</span>
-          <span className="text-accent">Trade</span>
-        </span>
+        <div className="flex flex-1 items-center gap-2.5">
+          <span className="text-ink">
+            <Logo size={24} />
+          </span>
+          <span className="text-base font-bold tracking-tight">
+            <span className="text-ink">Cong</span>
+            <span className="text-accent">Trade</span>
+          </span>
+        </div>
+        <Cong mood="about-us" width={52} className="-my-3" />
       </div>
 
       <h2 className="mt-3.5 text-sm font-semibold text-ink">Why CongTrade</h2>
@@ -33,7 +37,7 @@ export function AboutCongTrade({ trades, members }: { trades?: number; members?:
       </p>
       <p className="mt-2.5 text-[13px] leading-relaxed text-ink-muted">
         CongTrade is an independent project, not a company and not funded by anyone with a position to talk up. It reads
-        every filing the House Clerk and the Senate publish, updated daily
+        every filing the House Clerk and the Senate publish, and is updated daily
         {trades && members ? (
           <>
             {" "}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { LatestFilingCard } from '@/components/latest-filing';
+import { LatestFilingsCard } from '@/components/latest-filing';
 import { OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
 import { Icon, type IconName } from '@/ui/icon';
@@ -63,8 +63,8 @@ export default function ProofScreen() {
             </View>
           </View>
         ))}
-        {/* Proof the feed is live: the latest filing by whoever was picked, or anyone. */}
-        <LatestFilingCard filedNames={answers.members} />
+        {/* Proof the feed is live: the latest filings by whoever was picked, then anyone. */}
+        <LatestFilingsCard filedNames={answers.members} />
       </View>
     </OnboardingStep>
   );

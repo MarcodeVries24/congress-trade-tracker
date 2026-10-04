@@ -11,16 +11,21 @@ import { TickerLogo } from '@/ui/ticker-logo';
 
 /** A filed trade as the card shows it, from either source below. */
 type Filing = {
+  key: string;
+  /** Who, for showing one trade per member when filling from anyone's. */
+  who: string;
   name: string;
   photo: string | null;
   party: string | null;
   ticker: string;
   what: string;
   amount: string;
+  filed: string;
 };
 
-// Picked members whose recent trades are looked through, at most: one request
-// each, and the card shows only one trade.
+// How many filings the card shows.
+const SHOWN = 3;
+// Picked members whose recent trades are looked through, at most: one request each.
 const MEMBERS_ASKED = 5;
 
 // A stock bought or sold: options (OP) carry the underlying's ticker too, but
@@ -29,16 +34,17 @@ const isStockBuyOrSale = (t: { ticker: string | null; transaction_type: string; 
   !!t.ticker && /^[PS]/i.test(t.transaction_type) && (t.asset_type_code ?? 'ST') === 'ST';
 
 /**
- * The most recent stock purchase or sale filed by the members picked during
- * setup, or by anyone when nobody was picked or none of them has one; null
- * until it loads (and if it cannot), as the screen is complete without it.
+ * The most recent stock purchases and sales: first those of the members
+ * picked during setup, newest filed first, then filled up with the latest
+ * filings by anyone else, one per member. Empty until loaded (and if nothing
+ * can be), as the screen is complete without it.
  *
- * Each member comes from their page's free endpoint rather than a member
- * filter on /api/trades, which is a Pro filter the API drops for everyone
- * else, and everyone on this screen is someone else.
+ * Each picked member comes from their page's free endpoint rather than a
+ * member filter on /api/trades, which is a Pro filter the API drops for
+ * everyone else, and everyone on this screen is someone else.
  */
-export function useLatestFiling(filedNames: string[]): Filing | null {
-  const [latest, setLatest] = useState<Filing | null>(null);
+export function useLatestFilings(filedNames: string[]): Filing[] {
+  const [latest, setLatest] = useState<Filing[]>([]);
   // Spellings of one person can differ; their slugs mostly do not.
   const slugs = [...new Set(filedNames.map(memberSlug))].slice(0, MEMBERS_ASKED);
   const key = slugs.join(',');
@@ -46,28 +52,40 @@ export function useLatestFiling(filedNames: string[]): Filing | null {
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-    const anyone = () =>
-      fetchTrades({ limit: 20, assetTypes: ['ST'] }, { signal }).then((res) => {
-        const t = res.data.find(isStockBuyOrSale);
-        return t ? asFiling(memberName(t), t.photo_url, t.party, t) : null;
-      });
-    const theirs = async () => {
+    const theirs = async (): Promise<Filing[]> => {
+      if (!key) return [];
       const pages = await Promise.all(
         key.split(',').map((slug) => fetchPolitician(slug, { signal }).catch(() => null))
       );
-      let best: { filing: Filing; filed: string } | null = null;
-      for (const page of pages) {
-        const t = page?.trades.find(isStockBuyOrSale);
-        if (!page || !t) continue;
-        const filed = t.filing_date ?? '';
-        if (!best || filed > best.filed) {
-          best = { filing: asFiling(page.profile.display, page.profile.photo_url, page.profile.party, t), filed };
-        }
-      }
-      return best?.filing ?? null;
+      return pages
+        .flatMap((page) =>
+          page
+            ? page.trades
+                .filter(isStockBuyOrSale)
+                .slice(0, SHOWN)
+                .map((t) =>
+                  asFiling(page.profile.slug, page.profile.display, page.profile.photo_url, page.profile.party, t)
+                )
+            : []
+        )
+        .sort((a, b) => b.filed.localeCompare(a.filed))
+        .slice(0, SHOWN);
     };
-    (key ? theirs() : Promise.resolve(null))
-      .then((filing) => filing ?? anyone())
+    const anyone = async (exclude: Set<string>, count: number): Promise<Filing[]> => {
+      if (count <= 0) return [];
+      const res = await fetchTrades({ limit: 40, assetTypes: ['ST'] }, { signal });
+      const picked: Filing[] = [];
+      for (const t of res.data.filter(isStockBuyOrSale)) {
+        const who = t.member_slug ?? t.member_name;
+        if (exclude.has(who)) continue;
+        exclude.add(who);
+        picked.push(asFiling(who, memberName(t), t.photo_url, t.party, t));
+        if (picked.length === count) break;
+      }
+      return picked;
+    };
+    theirs()
+      .then(async (mine) => [...mine, ...(await anyone(new Set(mine.map((f) => f.who)), SHOWN - mine.length))])
       .then(setLatest)
       .catch(() => {});
     return () => controller.abort();
@@ -76,12 +94,16 @@ export function useLatestFiling(filedNames: string[]): Filing | null {
 }
 
 function asFiling(
+  who: string,
   name: string,
   photo: string | null,
   party: string | null,
-  t: Pick<Trade, 'asset_name' | 'ticker' | 'company_name' | 'transaction_type' | 'amount_range'>
+  t: Pick<Trade, 'id' | 'asset_name' | 'ticker' | 'company_name' | 'transaction_type' | 'amount_range' | 'filing_date'>
 ): Filing {
   return {
+    key: String(t.id),
+    who,
+    filed: t.filing_date ?? '',
     name,
     photo,
     party,
@@ -103,14 +125,13 @@ function memberSlug(name: string): string {
 }
 
 /**
- * The most recent real filing, as proof the feed is live: by a member picked
- * during setup when there is one, otherwise by anyone. Nothing until it has
- * loaded, and nothing if it can't: the screen is complete without it.
+ * The latest real filings, as proof the feed is live: those of the members
+ * picked during setup first, then anyone's.
  */
-export function LatestFilingCard({ filedNames }: { filedNames: string[] }) {
+export function LatestFilingsCard({ filedNames }: { filedNames: string[] }) {
   const { c } = useTheme();
-  const latest = useLatestFiling(filedNames);
-  if (!latest) return null;
+  const latest = useLatestFilings(filedNames);
+  if (!latest.length) return null;
   return (
     <Animated.View
       entering={FadeInDown.duration(380)}
@@ -118,35 +139,45 @@ export function LatestFilingCard({ filedNames }: { filedNames: string[] }) {
       <View style={styles.head}>
         <View style={[styles.liveDot, { backgroundColor: c.gain }]} />
         <Text variant="caption" tone="muted" style={styles.semibold}>
-          Latest filing
+          Latest filings
         </Text>
       </View>
-      <View style={styles.row}>
-        <Avatar uri={latest.photo} name={latest.name} party={latest.party} size={36} />
-        <View style={styles.flex}>
-          <Text variant="callout" style={styles.bold} numberOfLines={1}>
-            {latest.name}
-          </Text>
-          <View style={styles.asset}>
-            <TickerLogo ticker={latest.ticker} size={16} />
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.flex}>
-              {latest.what}
+      {latest.map((f, i) => (
+        <View
+          key={f.key}
+          style={[styles.row, i > 0 && { borderTopColor: c.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
+          <Avatar uri={f.photo} name={f.name} party={f.party} size={36} />
+          <View style={styles.flex}>
+            <Text variant="callout" style={styles.bold} numberOfLines={1}>
+              {f.name}
             </Text>
+            <View style={styles.asset}>
+              <TickerLogo ticker={f.ticker} size={16} />
+              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.flex}>
+                {f.what}
+              </Text>
+            </View>
           </View>
+          <Text variant="footnote" style={styles.bold}>
+            {f.amount}
+          </Text>
         </View>
-        <Text variant="footnote" style={styles.bold}>
-          {latest.amount}
-        </Text>
-      </View>
+      ))}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 12, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  card: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 4 },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   asset: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flex: { flex: 1 },
   bold: { fontWeight: '700' },

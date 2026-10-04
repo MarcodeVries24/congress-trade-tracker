@@ -19,9 +19,6 @@ const MOODS = {
   'no-results': require('../../assets/images/cong/poses/no-results.webp'),
   oops: require('../../assets/images/cong/poses/oops.webp'),
   offline: require('../../assets/images/cong/poses/offline.webp'),
-  'morning-brief': require('../../assets/images/cong/poses/morning-brief.webp'),
-  'desk-mode': require('../../assets/images/cong/poses/desk-mode.webp'),
-  'reading-filings': require('../../assets/images/cong/poses/reading-filings.webp'),
 };
 
 export type CongMood = keyof typeof MOODS;

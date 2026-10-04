@@ -39,9 +39,12 @@ export function PlanCards({
   symbol,
   savingPercent,
   returnTo,
+  annualTotal,
 }: {
   monthly: string;
   annualMonthly: string;
+  /** What a yearly plan actually charges, for the renewal notice. */
+  annualTotal: string;
   /** Currency is decided server-side from the visitor's country. */
   symbol: string;
   savingPercent: number | null;
@@ -50,6 +53,10 @@ export function PlanCards({
   const [annual, setAnnual] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The EU's 14-day withdrawal right: starting a service inside it needs the
+  // consumer's express request, and a sentence in the terms isn't one. This
+  // tick box is; the server refuses checkout without it and records when.
+  const [startNow, setStartNow] = useState(false);
   const { isSignedIn } = useAuth();
   const { openSignUp } = useClerk();
   const { isPro } = useProMirror();
@@ -62,12 +69,16 @@ export function PlanCards({
       openSignUp({ forceRedirectUrl: "/upgrade", signInForceRedirectUrl: "/upgrade" });
       return;
     }
+    if (!startNow) {
+      setError("Tick the box above the button to continue.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ period: annual ? "annual" : "monthly", returnTo }),
+        body: JSON.stringify({ period: annual ? "annual" : "monthly", returnTo, startNow: true }),
       });
       // Parsed by hand rather than with res.json(): a route that crashes
       // answers with an HTML error page, and letting that throw here reported
@@ -173,14 +184,43 @@ export function PlanCards({
               .
             </p>
           ) : (
-            <button
-              type="button"
-              onClick={subscribe}
-              disabled={busy}
-              className="mt-5 w-full rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {busy ? "Opening checkout…" : "Subscribe"}
-            </button>
+            <>
+              <label className="mt-5 flex cursor-pointer items-start gap-2 text-xs leading-relaxed text-ink-muted">
+                <input
+                  type="checkbox"
+                  checked={startNow}
+                  onChange={(e) => setStartNow(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--accent))]"
+                />
+                <span>
+                  Start Pro straight away. I understand that if I withdraw within 14 days, I pay for the days I&apos;ve
+                  already used, and get the rest back.
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={subscribe}
+                disabled={busy || !startNow}
+                className="mt-3 w-full rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {busy ? "Opening checkout…" : "Subscribe"}
+              </button>
+              {/* Auto-renewal notice, next to the button, as US state auto-renewal laws ask. */}
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+                {symbol}
+                {annual ? `${annualTotal} a year` : `${monthly} a month`}, renews automatically until you cancel. Cancel any
+                time from your account; you keep Pro until the end of the period you paid for. By subscribing you agree to
+                the{" "}
+                <a href="/terms" className="underline decoration-line-strong hover:text-ink">
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a href="/privacy" className="underline decoration-line-strong hover:text-ink">
+                  Privacy Policy
+                </a>
+                .
+              </p>
+            </>
           )}
           {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
         </div>

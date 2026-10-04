@@ -8,7 +8,15 @@ import "./globals.css";
 // account — not just wherever an <AdSlot> happens to render. Individual ad
 // placements (components/AdSlot.tsx) only add the <ins> unit + a request
 // push, assuming this script is already loaded.
-const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+//
+// Off until consent is in place. Google's script can set advertising cookies
+// and contacts Google for every visitor, and EU/UK law (and Google's own
+// rules for EEA traffic) require consent first, through a Google-certified
+// consent message (AdSense → Privacy & messaging). Set
+// NEXT_PUBLIC_ADS_CONSENT_READY=true only once that message is live, and
+// update the Privacy Policy's advertising section at the same time.
+const ADSENSE_CLIENT_ID =
+  process.env.NEXT_PUBLIC_ADS_CONSENT_READY === "true" ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID : undefined;
 
 export const metadata: Metadata = {
   // Without a metadataBase, Next emits relative URLs in metadata and warns at

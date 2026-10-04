@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { clerkClient } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
+import { sendPurchaseConfirmation } from "@/lib/purchaseEmail";
 import { claimEvent, upsertSubscription, userIdForCustomer } from "@/lib/subscriptionWrite";
 
 /**
@@ -83,7 +84,9 @@ async function apply(event: Stripe.Event): Promise<void> {
     const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
     const clerkUserId =
       session.client_reference_id ?? (session.metadata?.clerk_user_id as string | undefined) ?? null;
-    await record(await stripe().subscriptions.retrieve(subscriptionId), clerkUserId);
+    const subscription = await stripe().subscriptions.retrieve(subscriptionId);
+    await record(subscription, clerkUserId);
+    await confirmByEmail(session, subscription);
     return;
   }
 
@@ -141,5 +144,37 @@ async function record(subscription: Stripe.Subscription, fallbackUserId: string 
     });
   } catch (err) {
     console.error(`stripe webhook: could not mirror plan onto ${clerkUserId} — ${(err as Error).message}`);
+  }
+}
+
+/**
+ * The purchase confirmation email (lib/purchaseEmail.ts). Best effort: the
+ * subscription is already recorded, and a failed email must not make Stripe
+ * retry the whole event.
+ */
+async function confirmByEmail(session: Stripe.Checkout.Session, subscription: Stripe.Subscription): Promise<void> {
+  const to = session.customer_details?.email ?? session.customer_email;
+  if (!to) return;
+  try {
+    const item = subscription.items.data[0];
+    const price = item?.price;
+    const interval = price?.recurring?.interval;
+    const amount =
+      price?.unit_amount != null
+        ? `${new Intl.NumberFormat("en-US", { style: "currency", currency: (price.currency ?? "eur").toUpperCase() }).format(price.unit_amount / 100)} a ${interval ?? "period"}`
+        : "as shown at checkout";
+    const periodEnd =
+      (item as { current_period_end?: number } | undefined)?.current_period_end ??
+      (subscription as unknown as { current_period_end?: number }).current_period_end ??
+      null;
+    await sendPurchaseConfirmation({
+      to,
+      plan: interval === "year" ? "CongTrade Pro, yearly" : interval === "month" ? "CongTrade Pro, monthly" : "CongTrade Pro",
+      amount,
+      renews: periodEnd ? new Date(periodEnd * 1000) : null,
+      startNowRequestedAt: (subscription.metadata?.start_now_requested_at as string | undefined) ?? null,
+    });
+  } catch (err) {
+    console.error(`stripe webhook: purchase confirmation to ${to} failed — ${(err as Error).message}`);
   }
 }

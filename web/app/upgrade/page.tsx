@@ -112,6 +112,7 @@ export default async function UpgradePage({
             <PlanCards
               monthly={pricing.monthly}
               annualMonthly={pricing.annualMonthly}
+              annualTotal={pricing.annualTotal}
               symbol={pricing.currencySymbol}
               savingPercent={pricing.annualSavingPercent}
               returnTo={afterCheckout}
@@ -130,7 +131,7 @@ export default async function UpgradePage({
           <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 px-4 text-xs text-ink-muted">
             {[
               <>
-                <span className="font-medium text-ink">Join 4,500+ people</span> already using CongTrade Pro
+                <span className="font-medium text-ink">Every trade</span> straight from the official filings
               </>,
               <>Cancel any time from your account page</>,
               <>

@@ -31,7 +31,7 @@ export function UpgradeModal({
         <h2 id="upgrade-modal-title" className="text-lg font-bold tracking-tight text-ink">
           Unlock CongTrade Pro
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">Join 4,500+ people already using CongTrade Pro.</p>
+        <p className="mt-1 text-sm text-ink-muted">Every disclosed trade in Congress, straight from the official filings.</p>
 
         <ul className="mt-4 space-y-2.5">
           {BENEFITS.map((benefit) => (

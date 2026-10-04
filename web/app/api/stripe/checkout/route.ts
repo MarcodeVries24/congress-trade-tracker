@@ -5,6 +5,7 @@ import { priceIdFor, billingConfigured, BILLING_PERIODS, type BillingPeriod } fr
 import { currencyForRequest } from "@/lib/currency";
 import { getSubscriptionFor } from "@/lib/subscription";
 import { SITE_URL } from "@/lib/site";
+import { TERMS_VERSION } from "@/lib/legal";
 
 /**
  * Starts a Stripe Checkout session for the signed-in user.
@@ -22,12 +23,20 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { period?: BillingPeriod; returnTo?: string };
+  const body = (await req.json().catch(() => ({}))) as { period?: BillingPeriod; returnTo?: string; startNow?: boolean };
   // Validated against the list rather than coerced with a ternary, which
   // silently turned every unknown period into monthly and would have charged a
   // weekly buyer a month.
   const period: BillingPeriod =
     body.period && BILLING_PERIODS.includes(body.period) ? body.period : "monthly";
+
+  // The buyer's express request to start straight away, inside the EU's
+  // 14-day withdrawal period (the tick box on the plans). Required, and kept
+  // on the subscription as the record of when it was given.
+  if (body.startNow !== true) {
+    return NextResponse.json({ error: "Please confirm you want Pro to start straight away." }, { status: 400 });
+  }
+  const startNowAt = new Date().toISOString();
 
   // Everything from here on is inside the catch. The first version wrapped
   // only the Stripe call, and the failure that actually broke checkout was the
@@ -67,9 +76,16 @@ export async function POST(req: NextRequest) {
       // the resulting subscription, which is what lets the webhook know whose
       // access to open without a lookup table of its own.
       client_reference_id: userId,
-      subscription_data: { metadata: { clerk_user_id: userId } },
+      subscription_data: { metadata: { clerk_user_id: userId, start_now_requested_at: startNowAt, terms_version: TERMS_VERSION } },
       metadata: { clerk_user_id: userId },
       allow_promotion_codes: true,
+      // Repeated where the buyer pays: what renews, and how to stop it.
+      custom_text: {
+        submit: {
+          message:
+            "Renews automatically until you cancel. Cancel any time from your CongTrade account; you keep Pro until the end of the period you paid for. EU: you asked for Pro to start now, so withdrawing within 14 days refunds the days you haven't used.",
+        },
+      },
       automatic_tax: { enabled: automaticTax },
       billing_address_collection: automaticTax ? "required" : "auto",
       success_url: `${SITE_URL}${returnTo}${returnTo.includes("?") ? "&" : "?"}checkout=success`,

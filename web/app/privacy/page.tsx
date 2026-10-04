@@ -3,13 +3,13 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LegalDocument, LegalSection } from "@/components/LegalDocument";
+import { PRIVACY_VERSION as LAST_UPDATED } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | CongTrade",
   description: "How CongTrade handles data.",
 };
 
-const LAST_UPDATED = "September 30, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -43,8 +43,9 @@ export default function PrivacyPage() {
             minimum needed to run that account and subscription, mostly handled by our providers (Clerk for
             accounts; Stripe, Apple or Google for payment) rather than stored by us directly. The one
             exception is email alerts, which need your address and your saved criteria in our own database in order
-            to send anything. The apps collect nothing beyond that: no location, no contacts, no photos, no
-            analytics and no advertising identifiers.
+            to send anything, and push notifications, which need your device&rsquo;s push token if you turn them on.
+            The apps collect nothing beyond that: no location, no contacts, no analytics and no advertising
+            identifiers, and a photo only if you choose one as your profile picture.
           </p>
         </LegalSection>
 
@@ -57,7 +58,11 @@ export default function PrivacyPage() {
             If you sign in with Google or Apple, that provider also shares the name on your account, and Google
             shares your profile picture; Clerk stores them with your account, and neither is used for anything else.
             Clerk stores your email address, authentication method, and account metadata, and keeps you signed in
-            with a cookie on the website and a securely stored token in the apps. See{" "}
+            with a cookie on the website and a securely stored token in the apps. You can change the name on your
+            account and add, change or remove a profile photo; a photo you choose is uploaded to Clerk and shown
+            only to you, in your account, and removing it deletes it there. To stop one paid account being shared,
+            a Pro account can only be signed in on a limited number of devices at once; signing in on another one
+            signs out the session that was used least recently. See{" "}
             <a href="https://clerk.com/privacy" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
               Clerk&rsquo;s privacy policy
             </a>{" "}
@@ -65,7 +70,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="5. Email alerts">
+        <LegalSection title="5. Alerts">
           <p>
             CongTrade Pro subscribers can save alerts, each one a set of filter criteria, and be emailed
             when a new public filing matches. To send those emails we store, in our own database: the criteria you
@@ -75,10 +80,18 @@ export default function PrivacyPage() {
             isn&rsquo;t emailed twice.
           </p>
           <p>
+            If you turn on push notifications in an app, we store that device&rsquo;s push token, whether it is an
+            iPhone or Android device, and when it was registered and last used, so alerts can reach it. Notifications
+            are delivered through Expo&rsquo;s push service and then Apple&rsquo;s or Google&rsquo;s. A token is
+            deleted when you turn notifications off or sign out on that device, when you delete your account, and
+            automatically when Apple or Google report that it no longer works.
+          </p>
+          <p>
             Every alert email includes a one-click unsubscribe link that switches that alert off without signing in.
             Deleting an alert deletes its criteria and its sent-history with it. Alerts are the only thing we use
             your email address for. We don&rsquo;t send marketing, and we don&rsquo;t share the address with
-            anyone beyond our email delivery provider, Resend, which transmits the message.
+            anyone beyond our email delivery provider, Resend, which transmits the message, and Stripe, if you
+            subscribe on the website.
           </p>
         </LegalSection>
 
@@ -105,8 +118,11 @@ export default function PrivacyPage() {
           <ul>
             <li>An authentication session cookie (Clerk), if you create an account. It keeps you signed in.</li>
             <li>A theme preference (light/dark) in your browser&rsquo;s local storage. It stays on your device, never sent to us.</li>
-            <li>Advertising cookies (Google AdSense), for visitors on the free tier. See the next section. CongTrade Pro subscribers don&rsquo;t see ads and shouldn&rsquo;t get these cookies.</li>
           </ul>
+          <p>
+            Both are strictly necessary for what you asked for, so they need no consent. We set no analytics or
+            advertising cookies. If that ever changes, we will ask for your consent first (see section 9).
+          </p>
         </LegalSection>
 
         <LegalSection title="8. In the iPhone and Android apps">
@@ -121,8 +137,13 @@ export default function PrivacyPage() {
               They are never sent to us, and deleting the app removes them.
             </li>
             <li>
-              The apps request no device permissions. They do not access your location, contacts, photos, camera,
-              microphone or files.
+              The apps ask for one permission, and only when you choose to turn on push notifications: to send you
+              notifications. You can turn it off at any time in the app or in your device&rsquo;s settings.
+            </li>
+            <li>
+              If you choose a profile photo, the app opens your device&rsquo;s photo picker, and only the photo you
+              pick is read and uploaded. The apps do not access your location, contacts, camera, microphone, files,
+              or any other photo.
             </li>
             <li>
               The apps contain no analytics, crash reporting or advertising software, do not read your device&rsquo;s
@@ -138,19 +159,12 @@ export default function PrivacyPage() {
 
         <LegalSection title="9. Advertising">
           <p>
-            The free tier of the website may show ads served by Google AdSense. The apps show none. Google and its advertising partners may
-            use cookies or device identifiers to serve ads, including personalized ones based on your activity
-            across sites. We don&rsquo;t control this data or receive it ourselves. You can review or opt out of
-            personalized advertising via{" "}
-            <a href="https://myadcenter.google.com" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-              Google&rsquo;s Ad Center
-            </a>
-            , and read more in{" "}
-            <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noreferrer" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-              Google&rsquo;s advertising policy
-            </a>
-            . If you&rsquo;re in the EEA or UK, we ask for your consent to non-essential advertising cookies before
-            they&rsquo;re set.
+            CongTrade does not currently show advertising, on the website or in the apps, and no advertising
+            partner receives data about you. If the website&rsquo;s free tier shows ads in future, they would be served
+            by an advertising partner such as Google AdSense. Before that happens we will update this policy and, for
+            visitors in the EU, EEA and UK, ask for your consent before any advertising cookie is set or any data is
+            shared for advertising, with a way to change your mind at any time. CongTrade Pro subscribers will not
+            see ads.
           </p>
         </LegalSection>
 
@@ -160,17 +174,20 @@ export default function PrivacyPage() {
             use the same servers, and like virtually every online service, our hosting provider automatically logs standard technical information for security and
             reliability purposes: things like IP address, browser or app version, and request timestamps. We don&rsquo;t
             personally review this data; it&rsquo;s processed under our infrastructure providers&rsquo; own privacy
-            and security practices.
+            and security practices. We also look at the country your IP address belongs to, to show prices in euros
+            or US dollars; that is worked out per visit and not stored.
           </p>
         </LegalSection>
 
         <LegalSection title="11. Third-party services and sites">
           <p>
             The Site links out to third-party sites, such as the House Clerk&rsquo;s disclosure portal, the Senate
-            eFD system, and individual source filings, to let you verify data at the source. It also relies on Clerk,
-            Stripe, Apple (the App Store), Google (Google Play and AdSense), Resend (which delivers alert emails),
-            Vercel and Neon to operate, as described above. None of
-            these are under our control, and each has its own privacy practices.
+            eFD system, and individual source filings, to let you verify data at the source. To operate, it relies on
+            these providers, which process personal data on our behalf or, for the app stores, as sellers in their
+            own right: Clerk (accounts), Stripe (payments on the website), Apple (the App Store and iPhone
+            notifications), Google (Google Play and Android notifications), Expo (push notification delivery),
+            Resend (alert emails), Vercel (hosting) and Neon (database). Each has its own privacy practices. We do not
+            sell your personal data or share it for advertising.
           </p>
         </LegalSection>
 
@@ -186,13 +203,33 @@ export default function PrivacyPage() {
             Under the GDPR we need a legal ground for each use. Ours are: performing our agreement with you, which
             covers your account, your subscription and your alerts; our legitimate interest in keeping the Site
             secure, preventing abuse and keeping it working, which covers technical logs; a legal obligation, which
-            covers billing and tax records; and your consent, which we ask for separately and which covers
-            non-essential advertising cookies. Accepting our Terms of Service is not itself consent, and we never
+            covers billing and tax records; and your consent, which we ask for separately, for push notifications
+            and, if we ever use them, advertising cookies. Accepting our Terms of Service is not itself consent, and we never
             treat it as though it were.
           </p>
         </LegalSection>
 
-        <LegalSection title="14. Your rights">
+        <LegalSection title="14. Transfers outside the EU">
+          <p>
+            Several of these providers are based in, or process data in, the United States. Where that means personal
+            data leaves the EU or EEA, we rely on the EU&ndash;US Data Privacy Framework when the provider is certified
+            under it, and otherwise on the European Commission&rsquo;s standard contractual clauses in our agreement
+            with that provider. You can ask us for details of the safeguard for a particular provider.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="15. How long we keep data">
+          <ul>
+            <li>Your account, name and profile photo: until you delete your account or remove them.</li>
+            <li>An alert and its sending history: until you delete the alert or your account.</li>
+            <li>A device&rsquo;s push token: as described in section 5.</li>
+            <li>Subscription and billing records: seven years, because Dutch tax law requires it.</li>
+            <li>Technical logs: only for the limited period our hosting provider keeps them, typically days.</li>
+          </ul>
+          <p>We make no decisions about you by automated means that have legal or similarly significant effects.</p>
+        </LegalSection>
+
+        <LegalSection title="16. Your rights">
           <p>
             You can access or update your account details (email, sign-in method) directly through your account
             settings, and cancel a subscription at any time. You can also ask us for a copy of your data, to correct
@@ -219,14 +256,14 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="15. Changes to this policy">
+        <LegalSection title="17. Changes to this policy">
           <p>
             We may update this policy from time to time; the &ldquo;last updated&rdquo; date at the top reflects the
             most recent revision.
           </p>
         </LegalSection>
 
-        <LegalSection title="16. Contact">
+        <LegalSection title="18. Contact">
           <p>
             Questions about this policy, or a request to access or delete your data, can be sent to{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

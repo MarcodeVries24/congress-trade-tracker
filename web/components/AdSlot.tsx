@@ -16,7 +16,9 @@ import { useProMirror } from "@/lib/useProMirror";
 // the one above the stats bar vs. the one below the results table) its own
 // ad unit once you've created more than one in AdSense — Google generally
 // expects distinct ad units per placement, not the same one reused twice.
-const AD_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+// Off until consent is in place: see ADSENSE_CLIENT_ID in app/layout.tsx.
+const AD_CLIENT =
+  process.env.NEXT_PUBLIC_ADS_CONSENT_READY === "true" ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID : undefined;
 const DEFAULT_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID;
 
 declare global {

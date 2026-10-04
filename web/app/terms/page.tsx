@@ -3,17 +3,17 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LegalDocument, LegalSection } from "@/components/LegalDocument";
+import { TERMS_VERSION as LAST_UPDATED } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Terms of Service | CongTrade",
   description: "The terms that govern use of CongTrade, including Dutch governing law and how complaints are handled.",
 };
 
-const LAST_UPDATED = "October 4, 2026";
 
 // Section 2 names the trader but not its street address, deliberately: the
 // address is published once, in the Privacy Policy, which the footer links from
-// every page and which section 12 makes part of these terms. Don't add it here
+// every page and which section 15 makes part of these terms. Don't add it here
 // as a tidying-up; that placement is a decision, not an omission.
 
 export default function TermsPage() {
@@ -64,45 +64,63 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="4. Accounts and paid plans">
+        <LegalSection title="4. Accounts, CongTrade Pro and alerts">
           <p>
-            Some features, namely filters, email alerts, and an ad-free view, require a free account and a paid
-            CongTrade Pro subscription. Accounts are handled by our authentication provider, Clerk; you can sign up
-            with an email address, a Google account, or an Apple account. Subscriptions are billed by Stripe, which
-            handles the payment and the card details directly. We never see or store your card details ourselves.
+            Every disclosed trade on the website is free to read, without an account. Some features, namely filters,
+            alerts and an ad-free view, require a free account and a paid CongTrade Pro subscription. In the
+            CongTrade apps for iPhone and Android, using the app requires CongTrade Pro. Accounts are handled by our
+            authentication provider, Clerk; you can sign up with an email address, a Google account, or an Apple
+            account. The same account works on the website and in the apps.
           </p>
           <p>
-            The price shown on the pricing page is the total you pay. Nothing is added at checkout. Prices are quoted
-            in euros or in US dollars depending on the country you are visiting from.
-          </p>
-          <p>
-            Email alerts send to the address on your account. Each alert email carries a one-click unsubscribe link
-            that switches that alert off; you can also pause or delete any alert from your account screen, with or
-            without an active subscription. Alerts run on the same schedule as our data collection, so &ldquo;as it
-            happens&rdquo; means on the next collection run. We don&rsquo;t promise any particular delivery time,
-            and an alert is a convenience rather than a guarantee that you&rsquo;ll be told about every filing.
-          </p>
-          <p>
-            Subscriptions renew automatically until cancelled. You can cancel at any time from your account
-            settings, effective at the end of the current billing period, and you keep access until then. Beyond the
-            withdrawal right in section 5 and anything else the law requires, fees already paid are not refunded.
+            Alerts are sent by email to the address on your account and, if you turn notifications on in an app, as
+            push notifications to that device. Each alert email carries a one-click unsubscribe link that switches
+            that alert off, and push notifications can be turned off in the app or in your device&rsquo;s settings;
+            you can also pause or delete any alert, with or without an active subscription. The Site is updated
+            daily, and an alert is sent once a matching filing has been published. We don&rsquo;t promise any
+            particular delivery time, and an alert is a convenience rather than a guarantee that you&rsquo;ll be
+            told about every filing.
           </p>
         </LegalSection>
 
-        <LegalSection title="5. Right of withdrawal">
+        <LegalSection title="5. Paying, renewal and cancelling">
           <p>
-            If you are a consumer in the EU or EEA, you have 14 days from the day your subscription starts to
-            withdraw from it, without giving a reason. Tell us within that period at{" "}
-            <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">
-              contact@congtrade.com
-            </a>
-            , in any clear statement, or by using the model form below.
+            <strong>On the website,</strong> subscriptions are billed by Stripe, which handles the payment and your
+            card details directly; we never see or store them. The price shown on the pricing page is the total you
+            pay, and nothing is added at checkout. Prices are quoted in euros or in US dollars depending on the
+            country you are visiting from. You can cancel at any time from your account, which takes you to
+            Stripe&rsquo;s billing page.
           </p>
           <p>
-            A subscription unlocks the paid features straight away, so by subscribing you expressly ask us to begin
-            performance during the withdrawal period. If you then withdraw within those 14 days, you owe a
-            proportionate amount for the part of the period you already had access to, and we refund the rest within
-            14 days of being told, using the same payment method you paid with.
+            <strong>In the apps,</strong> subscriptions are sold and billed by Apple through the App Store, or by
+            Google through Google Play, at the price the store shows you, under the store&rsquo;s own terms. You
+            cancel them in your App Store or Google Play subscription settings (the app&rsquo;s account screen links
+            there), at least 24 hours before the renewal date to avoid the next charge. Refunds for store purchases
+            are handled by Apple or Google under their own policies; we cannot issue them ourselves.
+          </p>
+          <p>
+            Wherever you subscribed, a subscription renews automatically for the same period until you cancel it.
+            Cancelling takes effect at the end of the current billing period, and you keep access until then. Beyond
+            the withdrawal right in section 6 and anything else the law requires, fees already paid are not refunded.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="6. Right of withdrawal">
+          <p>
+            If you are a consumer in the EU or EEA, you have 14 days from the day your subscription starts to
+            withdraw from it, without giving a reason.
+          </p>
+          <p>
+            <strong>For a subscription bought on the website,</strong> tell us within that period at <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">contact@congtrade.com</a>, in any
+            clear statement, or by using the model form below. When you subscribe you expressly ask us to start
+            straight away, by ticking the box for it before checkout. If you then withdraw within those 14 days, you
+            owe a proportionate amount for the part of the period you already had access to, and we refund the rest
+            within 14 days of being told, using the same payment method you paid with.
+          </p>
+          <p>
+            <strong>For a subscription bought in an app,</strong> the contract of sale is with Apple or Google, so
+            you withdraw through them: Apple via reportaproblem.apple.com, Google via your Google Play order
+            history. We will help if you contact us.
           </p>
           <p>Model withdrawal form, to be copied and sent to us:</p>
           <ul>
@@ -116,7 +134,7 @@ export default function TermsPage() {
           </ul>
         </LegalSection>
 
-        <LegalSection title="6. Not financial, legal, or investment advice">
+        <LegalSection title="7. Not financial, legal, or investment advice">
           <p>
             Nothing on the Site constitutes financial, investment, legal, or tax advice, or a recommendation to buy,
             sell, or hold any security or other asset. The fact that a member of Congress reported a given trade is
@@ -127,7 +145,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="7. Accuracy of data">
+        <LegalSection title="8. Accuracy of data">
           <p>
             We do our best to faithfully reproduce what appears in the underlying government filings, but the data on
             this Site is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis, without warranties of
@@ -149,7 +167,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="8. Acceptable use">
+        <LegalSection title="9. Acceptable use">
           <p>You agree not to:</p>
           <ul>
             <li>Use automated means (scraping, bots, crawlers) to extract data from the Site at a volume or frequency that degrades the Site for other users;</li>
@@ -164,7 +182,21 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="9. Intellectual property">
+        <LegalSection title="10. Ending your account or the service">
+          <p>
+            You can stop using CongTrade and close your account at any time, in the app&rsquo;s account screen or on
+            the <Link href="/delete-account" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">account deletion page</Link>. Closing your account does not cancel an
+            App Store or Google Play subscription; cancel that in the store first.
+          </p>
+          <p>
+            We may suspend or close an account that breaks these terms, as section 9 describes. We may also stop
+            offering CongTrade, or a paid plan, altogether; we will then tell subscribers by email at least 30 days
+            beforehand, stop all renewals, and refund the unused part of any period paid on the website. For store
+            subscriptions, we stop renewals and you can ask Apple or Google for a refund of the unused part.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="11. Intellectual property">
           <p>
             The underlying filing data is public information produced by the U.S. government and is not owned by us.
             The Site&rsquo;s design, branding, code, and the specific way data is organized and presented are owned by
@@ -173,26 +205,70 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="10. Third-party services and links">
+        <LegalSection title="12. Third-party services and links">
           <p>
             The Site links to third-party sites that we don&rsquo;t control, including the House Clerk, the Senate
             eFD system, and individual source filings. We&rsquo;re not responsible for the content, accuracy, or
             practices of those sites. The Site also relies on third-party services to operate: Clerk (accounts),
-            Stripe (payments), Resend (alert email delivery), Vercel (hosting), Neon (database), and Google AdSense
-            (advertising). Each is governed by its own terms and privacy policy.
+            Stripe (payments on the website), Apple and Google (app stores, and push notification delivery), Expo
+            (push notifications), Resend (alert email delivery), Vercel (hosting) and Neon (database). Each is
+            governed by its own terms and privacy policy.
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Advertising">
+        <LegalSection title="13. Advertising">
           <p>
-            The free tier of the Site may display ads served by Google AdSense. Google and its partners may use
-            cookies or similar technology to serve ads based on your visits to this and other sites; see Google&rsquo;s
-            own policies for how that data is used, and how to opt out of personalized advertising. CongTrade Pro
-            subscribers don&rsquo;t see ads.
+            The Site does not currently show advertising. If the free tier of the website shows ads in future, they
+            will be served by an advertising partner such as Google AdSense, only with your consent where the law
+            requires it (in the EU, EEA and UK, before any advertising cookie is set), and the Privacy Policy will
+            say so first. CongTrade Pro subscribers don&rsquo;t see ads, and the apps show none.
           </p>
         </LegalSection>
 
-        <LegalSection title="12. Your details and how we use them">
+        <LegalSection title="14. Apps from the App Store and Google Play">
+          <p>
+            These terms are the licence agreement for the CongTrade apps. If you use the iPhone app, you also agree
+            that:
+          </p>
+          <ul>
+            <li>
+              These terms are between you and MV Digital only, not Apple. MV Digital, not Apple, is solely responsible
+              for the app and its content, and for any maintenance and support of it; Apple has no obligation to
+              provide any.
+            </li>
+            <li>
+              You may use the app on Apple-branded devices you own or control, as the App Store&rsquo;s Usage Rules
+              allow. This licence is personal and not transferable.
+            </li>
+            <li>
+              If the app fails to conform to any warranty that applies, you may notify Apple, and Apple will refund
+              the price you paid for it, if any. To the extent the law permits, Apple has no other warranty
+              obligation for the app.
+            </li>
+            <li>
+              MV Digital, not Apple, is responsible for any claim relating to the app or your use of it, including
+              product liability, failure to meet a legal or regulatory requirement, consumer protection or privacy
+              claims, and for investigating and defending any claim that the app infringes someone&rsquo;s
+              intellectual property.
+            </li>
+            <li>
+              You confirm that you are not in a country subject to a U.S. Government embargo or designated as
+              &ldquo;terrorist supporting&rdquo;, and that you are not on any U.S. Government list of prohibited or
+              restricted parties.
+            </li>
+            <li>You must also comply with any third-party terms that apply when using the app, such as your mobile data plan.</li>
+            <li>
+              Apple and its subsidiaries are third-party beneficiaries of these terms, and once you accept them,
+              Apple may enforce them against you as a third-party beneficiary.
+            </li>
+          </ul>
+          <p>
+            Questions and complaints about the apps go to MV Digital at the address in section 2. If you use the
+            Android app, Google Play&rsquo;s terms also apply to your purchase.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="15. Your details and how we use them">
           <p>
             By creating an account, saving an alert, or subscribing, you accept that we process personal data about
             you in the ways set out in our{" "}
@@ -200,9 +276,10 @@ export default function TermsPage() {
               Privacy Policy
             </Link>
             , which forms part of these terms. In practice that means your email address, your account identifier and
-            sign-in method, the criteria of any alerts you save, a record of which filings each alert has already
-            told you about, whether your account has an active subscription, and the ordinary technical logs any
-            website produces.
+            sign-in method, the name and profile photo on your account if you add them, the criteria of any alerts
+            you save, a record of which filings each alert has already told you about, the push notification token of
+            any device you turn notifications on for, whether your account has an active subscription, and the
+            ordinary technical logs any website produces.
           </p>
           <p>We use that data on these grounds, and no others:</p>
           <ul>
@@ -228,7 +305,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="13. Limitation of liability">
+        <LegalSection title="16. Limitation of liability">
           <p>
             Nothing in these terms excludes or limits our liability for death or personal injury caused by our
             negligence, for fraud, for intent or deliberate recklessness on our part, or for anything else that
@@ -244,7 +321,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="14. Governing law, complaints, and disputes">
+        <LegalSection title="17. Governing law, complaints, and disputes">
           <p>
             These terms, and any dispute or claim arising out of or in connection with them, their subject matter or
             their formation, including non-contractual disputes, are governed by the law of the Netherlands. The
@@ -280,7 +357,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="15. Changes to the Site or these terms">
+        <LegalSection title="18. Changes to the Site or these terms">
           <p>
             We may modify, suspend, or discontinue the Site, or any part of it, at any time. We may also update these
             terms from time to time; the &ldquo;last updated&rdquo; date at the top of this page reflects the most
@@ -290,14 +367,14 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="16. Severability">
+        <LegalSection title="19. Severability">
           <p>
             If any part of these terms turns out to be invalid or unenforceable, the rest stays in force, and the
             invalid part is read down to whatever the law does allow, as close to the original intention as possible.
           </p>
         </LegalSection>
 
-        <LegalSection title="17. Contact">
+        <LegalSection title="20. Contact">
           <p>
             Questions about these terms can be sent to{" "}
             <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">

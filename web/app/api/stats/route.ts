@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { groupMembers } from "@/lib/members";
+import { publicJson } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   // Defaults to House-only, same reasoning as /api/trades.
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
     { last: string | null }[],
   ];
 
-  return NextResponse.json({
+  return publicJson({
     totalTransactions: totals[0]?.transactions ?? 0,
     totalFilings: filings[0]?.filings ?? 0,
     totalMembers: groupMembers(members).length,

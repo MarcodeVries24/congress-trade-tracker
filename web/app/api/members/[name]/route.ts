@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { publicJson } from "@/lib/cache";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
@@ -11,5 +11,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
      ORDER BY t.transaction_date DESC`,
     [decodeURIComponent(name)]
   );
-  return NextResponse.json({ data: rows });
+  return publicJson({ data: rows });
 }

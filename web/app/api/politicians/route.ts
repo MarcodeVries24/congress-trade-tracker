@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { groupMembers } from "@/lib/members";
+import { publicJson } from "@/lib/cache";
 
 const SORT_KEYS = new Set(["trade_count", "volume_sum", "last_filed"]);
 
@@ -121,7 +122,7 @@ export async function GET(req: NextRequest) {
   const total = merged.length;
   const data = merged.slice(offset, offset + limitNum).map(({ _names, ...row }) => row);
 
-  return NextResponse.json({
+  return publicJson({
     data,
     page: pageNum,
     limit: limitNum,

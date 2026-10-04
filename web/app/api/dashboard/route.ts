@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { getMemberSlugsByName } from "@/lib/members";
 import { ASSET_TYPE_VALUES } from "@/lib/api";
+import { publicJson } from "@/lib/cache";
 
 // members_history/member_terms resolve which specific person filed a trade
 // (state_district alone is just the seat, reused by whoever holds it next —
@@ -143,7 +143,7 @@ export async function GET() {
   const withSlug = <T extends { member_name: string }>(rows: unknown) =>
     (rows as T[]).map((row) => ({ ...row, member_slug: slugs.get(row.member_name) ?? null }));
 
-  return NextResponse.json({
+  return publicJson({
     data: {
       latestTradesStocks: withSlug(latestTradesStocks),
       latestTradesAll: withSlug(latestTradesAll),

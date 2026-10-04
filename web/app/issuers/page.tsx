@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { TickerLogo } from "@/components/TickerLogo";
@@ -31,7 +31,7 @@ const SORT_OPTIONS: { value: string; label: string; sort: SortField; order: "asc
   { value: "last_traded:desc", label: "Most recently traded", sort: "last_traded", order: "desc" },
 ];
 
-export default function Issuers() {
+function Issuers() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Hydrated from the URL and written back to it, so a refresh or the back
@@ -281,5 +281,17 @@ export default function Issuers() {
       </main>
       <Footer />
     </>
+  );
+}
+
+// The page reads its filters from the URL (useSearchParams), which needs a
+// Suspense boundary now that pages are no longer forced to render per request:
+// the shell is served from cache and the page fills in in the browser, as it
+// always did.
+export default function IssuersPage() {
+  return (
+    <Suspense fallback={null}>
+      <Issuers />
+    </Suspense>
   );
 }

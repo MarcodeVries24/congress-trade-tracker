@@ -25,6 +25,16 @@ import { PriceTradesChart } from "@/components/PriceTradesChart";
 import { TickerLogo } from "@/components/TickerLogo";
 import { daysAgo, getPriceSeries } from "@/lib/priceSeries";
 
+// Served from cache, refreshed at most hourly: the data changes once a day,
+// and these ~3,000 pages are what crawlers ask for most.
+export const revalidate = 3600;
+
+// None built in advance (that would be ~3,000 database renders per deploy);
+// each page is rendered on its first visit and then served from cache.
+export function generateStaticParams() {
+  return [];
+}
+
 /**
  * One page per traded company — the asset-side counterpart to the member
  * pages, and server-rendered for the same reason: a crawler asking for

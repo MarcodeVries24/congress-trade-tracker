@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
@@ -39,7 +39,7 @@ function partyColor(party: string | null): string {
   return "text-ink-faint";
 }
 
-export default function Politicians() {
+function Politicians() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // The whole view is hydrated from the URL and written back to it, so a
@@ -321,5 +321,17 @@ export default function Politicians() {
       </main>
       <Footer />
     </>
+  );
+}
+
+// The page reads its filters from the URL (useSearchParams), which needs a
+// Suspense boundary now that pages are no longer forced to render per request:
+// the shell is served from cache and the page fills in in the browser, as it
+// always did.
+export default function PoliticiansPage() {
+  return (
+    <Suspense fallback={null}>
+      <Politicians />
+    </Suspense>
   );
 }

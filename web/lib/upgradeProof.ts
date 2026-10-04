@@ -42,9 +42,9 @@ export type UpgradeProof = {
 };
 
 let cached: { at: number; value: Promise<UpgradeProof> } | null = null;
-const TTL_MS = 5 * 60 * 1000;
+const TTL_MS = 60 * 60 * 1000;
 
-/** Cached for five minutes: a pricing page shouldn't run four counts per view. */
+/** Cached for an hour: the data changes once a day, and a pricing page shouldn't run four counts per view. */
 export function getUpgradeProof(): Promise<UpgradeProof> {
   if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
   const value = load().catch((err) => {

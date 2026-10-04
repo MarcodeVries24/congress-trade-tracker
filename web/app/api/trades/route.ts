@@ -4,6 +4,7 @@ import { ALERT_FROM_SQL, buildAlertConditions } from "@/lib/alertFilters";
 import { getMemberSlugsByName } from "@/lib/members";
 import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
 import { hasFeatureServer } from "@/lib/access";
+import { PUBLIC_DAILY_HEADERS } from "@/lib/cache";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
 const SORT_EXPRESSIONS: Record<string, string> = {
@@ -165,11 +166,19 @@ export async function GET(req: NextRequest) {
     member_slug: slugsByName.get(String(row.member_name)) ?? null,
   }));
 
-  return NextResponse.json({
-    data,
-    page: pageNum,
-    limit: limitNum,
-    total,
-    totalPages: Math.ceil(total / limitNum),
-  });
+  // Cached at the CDN only when no Pro filter was asked for: the answer is
+  // then the same for everyone, signed in or not. With one, it depends on
+  // whether the caller has Pro (a free caller's filters are dropped), so it
+  // must never be shared.
+  const gated = GATED_PARAMS.some((k) => sp.has(k));
+  return NextResponse.json(
+    { data, page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+    { headers: gated ? { "Cache-Control": "private, no-store" } : PUBLIC_DAILY_HEADERS }
+  );
 }
+
+// Every parameter the route only honours for Pro (see canUseFilters above).
+const GATED_PARAMS = [
+  "members", "tickers", "parties", "states", "state", "types", "owners", "minAmount", "amountRanges",
+  "marketCapTiers", "filedStatus", "dateFrom", "dateTo", "tradedFrom", "tradedTo",
+];

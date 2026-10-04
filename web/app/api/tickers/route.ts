@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { publicJson } from "@/lib/cache";
 
 // Backs the searchable ticker multi-select filter — same shape/purpose as
 // /api/members. The company name comes along so a list can be searched by
@@ -14,5 +14,5 @@ export async function GET() {
      GROUP BY t.ticker
      ORDER BY trade_count DESC`
   );
-  return NextResponse.json({ data: rows });
+  return publicJson({ data: rows });
 }

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getIssuerDirectory } from "@/lib/issuers";
+import { publicJson } from "@/lib/cache";
 
 /**
  * The issuer directory — free/ungated, like /api/politicians and /api/stats.
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
   });
 
   const total = rows.length;
-  return NextResponse.json({
+  return publicJson({
     data: rows.slice((page - 1) * limit, (page - 1) * limit + limit),
     page,
     limit,

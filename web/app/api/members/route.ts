@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { sql, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { publicJson } from "@/lib/cache";
 
 export async function GET() {
   // Grouped by (member_name, bioguide_id) rather than state_district: a
@@ -19,5 +19,5 @@ export async function GET() {
      GROUP BY t.member_name, f.bioguide_id
      ORDER BY trade_count DESC`
   );
-  return NextResponse.json({ data: rows });
+  return publicJson({ data: rows });
 }

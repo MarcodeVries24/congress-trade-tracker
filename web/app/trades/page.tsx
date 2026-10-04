@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { useProMirror } from "@/lib/useProMirror";
@@ -116,7 +116,7 @@ function clampToEarliestFilingDate(value: string): string {
   return value && value < EARLIEST_FILING_DATE ? EARLIEST_FILING_DATE : value;
 }
 
-export default function Home() {
+function Home() {
   const router = useRouter();
   // Dashboard cards link in as /trades?q=<name/ticker> — the free search
   // param — so a visitor lands here already filtered instead of on the
@@ -1227,4 +1227,16 @@ function StatItem({ value, label, info }: { value: string; label: string; info?:
 
 function StatDivider() {
   return <span className="hidden text-ink-faint/50 sm:inline">·</span>;
+}
+
+// The page reads its filters from the URL (useSearchParams), which needs a
+// Suspense boundary now that pages are no longer forced to render per request:
+// the shell is served from cache and the page fills in in the browser, as it
+// always did.
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <Home />
+    </Suspense>
+  );
 }

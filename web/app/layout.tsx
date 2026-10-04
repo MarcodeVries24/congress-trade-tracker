@@ -30,13 +30,12 @@ export const metadata: Metadata = {
   // of /. Canonicals belong on individual pages or nowhere.
 };
 
-// Clerk's <SignedIn>/<SignedOut>/<UserButton> (used in Header, rendered on
-// every page) need a real per-request auth context from clerkMiddleware —
-// which only runs for actual HTTP requests, not at `next build` time when
-// Next.js tries to statically prerender a page. Every route already fetches
-// its own data client-side anyway, so there's no static-shell win being
-// given up by rendering per-request instead.
-export const dynamic = "force-dynamic";
+// No `dynamic = "force-dynamic"` here any more. It rendered every page afresh
+// for every request, crawlers included, which is what used up Vercel's Fluid
+// Active CPU. The header's sign-in controls now render in the browser
+// (components/Header.tsx is a client component), so pages can be cached;
+// the ones that need the visitor (account, admin, upgrade) are dynamic on
+// their own because they read the session or the request.
 
 // Runs before paint so there's no light/dark flash on load.
 const THEME_INIT_SCRIPT = `

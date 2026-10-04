@@ -13,6 +13,16 @@ import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/
 import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { TickerLogo } from "@/components/TickerLogo";
 
+// Served from cache, refreshed at most hourly: the data changes once a day,
+// and these ~3,000 pages are what crawlers ask for most.
+export const revalidate = 3600;
+
+// None built in advance (that would be ~3,000 database renders per deploy);
+// each page is rendered on its first visit and then served from cache.
+export function generateStaticParams() {
+  return [];
+}
+
 /**
  * One page per member who has traded.
  *

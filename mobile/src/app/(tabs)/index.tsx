@@ -110,7 +110,7 @@ export default function DiscoverScreen() {
 
   const [recent, setRecent] = useState<Trade[] | null | 'failed'>(null);
   // Each window kept once loaded, so switching back is instant.
-  const [timingDays, setTimingDays] = useState<TimingKey>('90');
+  const [timingDays, setTimingDays] = useState<TimingKey>('365');
   const [timing, setTiming] = useState<Partial<Record<TimingKey, TimingOverview>> | null | 'failed'>(null);
   const [news, setNews] = useState<NewsItem[] | null | 'failed'>(null);
 

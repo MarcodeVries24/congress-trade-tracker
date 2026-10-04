@@ -575,7 +575,7 @@ export interface TimingOverview {
 }
 
 /** The best trades disclosed in the last `days` (30, 90 or 365) by return since the trade, and the members whose trades do best. */
-export function fetchTiming(days: 30 | 90 | 365 = 90, options: RequestOptions = {}): Promise<TimingOverview> {
+export function fetchTiming(days: 30 | 90 | 365 = 365, options: RequestOptions = {}): Promise<TimingOverview> {
   return get<TimingOverview>("/api/timing", new URLSearchParams({ days: String(days) }), options);
 }
 

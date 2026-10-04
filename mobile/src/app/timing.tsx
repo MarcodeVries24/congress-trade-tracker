@@ -29,7 +29,7 @@ type WindowKey = (typeof WINDOWS)[number]['key'];
 export default function TimingScreen() {
   const { c } = useTheme();
   const authed = useAuthedRequest();
-  const [window, setWindow] = useState<WindowKey>('90');
+  const [window, setWindow] = useState<WindowKey>('365');
   const [data, setData] = useState<TimingOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

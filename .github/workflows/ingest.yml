@@ -56,6 +56,14 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
 
+      # Company names from the SEC's public ticker list, so a ticker that
+      # arrived in this run is named straight away. Only names that differ are
+      # written. An enrichment like the one above: never fails the ingest.
+      - run: npm run sync-company-names --workspace ingest
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       # Daily closes for trades that just arrived: the close on each new
       # trade date, so the trade page and "before the public knew" have it
       # within this cycle. Only tickers with something unpriced are asked

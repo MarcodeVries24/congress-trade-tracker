@@ -19,8 +19,8 @@ import { SITE_URL } from "@/lib/site";
  * robots.txt". Letting them be crawled is what actually keeps them out.
  */
 // Crawlers that collect pages to train or feed AI models. They bring no
-// visitors, and one of them reading every page is what used up the free
-// plan's function calls in October 2026.
+// visitors, and crawlers reading every page used up most of the free plan's
+// function calls in October 2026.
 const AI_CRAWLERS = [
   "GPTBot",
   "CCBot",

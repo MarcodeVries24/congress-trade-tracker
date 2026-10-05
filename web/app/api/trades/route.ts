@@ -5,6 +5,7 @@ import { getMemberSlugsByName } from "@/lib/members";
 import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
 import { hasFeatureServer } from "@/lib/access";
 import { PUBLIC_DAILY_HEADERS } from "@/lib/cache";
+import { usesGatedTradeParams } from "@congtrade/shared/tradeFilters";
 
 // Plain columns sort directly; "days_to_file" is a computed expression.
 const SORT_EXPRESSIONS: Record<string, string> = {
@@ -30,7 +31,11 @@ export async function GET(req: NextRequest) {
   // caller's gated params are silently dropped (falls back to the same
   // default view the free UI already shows) rather than erroring the whole
   // request, since q/chamber/assetTypes are legitimately still free to mix in.
-  const canUseFilters = await hasFeatureServer("filters");
+  // Pro is only asked about when a Pro filter is: the middleware (and with it
+  // the sign-in) runs on this route only then, and the answer without one is
+  // the same for everyone and cached.
+  const gated = usesGatedTradeParams(sp);
+  const canUseFilters = gated && (await hasFeatureServer("filters"));
 
   const q = sp.get("q") ?? undefined;
   const members = canUseFilters ? sp.getAll("members") : [];
@@ -170,15 +175,10 @@ export async function GET(req: NextRequest) {
   // then the same for everyone, signed in or not. With one, it depends on
   // whether the caller has Pro (a free caller's filters are dropped), so it
   // must never be shared.
-  const gated = GATED_PARAMS.some((k) => sp.has(k));
   return NextResponse.json(
     { data, page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
     { headers: gated ? { "Cache-Control": "private, no-store" } : PUBLIC_DAILY_HEADERS }
   );
 }
 
-// Every parameter the route only honours for Pro (see canUseFilters above).
-const GATED_PARAMS = [
-  "members", "tickers", "parties", "states", "state", "types", "owners", "minAmount", "amountRanges",
-  "marketCapTiers", "filedStatus", "dateFrom", "dateTo", "tradedFrom", "tradedTo",
-];
+

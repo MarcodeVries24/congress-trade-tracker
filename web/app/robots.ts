@@ -13,10 +13,12 @@ import { SITE_URL } from "@/lib/site";
  * leave the crawler looking at empty shells and make the thin-content problem
  * strictly worse.
  *
- * /account and /unsubscribe aren't disallowed either. They already carry
- * `noindex`, and a page blocked in robots.txt can't be crawled to *discover*
- * its noindex — which is how URLs end up listed as "indexed, though blocked by
- * robots.txt". Letting them be crawled is what actually keeps them out.
+ * /upgrade, /account and /admin are disallowed: each is rendered per request
+ * (the price follows the visitor's country; the others are personal), and
+ * crawlers fetched /upgrade from the header of every page. A blocked page can
+ * still be listed as "indexed, though blocked by robots.txt", which for these
+ * costs nothing; the server time it saves is worth more. /unsubscribe only
+ * works with an emailed token, so crawlers never reach it.
  */
 // Crawlers that collect pages to train or feed AI models. They bring no
 // visitors, and crawlers reading every page used up most of the free plan's
@@ -49,7 +51,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       { userAgent: AI_CRAWLERS, disallow: "/" },
-      { userAgent: "*", allow: "/", disallow: "/trades/" },
+      { userAgent: "*", allow: "/", disallow: ["/trades/", "/upgrade", "/account", "/admin"] },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,

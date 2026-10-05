@@ -65,7 +65,7 @@ export function HomeTiming() {
               </button>
             ))}
           </div>
-          <Link href={`/best-trades?days=${days}`} className="shrink-0 text-xs text-accent hover:underline">
+          <Link href={days === 365 ? "/best-trades" : `/best-trades/${days}`} className="shrink-0 text-xs text-accent hover:underline">
             View all →
           </Link>
         </div>

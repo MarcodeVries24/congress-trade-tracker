@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getOtherAssetDirectory } from "@/lib/issuers";
+import { publicJson } from "@/lib/cache";
 
 type SortKey = "trade_count" | "volume_sum" | "last_traded";
 const SORT_KEYS = new Set<string>(["trade_count", "volume_sum", "last_traded"]);
@@ -31,5 +32,6 @@ export async function GET(req: NextRequest) {
   });
 
   const offset = (page - 1) * limit;
-  return NextResponse.json({ data: rows.slice(offset, offset + limit), total: rows.length });
+  // The same for everyone, so cached at the CDN like the other directories.
+  return publicJson({ data: rows.slice(offset, offset + limit), total: rows.length });
 }

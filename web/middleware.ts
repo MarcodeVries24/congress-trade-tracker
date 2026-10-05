@@ -33,10 +33,9 @@ function devCors(req: NextRequest): Headers | null {
   return headers;
 }
 
-// Runs on the API and the account page (matcher below), so `auth()` is
-// available where the server checks who is calling: API routes such as
-// app/api/trades/route.ts, which check the plan before honouring gated
-// filters, and the account page.
+// Runs only where the server checks who is calling (matcher below), so
+// `auth()` is available there: the account and admin pages, the API routes
+// that act for an account, and /api/trades when it is asked for a Pro filter.
 export default clerkMiddleware(async (_auth, req) => {
   const cors = devCors(req);
   if (!cors) return;
@@ -49,14 +48,37 @@ export default clerkMiddleware(async (_auth, req) => {
 });
 
 export const config = {
+  // Only where the server reads who is signed in. Every other request, cached
+  // pages and the public API alike, is the same for everyone, and on Vercel a
+  // middleware runs before the cache, so running Clerk there cost a function
+  // call per page view, per crawler request and per public API call.
+  //
+  // - /account and /admin: pages that check the account on the server.
+  // - The API routes that act for an account.
+  // - /api/trades only when it carries a Pro filter: the route checks Pro for
+  //   those alone (one entry per parameter, as a matcher cannot list
+  //   alternatives; keep in step with @congtrade/shared/tradeFilters, which a
+  //   matcher cannot import).
+  //
+  // robots.txt, sitemap.xml and ads.txt stay clear of the auth layer.
   matcher: [
-    // Only where the server reads who is signed in: the API (plan checks,
-    // alerts, the store and Stripe routes) and the account page. Every other
-    // page is the same for everyone, cached, and signs people in in the
-    // browser, so running Clerk in front of it was an invocation per page view,
-    // per prefetch and per crawler request for nothing. It also kept robots.txt,
-    // sitemap.xml and ads.txt clear of the auth layer, which still holds.
-    "/(api|trpc)(.*)",
     "/account(.*)",
+    "/admin(.*)",
+    "/api/(account|admin|alerts|push|store|stripe)(.*)",
+    { source: "/api/trades", has: [{ type: "query", key: "members" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "tickers" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "parties" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "states" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "state" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "types" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "owners" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "minAmount" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "amountRanges" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "marketCapTiers" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "filedStatus" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "dateFrom" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "dateTo" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "tradedFrom" }] },
+    { source: "/api/trades", has: [{ type: "query", key: "tradedTo" }] },
   ],
 };

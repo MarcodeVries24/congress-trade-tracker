@@ -13,6 +13,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import type { TradePrices } from "@/lib/prices";
+import { usesGatedTradeParams } from "@congtrade/shared/tradeFilters";
 
 /**
  * In development, EXPO_PUBLIC_API_BASE=auto means "the website's dev server
@@ -125,6 +126,21 @@ export interface RequestOptions {
 }
 
 /**
+ * Whether an answer depends on who is asking, and so needs the sign-in.
+ *
+ * Everything else (the feed without Pro filters, members, companies, news,
+ * the rankings) is the same for everyone and cached at Vercel's CDN, which
+ * skips its cache for any request carrying an Authorization header. Sending
+ * the token everywhere turned every screen of every signed-in phone into a
+ * server call; leaving it off where it changes nothing lets them share the
+ * cached copy.
+ */
+function isPersonal(path: string, params?: URLSearchParams): boolean {
+  if (path === "/api/trades") return Boolean(params && usesGatedTradeParams(params));
+  return path.startsWith("/api/alerts") || path.startsWith("/api/account");
+}
+
+/**
  * One place where a request is built, so every screen reports a failure the
  * same way. A route that refuses is not the same as a network that is not
  * there, and on a phone the second is the common one: the distinction is what
@@ -133,7 +149,7 @@ export interface RequestOptions {
 async function get<T>(path: string, params?: URLSearchParams, options: RequestOptions = {}): Promise<T> {
   const url = `${API_BASE}${path}${params && [...params].length ? `?${params}` : ""}`;
   const headers: Record<string, string> = { accept: "application/json" };
-  if (options.token) headers.authorization = `Bearer ${options.token}`;
+  if (options.token && isPersonal(path, params)) headers.authorization = `Bearer ${options.token}`;
 
   let res: Response;
   try {

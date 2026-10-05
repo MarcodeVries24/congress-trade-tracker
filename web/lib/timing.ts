@@ -87,6 +87,11 @@ export type TimingWindow = (typeof TIMING_WINDOWS)[number];
 /** What the website shows first: a year, the most telling ranking. */
 export const DEFAULT_TIMING_WINDOW: TimingWindow = 365;
 
+/** The ranking's address for a period: /best-trades for the default, /best-trades/30 for the others. */
+export function bestTradesHref(days: TimingWindow): string {
+  return days === DEFAULT_TIMING_WINDOW ? "/best-trades" : `/best-trades/${days}`;
+}
+
 export function parseTimingWindow(value: unknown): TimingWindow {
   const n = Number(value);
   return (TIMING_WINDOWS as readonly number[]).includes(n) ? (n as TimingWindow) : DEFAULT_TIMING_WINDOW;

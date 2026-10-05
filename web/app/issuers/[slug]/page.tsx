@@ -25,9 +25,10 @@ import { PriceTradesChart } from "@/components/PriceTradesChart";
 import { TickerLogo } from "@/components/TickerLogo";
 import { daysAgo, getPriceSeries } from "@/lib/priceSeries";
 
-// Served from cache, refreshed at most hourly: the data changes once a day,
-// and these ~3,000 pages are what crawlers ask for most.
-export const revalidate = 3600;
+// Served from cache, refreshed at most every six hours: new filings arrive a
+// few times a day, and these ~3,000 pages are what crawlers ask for most, so
+// an hourly refresh re-rendered each of them every hour a crawler came by.
+export const revalidate = 21600;
 
 // None built in advance (that would be ~3,000 database renders per deploy);
 // each page is rendered on its first visit and then served from cache.

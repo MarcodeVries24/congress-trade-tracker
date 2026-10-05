@@ -22,13 +22,13 @@ import { getTrade, type TradeDetail } from "@/lib/trade";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { TradeChartRange } from "@/components/TradeChartRange";
 
-// Served from cache, refreshed at most every six hours: a filing does not
-// change once published (a correction is rare), and the price chart moves
-// once a weekday evening. There are ~65,000 of these pages and crawlers ask
+// Served from cache, refreshed at most daily: a filing does not change once
+// published (a correction is rare), and the price chart moves once a weekday
+// evening. There are ~65,000 of these pages and crawlers ask
 // for them one after another; rendering each on every request is what ran
 // the function bill up. Nothing on the page may read the request for this to
 // hold, which is why the chart's range switch is in the browser.
-export const revalidate = 21600;
+export const revalidate = 86400;
 
 // None built in advance; each is rendered on its first visit, then cached.
 export function generateStaticParams() {

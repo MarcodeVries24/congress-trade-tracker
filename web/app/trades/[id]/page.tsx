@@ -6,7 +6,6 @@ import { Footer } from "@/components/Footer";
 import { InfoTip } from "@/components/InfoTip";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { TickerLogo } from "@/components/TickerLogo";
-import { TradeWindowChart } from "@/components/TradeWindowChart";
 import { alertDraftHref } from "@/lib/alertsClient";
 import { amountLabel, ASSET_TYPE_LABELS, displayAssetName, ownerLabel } from "@/lib/api";
 import { formatDate, isPartialSale, PARTIAL_SALE_NOTE, typeBadge } from "@/lib/format";
@@ -21,6 +20,20 @@ import {
 import { getPriceSeries } from "@/lib/priceSeries";
 import { getTrade, type TradeDetail } from "@/lib/trade";
 import { issuerSlug } from "@/lib/issuerSlug";
+import { TradeChartRange } from "@/components/TradeChartRange";
+
+// Served from cache, refreshed at most every six hours: a filing does not
+// change once published (a correction is rare), and the price chart moves
+// once a weekday evening. There are ~65,000 of these pages and crawlers ask
+// for them one after another; rendering each on every request is what ran
+// the function bill up. Nothing on the page may read the request for this to
+// hold, which is why the chart's range switch is in the browser.
+export const revalidate = 21600;
+
+// None built in advance; each is rendered on its first visit, then cached.
+export function generateStaticParams() {
+  return [];
+}
 
 
 /**
@@ -74,14 +87,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function TradePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ range?: string }>;
-}) {
-  const [{ id }, { range: rangeParam }] = await Promise.all([params, searchParams]);
+export default async function TradePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const found = await getTrade(Number(id));
   if (!found) notFound();
   const { trade: t, siblings } = found;
@@ -100,13 +107,9 @@ export default async function TradePage({
   const edgeNow = overall === null || kind === "other" ? null : kind === "buy" ? overall : -overall;
   const priced = Boolean(t.ticker && t.transaction_date && (before !== null || overall !== null));
 
-  // To today by default, since that is the headline figure; the close-up
-  // around the trade is one tap away.
-  const range = rangeParam === "around" ? "around" : "today";
   const series =
     priced && t.ticker && t.transaction_date ? await getPriceSeries(t.ticker, offset(t.transaction_date, -MARGIN_DAYS)) : null;
   const aroundEnd = t.filing_date ? offset(t.filing_date, MARGIN_DAYS) : null;
-  const shown = series && range === "around" && aroundEnd ? series.filter((p) => p.d <= aroundEnd) : series;
   const canToggle = Boolean(series && aroundEnd && series.filter((p) => p.d > aroundEnd).length > 20);
 
   const alertHref = t.ticker ? alertDraftHref({ tickers: [t.ticker] }) : null;
@@ -230,23 +233,16 @@ export default async function TradePage({
               ) : null}
             </div>
 
-            {shown && shown.length > 4 && t.transaction_date ? (
+            {series && series.length > 4 && t.transaction_date ? (
               <div className="mt-4">
-                {canToggle ? (
-                  <div className="mb-2 inline-flex rounded-full border border-line p-0.5 text-xs">
-                    {(["around", "today"] as const).map((r) => (
-                      <Link
-                        key={r}
-                        href={`?range=${r}`}
-                        scroll={false}
-                        className={`rounded-full px-3 py-1 ${range === r ? "bg-ink text-panel" : "text-ink-muted hover:text-ink"}`}
-                      >
-                        {r === "around" ? "Around the trade" : "To today"}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
-                <TradeWindowChart points={shown} traded={t.transaction_date} filed={t.filing_date} kind={kind} />
+                <TradeChartRange
+                  points={series}
+                  aroundEnd={aroundEnd}
+                  canToggle={canToggle}
+                  traded={t.transaction_date}
+                  filed={t.filing_date}
+                  kind={kind}
+                />
               </div>
             ) : null}
 

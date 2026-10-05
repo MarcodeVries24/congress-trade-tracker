@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { cleanAssetName } from "./api";
 import { LOGO_SQL, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { ISSUER_SLUG_SQL, issuerSlug } from "./issuerSlug";
 import { assetGroupName } from "./assetGroup";
@@ -41,6 +42,12 @@ const PEOPLE_SQL = `COUNT(DISTINCT COALESCE(f.bioguide_id, t.member_name))::int`
 const ISSUER_SUMMARY_COLUMNS = `
   t.ticker,
   MAX(cmc.company_name) AS company_name,
+  -- The spelling filed most often, preferring one in normal case over a
+  -- broker's capitals ("ELECTRONIC ARTS CMN").
+  COALESCE(
+    MODE() WITHIN GROUP (ORDER BY t.asset_name) FILTER (WHERE t.asset_name ~ '[a-z]'),
+    MODE() WITHIN GROUP (ORDER BY t.asset_name)
+  ) AS filed_name,
   MAX(${LOGO_SQL}) AS logo_url,
   MAX(cmc.market_cap)::float8 AS market_cap,
   COUNT(*)::int AS trade_count,
@@ -190,12 +197,31 @@ export const ISSUER_PAGE_TRADE_LIMIT = 100;
 /** How many of an issuer's traders the page names. */
 const ISSUER_PAGE_TRADER_LIMIT = 12;
 
+/**
+ * A filed name fit to stand as a company's name, or null. An options
+ * contract ("PUT/XSP @ 544 EXP 04/17/2025") is not a name. Words in capitals
+ * or typed oddly ("FIRST REPuBlIC BANK") are put in ordinary case; short
+ * acronyms ("AG", "ETF") are left alone.
+ */
+function filedCompanyName(filed: string): string | null {
+  const name = cleanAssetName(filed);
+  if (/\b(PUT|CALL)\b|@|\bEXP\b/i.test(name)) return null;
+  const odd = (w: string) => /[A-Z]{2,}[a-z]+[A-Z]/.test(w) || (w === w.toUpperCase() && /[A-Z]{4,}/.test(w));
+  return name
+    .split(" ")
+    .map((w) => (odd(w) ? w.charAt(0) + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+
 function toSummary(row: Record<string, unknown>): IssuerSummary {
   const ticker = String(row.ticker);
   return {
     ticker,
     slug: issuerSlug(ticker),
-    company_name: (row.company_name as string) ?? null,
+    // The SEC's name; for a company it does not list (a fund, a foreign
+    // listing, one since taken over), the name members filed it under most.
+    company_name:
+      (row.company_name as string | null) ?? (row.filed_name ? filedCompanyName(String(row.filed_name)) : null),
     logo_url: (row.logo_url as string | null | undefined) ?? null,
     market_cap: row.market_cap === null || row.market_cap === undefined ? null : Number(row.market_cap),
     trade_count: Number(row.trade_count ?? 0),

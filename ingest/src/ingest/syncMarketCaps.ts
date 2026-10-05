@@ -32,15 +32,6 @@ import { FINNHUB, FX_RATES_URL } from "../config.js";
  * written in the wrong unit.
  */
 
-/**
- * Company names the provider has wrong for a ticker, found by the 2026-10
- * data audit: Liberty Media's Liberty Live tracking stocks come back as
- * "Formula One Group", another of its tracking stocks.
- */
-export const COMPANY_NAME_OVERRIDES: Record<string, string> = {
-  LLYVK: "Liberty Live Group",
-  LLYVA: "Liberty Live Group",
-};
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 if (!FINNHUB_API_KEY) {
@@ -347,7 +338,8 @@ async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Pro
     LEFT JOIN (SELECT ticker, COUNT(*) AS n FROM transactions GROUP BY ticker) traded ON traded.ticker = t.ticker
     ${
       mode === 'missing'
-        ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker)"
+        ? // Never looked up here. A row can exist with only the SEC name in it.
+          "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
         : mode === 'logos'
           ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
           : ""
@@ -399,12 +391,13 @@ async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Pro
         noCap++;
       }
       await sql.query(
-        `INSERT INTO company_market_caps (ticker, market_cap, company_name, source_currency, logo_url, logo_checked_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, company_name = EXCLUDED.company_name,
+        // No company name from here: names come from the SEC (syncCompanyNames).
+        `INSERT INTO company_market_caps (ticker, market_cap, source_currency, logo_url, logo_checked_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap,
            source_currency = EXCLUDED.source_currency, logo_url = EXCLUDED.logo_url, logo_checked_at = NOW(),
            updated_at = NOW()`,
-        [ticker, marketCap, COMPANY_NAME_OVERRIDES[ticker] ?? data.name ?? null, (data.currency ?? "").toUpperCase() || null, logo]
+        [ticker, marketCap, (data.currency ?? "").toUpperCase() || null, logo]
       );
     } catch (err) {
       failed++;

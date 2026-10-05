@@ -17,7 +17,8 @@
     "review:queue": "tsx src/ingest/reviewQueue.ts",
     "review:approve": "tsx src/ingest/approveFiling.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "backfill:asset-names": "tsx src/ingest/backfillAssetNames.ts"
+    "backfill:asset-names": "tsx src/ingest/backfillAssetNames.ts",
+    "sync-company-names": "tsx src/ingest/syncCompanyNames.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

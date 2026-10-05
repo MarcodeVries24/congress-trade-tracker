@@ -38,6 +38,16 @@ export const FINNHUB = {
 // currencies including TWD, KRW and IDR.
 export const FX_RATES_URL = "https://open.er-api.com/v6/latest/USD";
 
+/**
+ * The SEC's list of every ticker it has a registrant for, with the company's
+ * name as registered: public data, free to use, and where company names come
+ * from. The SEC asks automated clients to say who they are.
+ */
+export const SEC_COMPANY_TICKERS = {
+  url: "https://www.sec.gov/files/company_tickers.json",
+  userAgent: "CongTrade contact@congtrade.com",
+};
+
 export const MEMBERS_REFERENCE = {
   legislatorsYamlUrl: "https://raw.githubusercontent.com/unitedstates/congress-legislators/main/legislators-current.yaml",
   // Same dataset's companion file for members no longer serving (retired,

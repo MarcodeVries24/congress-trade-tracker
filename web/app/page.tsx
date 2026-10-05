@@ -10,6 +10,7 @@ import {
   fetchDashboard,
   fetchStats,
   Stats,
+  lastUpdated,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
 import { issuerSlug } from "@/lib/issuerSlug";
@@ -100,7 +101,7 @@ export default function Home() {
             <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
             <StatDivider />
             <StatItem
-              value={formatDateFromTimestamp(stats.lastUpdatedAt ?? stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              value={formatDateFromTimestamp(lastUpdated(stats))}
               label="Last updated"
             />
           </div>

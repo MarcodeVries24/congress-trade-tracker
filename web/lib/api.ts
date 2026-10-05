@@ -61,6 +61,17 @@ export interface Stats {
   failedFilings: number;
 }
 
+/**
+ * The "Last updated" date shown across the site: the last time the pipeline
+ * checked the House and Senate for new filings, every few hours, whether or
+ * not it found any. That is what "updated daily" promises, so on a quiet day
+ * the date is still today. Falls back to the last approval, then the last
+ * ingest, for a database the heartbeat has not been written to yet.
+ */
+export function lastUpdated(stats: Pick<Stats, "lastCheckedAt" | "lastUpdatedAt" | "lastIngestedAt">): string | null {
+  return stats.lastCheckedAt ?? stats.lastUpdatedAt ?? stats.lastIngestedAt;
+}
+
 // A trimmed-down Trade shape for the dashboard's trade cards — only the
 // fields those rows actually render (no days_to_file/pdf_url/market_cap/etc,
 // which the aggregate query doesn't join in).

@@ -24,6 +24,7 @@ import {
   Stats,
   Trade,
   TradeFilters,
+  lastUpdated,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
 import Link from "@/components/Link";
@@ -612,7 +613,7 @@ function Home() {
             <StatItem value={stats.totalMembers.toLocaleString()} label="Members" />
             <StatDivider />
             <StatItem
-              value={formatDateFromTimestamp(stats.lastUpdatedAt ?? stats.lastCheckedAt ?? stats.lastIngestedAt)}
+              value={formatDateFromTimestamp(lastUpdated(stats))}
               label="Last updated"
             />
           </div>

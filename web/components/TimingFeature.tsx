@@ -57,7 +57,7 @@ export function FeaturedTimedTrade({ trade: t, points }: { trade: TimedTrade; po
             {amountLabel(t.amount_range)} · traded {formatDate(t.transaction_date)} · disclosed {formatDate(t.filing_date)}
           </div>
         </div>
-        {t.ticker ? <TickerLogo ticker={t.ticker} size={44} /> : null}
+        {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={44} /> : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-1">
@@ -100,7 +100,7 @@ export function TimedTradeList({ trades, start = 1 }: { trades: TimedTrade[]; st
           <li key={t.id}>
             <Link href={`/trades/${t.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-panel-muted">
               <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-faint">{start + i}</span>
-              {t.ticker ? <TickerLogo ticker={t.ticker} size={30} /> : <span className="h-[30px] w-[30px] shrink-0" />}
+              {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={30} /> : <span className="h-[30px] w-[30px] shrink-0" />}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-ink">
                   {name} <span className="text-ink-muted">{verb(t.transaction_type)}</span> {t.ticker ?? displayAssetName(t)}

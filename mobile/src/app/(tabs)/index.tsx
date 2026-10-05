@@ -40,7 +40,15 @@ const ROW = 5;
 const LATEST = 5;
 
 type Story = { slug: string; name: string; photo: string | null; party: string | null; count: number };
-type Trending = { ticker: string; company: string | null; count: number; buys: number; sells: number; members: number };
+type Trending = {
+  ticker: string;
+  logo_url?: string | null;
+  company: string | null;
+  count: number;
+  buys: number;
+  sells: number;
+  members: number;
+};
 
 /**
  * The latest trades read two more ways: who has just filed (the stories row)
@@ -61,6 +69,7 @@ function digest(trades: Trade[]): { stories: Story[]; trending: Trending[] } {
     if (!t.ticker) continue;
     const entry = tickers.get(t.ticker) ?? {
       ticker: t.ticker,
+      logo_url: t.logo_url,
       company: t.company_name ?? null,
       count: 0,
       buys: 0,
@@ -296,7 +305,7 @@ export default function DiscoverScreen() {
                   onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: t.ticker.toLowerCase() } })}
                   style={styles.trendCard}>
                   <View style={styles.trendTop}>
-                    <TickerLogo ticker={t.ticker} size={52} />
+                    <TickerLogo ticker={t.ticker} logo={t.logo_url} size={52} />
                     <Icon name="arrow-forward" size={18} color={c.textFaint} />
                   </View>
                   <View style={styles.trendText}>

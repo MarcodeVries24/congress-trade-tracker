@@ -1,5 +1,5 @@
 import { sql } from "./db";
-import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
+import { LOGO_SQL, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { displayName } from "./api";
 import { memberSlug } from "./memberSlug";
 import { cleanName, NAME_NOISE, titleCaseIfShouted } from "./memberDisplay";
@@ -234,7 +234,7 @@ export interface MemberProfile {
   last_filed: string | null;
   purchases: number;
   sales: number;
-  top_tickers: { ticker: string; count: number }[];
+  top_tickers: { ticker: string; count: number; logo_url?: string | null }[];
 }
 
 export interface MemberTrade extends TradePrices {
@@ -252,6 +252,8 @@ export interface MemberTrade extends TradePrices {
   pdf_url: string;
   days_to_file: number | null;
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
 }
 
 /**
@@ -298,8 +300,9 @@ export async function getMemberBySlug(
       [entry.names]
     ),
     sql.query(
-      `SELECT t.ticker, COUNT(*)::int AS count
+      `SELECT t.ticker, COUNT(*)::int AS count, MAX(${LOGO_SQL}) AS logo_url
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
        WHERE t.member_name = ANY($1) AND ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
          AND t.ticker IS NOT NULL AND t.ticker <> ''
        GROUP BY 1 ORDER BY 2 DESC LIMIT 8`,
@@ -308,7 +311,7 @@ export async function getMemberBySlug(
     sql.query(
       `SELECT t.id, t.asset_name, t.ticker, t.asset_type_code, t.owner, t.transaction_type,
               t.transaction_date, t.amount_range, t.amount_low, t.amount_high,
-              f.filing_date, f.pdf_url, cmc.company_name,
+              f.filing_date, f.pdf_url, cmc.company_name, ${LOGO_SQL} AS logo_url,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
               ${PRICE_COLUMNS_SQL}
        FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
@@ -339,7 +342,7 @@ export async function getMemberBySlug(
       last_filed: (s?.last_filed as string) ?? null,
       purchases: Number(s?.purchases ?? 0),
       sales: Number(s?.sales ?? 0),
-      top_tickers: tickerRows as { ticker: string; count: number }[],
+      top_tickers: tickerRows as { ticker: string; count: number; logo_url?: string | null }[],
     },
     trades: tradeRows as MemberTrade[],
   };

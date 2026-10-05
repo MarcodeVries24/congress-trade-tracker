@@ -1,4 +1,4 @@
-import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL } from "@/lib/db";
+import { sql, LOGO_SQL, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL } from "@/lib/db";
 import type { Trade } from "@/lib/api";
 import { ALERT_FROM_SQL } from "@/lib/alertFilters";
 import { getMemberSlugsByName } from "@/lib/members";
@@ -21,7 +21,7 @@ export const TRADE_COLUMNS_SQL = `t.*, f.bioguide_id, f.filing_date, f.pdf_url, 
   COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
   COALESCE(mh.party, mr.party) AS party,
   COALESCE(mh.state, mr.state) AS member_state,
-  cmc.market_cap, cmc.company_name,
+  cmc.market_cap, cmc.company_name, ${LOGO_SQL} AS logo_url,
   (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
   ${PRICE_COLUMNS_SQL}`;
 

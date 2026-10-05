@@ -58,3 +58,12 @@ export const PLAUSIBLE_DATES_SQL = `((NULLIF(f.filing_date, '')::date - NULLIF(t
  * ("Over $1,000,000***") at their floor rather than dropping them to half.
  */
 export const VOLUME_MIDPOINT_SQL = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
+
+/**
+ * A company's logo for the browser to load straight from the provider, so a
+ * list of trades does not send one request per logo through this site:
+ * the logo's address, '' when it has been looked up and there is none (the
+ * lettered tile is drawn without asking), or NULL when it has not been looked
+ * up yet (the browser falls back to /api/logo). Needs `cmc` joined.
+ */
+export const LOGO_SQL = `CASE WHEN cmc.logo_url ~ '^https://' THEN cmc.logo_url WHEN cmc.logo_checked_at IS NOT NULL THEN '' END`;

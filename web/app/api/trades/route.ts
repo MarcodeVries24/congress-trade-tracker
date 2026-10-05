@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, LOGO_SQL } from "@/lib/db";
 import { ALERT_FROM_SQL, buildAlertConditions } from "@/lib/alertFilters";
 import { getMemberSlugsByName } from "@/lib/members";
 import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
               COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.state, mr.state) AS member_state,
-              cmc.market_cap, cmc.company_name,
+              cmc.market_cap, cmc.company_name, ${LOGO_SQL} AS logo_url,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
               ${PRICE_COLUMNS_SQL}
        ${ALERT_FROM_SQL}

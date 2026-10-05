@@ -18,6 +18,7 @@ type Filing = {
   photo: string | null;
   party: string | null;
   ticker: string;
+  logo_url?: string | null;
   what: string;
   amount: string;
   filed: string;
@@ -98,7 +99,10 @@ function asFiling(
   name: string,
   photo: string | null,
   party: string | null,
-  t: Pick<Trade, 'id' | 'asset_name' | 'ticker' | 'company_name' | 'transaction_type' | 'amount_range' | 'filing_date'>
+  t: Pick<
+    Trade,
+    'id' | 'asset_name' | 'ticker' | 'company_name' | 'transaction_type' | 'amount_range' | 'filing_date' | 'logo_url'
+  >
 ): Filing {
   return {
     key: String(t.id),
@@ -108,6 +112,7 @@ function asFiling(
     photo,
     party,
     ticker: t.ticker!,
+    logo_url: t.logo_url,
     what: `${tradeVerb(t.transaction_type)} ${assetLabel(t)} (${t.ticker})`,
     amount: compactAmount(t.amount_range),
   };
@@ -152,7 +157,7 @@ export function LatestFilingsCard({ filedNames }: { filedNames: string[] }) {
               {f.name}
             </Text>
             <View style={styles.asset}>
-              <TickerLogo ticker={f.ticker} size={16} />
+              <TickerLogo ticker={f.ticker} logo={f.logo_url} size={16} />
               <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.flex}>
                 {f.what}
               </Text>

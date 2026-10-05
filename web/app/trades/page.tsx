@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { useProMirror } from "@/lib/useProMirror";
@@ -238,8 +238,18 @@ function Home() {
   const [memberSpellings, setMemberSpellings] = useState<Map<string, string[]>>(new Map());
   const [tickerOptions, setTickerOptions] = useState<{ value: string; label: string }[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  // The member and ticker lists (some 40 KB) are only fetched once they are
+  // needed: the member or ticker filter is opened, or the page arrived with
+  // one already set (a selected member's other spellings come from the list).
+  // Most visits, and every crawler, use neither.
+  const [optionsWanted, setOptionsWanted] = useState(false);
+  const needOptions = optionsWanted || members.length > 0 || tickers.length > 0;
+  const wantOptions = useCallback(() => setOptionsWanted(true), []);
 
+  const optionsFetched = useRef(false);
   useEffect(() => {
+    if (!needOptions || optionsFetched.current) return;
+    optionsFetched.current = true;
     Promise.all([fetchMemberOptions(), fetchTickerOptions()])
       .then(([memberRows, tickerRows]) => {
         setMemberOptions(memberRows.map((m) => ({ value: m.member_name, label: memberDisplayName(m) })));
@@ -248,17 +258,18 @@ function Home() {
       })
       .catch(() => {})
       .finally(() => setOptionsLoading(false));
-  }, []);
+  }, [needOptions]);
 
   const debouncedQ = useDebounced(q);
 
   // `members` holds one value per person, which is what the select shows and
   // what the URL carries. The trade query and a saved alert both match on the
   // filed spelling, so both use this expansion instead.
-  const queriedMembers = useMemo(
-    () => members.flatMap((m) => memberSpellings.get(m) ?? [m]),
-    [members, memberSpellings]
-  );
+  // Keyed on the expansion's content rather than on the spellings map, so the
+  // map arriving (it loads when a filter is opened) does not refetch the
+  // trades when nothing about the query changed.
+  const queriedKey = members.flatMap((m) => memberSpellings.get(m) ?? [m]).join("\u0000");
+  const queriedMembers = useMemo(() => (queriedKey ? queriedKey.split("\u0000") : []), [queriedKey]);
 
   const filters: TradeFilters = useMemo(
     () => ({
@@ -672,6 +683,7 @@ function Home() {
                   onChange={setMembers}
                   options={memberOptions}
                   loading={optionsLoading}
+                  onOpen={wantOptions}
                 />
               </GatedFilter>
               <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-40">
@@ -682,6 +694,7 @@ function Home() {
                   onChange={setTickers}
                   options={tickerOptions}
                   loading={optionsLoading}
+                  onOpen={wantOptions}
                 />
               </GatedFilter>
               <GatedFilter locked={filtersLocked} onLockedClick={promptUpgrade} className="w-full sm:w-36">
@@ -922,7 +935,7 @@ function Home() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          {trade.ticker ? <TickerLogo ticker={trade.ticker} size={30} /> : null}
+                          {trade.ticker ? <TickerLogo ticker={trade.ticker} logo={trade.logo_url} size={30} /> : null}
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5" title={trade.asset_name}>
                               <Link href={`/trades/${trade.id}`} className="hover:underline">
@@ -1035,7 +1048,7 @@ function Home() {
                   </div>
 
                   <div className="mt-3 flex items-center gap-2 text-sm" title={trade.asset_name}>
-                    {trade.ticker ? <TickerLogo ticker={trade.ticker} size={24} /> : null}
+                    {trade.ticker ? <TickerLogo ticker={trade.ticker} logo={trade.logo_url} size={24} /> : null}
                     <Link href={`/trades/${trade.id}`}>{displayAssetName(trade)}</Link>
                     {trade.parse_status === "ocr" && <OcrBadge />}
                   </div>

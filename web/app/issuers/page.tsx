@@ -189,7 +189,7 @@ function Issuers() {
                     <td className="px-4 py-3 text-ink-faint">{(page - 1) * pageSize + i + 1}</td>
                     <td className="px-4 py-3">
                       <Link href={`/issuers/${r.slug}`} className="group flex items-center gap-3">
-                        <TickerLogo ticker={r.ticker} size={32} />
+                        <TickerLogo ticker={r.ticker} logo={r.logo_url} size={32} />
                         <div className="min-w-0">
                           <div className="text-ink group-hover:underline">{r.company_name ?? r.ticker}</div>
                           <div className="font-mono text-xs text-ink-faint">{r.ticker}</div>
@@ -222,7 +222,7 @@ function Issuers() {
                 href={`/issuers/${r.slug}`}
                 className="flex items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3"
               >
-                <TickerLogo ticker={r.ticker} size={36} />
+                <TickerLogo ticker={r.ticker} logo={r.logo_url} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-ink">{r.company_name ?? r.ticker}</div>
                   <div className="truncate font-mono text-xs text-ink-faint">

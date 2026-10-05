@@ -103,7 +103,7 @@ export default function IssuerScreen() {
   const header = (
     <View>
       <View style={styles.hero}>
-        <TickerLogo ticker={i.ticker} size={96} />
+        <TickerLogo ticker={i.ticker} logo={i.logo_url} size={96} />
         <Text variant="title" style={styles.center}>
           {i.ticker}
         </Text>

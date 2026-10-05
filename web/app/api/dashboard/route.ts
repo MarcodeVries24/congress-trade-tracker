@@ -1,4 +1,4 @@
-import { sql, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
+import { sql, LOGO_SQL, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "@/lib/db";
 import { getMemberSlugsByName } from "@/lib/members";
 import { ASSET_TYPE_VALUES } from "@/lib/api";
 import { publicJson } from "@/lib/cache";
@@ -27,7 +27,7 @@ const STATE_DISTRICT_GROUPED = `(ARRAY_AGG(t.state_district ORDER BY f.filing_da
 const GROUPED_BY_PERSON = `t.member_name, f.bioguide_id, mh.photo_url, mh.party, mh.state, f.chamber`;
 
 const TRADE_COLUMNS = `t.id, t.member_name, f.bioguide_id, t.state_district, t.asset_name, t.ticker, t.asset_type_code, t.transaction_type,
-              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, cmc.company_name, ${MEMBER_COLUMNS}`;
+              t.amount_range, t.amount_low, t.amount_high, f.filing_date, f.chamber, cmc.company_name, ${LOGO_SQL} AS logo_url, ${MEMBER_COLUMNS}`;
 
 // One canonical company name per ticker, so the same company isn't shown four
 // different ways across these cards — see displayAssetName in lib/api.
@@ -97,9 +97,10 @@ export async function GET() {
          LIMIT 8`
       ),
       sql.query(
-        `SELECT t.ticker, COUNT(*)::int as trade_count
+        `SELECT t.ticker, COUNT(*)::int as trade_count, MAX(${LOGO_SQL}) AS logo_url
          FROM transactions t
          JOIN filings f ON f.doc_id = t.doc_id
+         LEFT JOIN company_market_caps cmc ON cmc.ticker = NULLIF(t.ticker, '')
          WHERE ${PUBLISHED_FILING_SQL} AND t.ticker IS NOT NULL AND t.ticker != '' AND ${PLAUSIBLE_DATES_SQL}
          GROUP BY t.ticker
          ORDER BY trade_count DESC

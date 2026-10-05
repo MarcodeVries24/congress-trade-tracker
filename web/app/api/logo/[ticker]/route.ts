@@ -37,10 +37,11 @@ function monogram(ticker: string): string {
  * A company's logo, by ticker: a redirect to the logo Finnhub has on file for
  * it, or a lettered tile in the company's colour when there is none.
  *
- * One address for every place a ticker appears, on the website and in the
- * app, so neither has to carry logo URLs through every query that lists
- * trades. The redirect is cached at the edge for a day; a logo almost never
- * changes, and a new one arrives with the monthly market-cap sync.
+ * The fallback for a row that did not bring its logo's address along (most
+ * lists now do, see LOGO_SQL, and load the provider's image directly). The
+ * redirect is cached at the edge for a day and in the browser for a week; a
+ * logo almost never changes, and a new one arrives with the monthly
+ * market-cap sync.
  *
  * `?fallback=none` answers 404 instead of a tile, for a client (the app) that
  * draws its own.
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
   const { ticker } = await params;
   const symbol = decodeURIComponent(ticker).trim().toUpperCase();
   const cache = {
-    "cache-control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+    "cache-control": "public, max-age=604800, s-maxage=86400, stale-while-revalidate=604800",
   };
   let checked = false;
 

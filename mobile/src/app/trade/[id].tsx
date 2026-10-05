@@ -122,7 +122,7 @@ export default function TradeDetailScreen() {
             trade.ticker && router.push({ pathname: '/issuer/[slug]', params: { slug: trade.ticker.toLowerCase() } })
           }
           style={styles.assetRow}>
-          <TickerLogo ticker={trade.ticker ?? asset} size={56} />
+          <TickerLogo ticker={trade.ticker ?? asset} logo={trade.logo_url} size={56} />
           <View style={styles.flex}>
             <Text variant="caption" tone="muted">
               {tradeVerb(trade.transaction_type)}

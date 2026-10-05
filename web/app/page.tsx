@@ -266,7 +266,7 @@ export default function Home() {
                   <li key={s.ticker}>
                     <Link href={`/issuers/${issuerSlug(s.ticker)}`} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
                       <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
-                        <TickerLogo ticker={s.ticker} size={26} />
+                        <TickerLogo ticker={s.ticker} logo={s.logo_url} size={26} />
                         {s.ticker}
                       </span>
                       <span className="text-sm text-ink-muted">

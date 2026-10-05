@@ -1,5 +1,5 @@
 import { sql } from "./db";
-import { PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
+import { LOGO_SQL, PLAUSIBLE_DATES_SQL, PUBLISHED_FILING_SQL, VOLUME_MIDPOINT_SQL } from "./sql";
 import { ISSUER_SLUG_SQL, issuerSlug } from "./issuerSlug";
 import { assetGroupName } from "./assetGroup";
 import { getTradeFlow, type TradeFlowQuarter } from "./tradeFlow";
@@ -41,6 +41,7 @@ const PEOPLE_SQL = `COUNT(DISTINCT COALESCE(f.bioguide_id, t.member_name))::int`
 const ISSUER_SUMMARY_COLUMNS = `
   t.ticker,
   MAX(cmc.company_name) AS company_name,
+  MAX(${LOGO_SQL}) AS logo_url,
   MAX(cmc.market_cap)::float8 AS market_cap,
   COUNT(*)::int AS trade_count,
   ${VOLUME_MIDPOINT_SQL}::float8 AS volume_sum,
@@ -54,6 +55,8 @@ export interface IssuerSummary {
   ticker: string;
   slug: string;
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
   market_cap: number | null;
   trade_count: number;
   volume_sum: number;
@@ -76,6 +79,8 @@ export interface IssuerTrade extends TradePrices {
   ticker: string | null;
   asset_type_code: string | null;
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
   owner: string | null;
   transaction_type: string;
   transaction_date: string | null;
@@ -191,6 +196,7 @@ function toSummary(row: Record<string, unknown>): IssuerSummary {
     ticker,
     slug: issuerSlug(ticker),
     company_name: (row.company_name as string) ?? null,
+    logo_url: (row.logo_url as string | null | undefined) ?? null,
     market_cap: row.market_cap === null || row.market_cap === undefined ? null : Number(row.market_cap),
     trade_count: Number(row.trade_count ?? 0),
     volume_sum: Number(row.volume_sum ?? 0),
@@ -260,7 +266,7 @@ export async function getIssuerBySlug(slug: string): Promise<{
     sql.query(
       `SELECT t.id, t.member_name, f.bioguide_id, t.asset_name, t.ticker, t.asset_type_code,
               t.owner, t.transaction_type, t.transaction_date, t.amount_range, t.amount_low,
-              t.amount_high, f.filing_date, f.pdf_url, f.chamber, cmc.company_name,
+              t.amount_high, f.filing_date, f.pdf_url, f.chamber, cmc.company_name, ${LOGO_SQL} AS logo_url,
               COALESCE(mh.party, mr.party) AS party,
               COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
               (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,

@@ -35,8 +35,10 @@ const missing = new Set<string>();
 const TICKER = /^[A-Z0-9.-]{1,12}$/;
 
 /**
- * A company's logo, from the website's /api/logo (which redirects to the one
- * on file), over a lettered tile in the company's colour.
+ * A company's logo over a lettered tile in the company's colour: straight
+ * from the provider when the row brought its address (`logo`), only the tile
+ * when the row says there is none (''), and otherwise from the website's
+ * /api/logo, which redirects to the one on file.
  *
  * The tile is drawn first and the logo fades in on top once it has loaded, so
  * a slow network shows the tile rather than a blank, and a ticker with no
@@ -46,16 +48,24 @@ const TICKER = /^[A-Z0-9.-]{1,12}$/;
  * Callers pass an asset's name when it has no ticker; that only ever gets
  * the tile.
  */
-export function TickerLogo({ ticker, size = 44 }: { ticker: string | null; size?: number }) {
+export function TickerLogo({
+  ticker,
+  logo,
+  size = 44,
+}: {
+  ticker: string | null;
+  logo?: string | null;
+  size?: number;
+}) {
   // Keyed, so a row that is handed another company starts over rather than
   // showing the last one's "loaded".
-  return <Mark key={ticker ?? ''} ticker={ticker} size={size} />;
+  return <Mark key={ticker ?? ''} ticker={ticker} logo={logo} size={size} />;
 }
 
-function Mark({ ticker, size }: { ticker: string | null; size: number }) {
+function Mark({ ticker, logo, size }: { ticker: string | null; logo?: string | null; size: number }) {
   const { scheme, c } = useTheme();
   const symbol = (ticker ?? '').trim().toUpperCase();
-  const remote = TICKER.test(symbol) && !missing.has(symbol);
+  const remote = logo !== '' && TICKER.test(symbol) && !missing.has(symbol);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -89,7 +99,7 @@ function Mark({ ticker, size }: { ticker: string | null; size: number }) {
       ) : null}
       {showLogo ? (
         <Image
-          source={{ uri: `${API_BASE}/api/logo/${encodeURIComponent(symbol)}?fallback=none` }}
+          source={{ uri: logo || `${API_BASE}/api/logo/${encodeURIComponent(symbol)}?fallback=none` }}
           style={[StyleSheet.absoluteFill, { opacity: loaded ? 1 : 0 }]}
           contentFit="contain"
           cachePolicy="memory-disk"

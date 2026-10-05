@@ -19,6 +19,7 @@ export function SearchableMultiSelect({
   onChange,
   className = "",
   loading,
+  onOpen,
 }: {
   placeholder: string;
   searchPlaceholder?: string;
@@ -27,6 +28,8 @@ export function SearchableMultiSelect({
   onChange: (values: string[]) => void;
   className?: string;
   loading?: boolean;
+  /** Called when the list is opened, for a caller that fetches its options only then. */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -72,7 +75,10 @@ export function SearchableMultiSelect({
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) onOpen?.();
+          setOpen((o) => !o);
+        }}
         className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm outline-none transition-colors bg-panel hover:border-line-strong ${
           selected.length ? "border-accent text-accent" : "border-line text-ink-muted"
         }`}

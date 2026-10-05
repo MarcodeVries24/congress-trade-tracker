@@ -137,7 +137,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
         {/* What happened, in one line, with the amount beside it. */}
         <section className="rounded-xl border border-line bg-panel p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            {t.ticker ? <TickerLogo ticker={t.ticker} size={56} /> : null}
+            {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={56} /> : null}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -388,7 +388,7 @@ function Siblings({ rows }: { rows: TradeDetail[] }) {
           return (
             <li key={r.id}>
               <Link href={`/trades/${r.id}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-panel-muted">
-                {r.ticker ? <TickerLogo ticker={r.ticker} size={28} /> : <span className="h-7 w-7 shrink-0" />}
+                {r.ticker ? <TickerLogo ticker={r.ticker} logo={r.logo_url} size={28} /> : <span className="h-7 w-7 shrink-0" />}
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-ink">{displayAssetName(r)}</div>
                   <div className="text-xs text-ink-faint">

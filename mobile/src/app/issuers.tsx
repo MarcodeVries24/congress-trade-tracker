@@ -54,7 +54,7 @@ export default function IssuersScreen() {
       onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: item.slug } })}
       style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={styles.top}>
-        <TickerLogo ticker={item.ticker} size={48} />
+        <TickerLogo ticker={item.ticker} logo={item.logo_url} size={48} />
         <View style={styles.text}>
           <Text variant="subhead">{item.ticker}</Text>
           <Text variant="caption" tone="muted" numberOfLines={1}>

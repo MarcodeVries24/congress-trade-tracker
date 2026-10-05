@@ -115,7 +115,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
 
         <div className="rounded-xl border border-line bg-panel p-4 sm:p-6">
           <div className="flex items-start gap-4">
-            <TickerLogo ticker={issuer.ticker} size={64} />
+            <TickerLogo ticker={issuer.ticker} logo={issuer.logo_url} size={64} />
             <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">{name}</h1>
               <p className="mt-0.5 text-sm text-ink-muted">

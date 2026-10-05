@@ -82,7 +82,7 @@ export function FeaturedTiming({ trade: t }: { trade: TimedTrade }) {
             {amountLabel(t.amount_range)} · traded {shortDate(traded)}
           </Text>
         </View>
-        {t.ticker ? <TickerLogo ticker={t.ticker} size={40} /> : null}
+        {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={40} /> : null}
       </View>
 
       <View style={styles.featuredFigure}>
@@ -135,7 +135,7 @@ export function TimedTradeCard({ trade: t, rank }: { trade: TimedTrade; rank: nu
       onPress={() => open(t)}
       style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={styles.cardTop}>
-        {t.ticker ? <TickerLogo ticker={t.ticker} size={36} /> : <View style={styles.logoGap} />}
+        {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={36} /> : <View style={styles.logoGap} />}
         <Text variant="footnote" tone="faint">
           #{rank}
         </Text>
@@ -165,7 +165,7 @@ export function TimedTradeRow({ trade: t, rank, divider }: { trade: TimedTrade; 
       <Text variant="footnote" tone="faint" style={styles.rank}>
         {rank}
       </Text>
-      <TickerLogo ticker={t.ticker ?? assetLabel(t)} size={40} />
+      <TickerLogo ticker={t.ticker ?? assetLabel(t)} logo={t.logo_url} size={40} />
       <View style={styles.flex}>
         <Text variant="bodyStrong" numberOfLines={1}>
           {memberName(t)}

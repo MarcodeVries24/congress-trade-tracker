@@ -45,6 +45,8 @@ export interface Trade extends TradePrices {
   state_district: string | null;
   asset_name: string;
   ticker: string | null;
+  /** The logo's address, '' when there is none, absent when unknown; see TickerLogo. */
+  logo_url?: string | null;
   asset_type_code: string | null;
   owner: string | null;
   transaction_type: string;
@@ -347,7 +349,7 @@ export interface PoliticianDetail {
     last_filed: string | null;
     purchases: number;
     sales: number;
-    top_tickers: { ticker: string; count: number }[];
+    top_tickers: { ticker: string; count: number; logo_url?: string | null }[];
   };
   /** The most recent hundred, newest first. */
   trades: DetailTrade[];
@@ -363,6 +365,8 @@ export interface IssuerSummary {
   ticker: string;
   slug: string;
   company_name: string | null;
+  /** The logo's address, '' when there is none, absent when unknown; see TickerLogo. */
+  logo_url?: string | null;
   market_cap: number | null;
   trade_count: number;
   volume_sum: number;

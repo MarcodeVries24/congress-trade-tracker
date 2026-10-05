@@ -178,7 +178,7 @@ export default function PoliticianScreen() {
                 scaleTo={0.94}
                 onPress={() => router.push({ pathname: '/issuer/[slug]', params: { slug: t.ticker.toLowerCase() } })}
                 style={[styles.tickerCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-                <TickerLogo ticker={t.ticker} size={40} />
+                <TickerLogo ticker={t.ticker} logo={t.logo_url} size={40} />
                 <View>
                   <Text variant="bodyStrong">{t.ticker}</Text>
                   <Text variant="footnote" tone="muted">

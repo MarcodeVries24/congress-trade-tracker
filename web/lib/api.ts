@@ -27,6 +27,8 @@ export interface Trade {
   market_cap: number | null;
   /** Canonical company name for this ticker, when we have one. See displayAssetName. */
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
   /** Closes on the trade date, the disclosure date and the latest; see lib/prices.ts. */
   price_at_trade?: number | null;
   price_at_filing?: number | null;
@@ -95,6 +97,8 @@ export interface DashboardTrade {
   party: string | null;
   member_state: string | null;
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
 }
 
 export interface DashboardPolitician {
@@ -127,6 +131,8 @@ export interface DashboardVolumeLeader {
 export interface DashboardStock {
   ticker: string;
   trade_count: number;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
 }
 
 export interface DashboardData {
@@ -625,6 +631,8 @@ export interface IssuerRow {
   /** Supplied by the API, not derived here — see PoliticianRow.slug. */
   slug: string;
   company_name: string | null;
+  /** The logo to load straight from the provider: see LOGO_SQL. */
+  logo_url?: string | null;
   market_cap: number | null;
   trade_count: number;
   volume_sum: number;

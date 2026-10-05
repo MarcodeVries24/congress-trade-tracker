@@ -44,7 +44,7 @@ export function TradeRow({
       {lead === 'member' ? (
         <Avatar uri={trade.photo_url} name={memberName(trade)} party={trade.party} size={48} />
       ) : (
-        <TickerLogo ticker={trade.ticker ?? asset} size={48} />
+        <TickerLogo ticker={trade.ticker ?? asset} logo={trade.logo_url} size={48} />
       )}
       <View
         style={[styles.body, divider && { borderBottomColor: c.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>

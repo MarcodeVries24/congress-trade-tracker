@@ -114,7 +114,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                     href={`/issuers/${issuerSlug(t.ticker)}`}
                     className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel-muted py-1 pl-1 pr-2.5 text-xs text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
                   >
-                    <TickerLogo ticker={t.ticker} size={20} />
+                    <TickerLogo ticker={t.ticker} logo={t.logo_url} size={20} />
                     <span className="text-ink">{t.ticker}</span> {t.count}
                   </Link>
                 ))}
@@ -161,7 +161,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
                   <RowLink key={t.id} href={`/trades/${t.id}`} className="border-b border-line/50 transition-colors hover:bg-panel-muted">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        {t.ticker ? <TickerLogo ticker={t.ticker} size={28} /> : null}
+                        {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={28} /> : null}
                         <div className="min-w-0">
                           <Link href={`/trades/${t.id}`} className="text-ink hover:underline">{displayAssetName(t)}</Link>
                           <div className="mt-0.5 text-xs text-ink-faint">
@@ -206,7 +206,7 @@ export default async function MemberPage({ params }: { params: Promise<{ slug: s
             return (
               <RowLink as="div" key={t.id} href={`/trades/${t.id}`} className={`rounded-lg border border-line border-l-2 bg-panel p-3 transition-colors hover:border-line-strong ${badge.accent}`}>
                 <div className="flex items-start justify-between gap-2">
-                  {t.ticker ? <TickerLogo ticker={t.ticker} size={32} /> : null}
+                  {t.ticker ? <TickerLogo ticker={t.ticker} logo={t.logo_url} size={32} /> : null}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-ink">{displayAssetName(t)}</div>
                     <div className="mt-0.5 text-xs text-ink-faint">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { TickerLogo } from "@/components/TickerLogo";
 import {
   fetchIssuers,

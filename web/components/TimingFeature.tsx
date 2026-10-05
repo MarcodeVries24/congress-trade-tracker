@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { TickerLogo } from "@/components/TickerLogo";
 import { TradeWindowChart } from "@/components/TradeWindowChart";

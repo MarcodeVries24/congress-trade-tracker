@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { displayName, fetchPoliticians, PAGE_SIZE_OPTIONS, PoliticianRow, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { compactUSD, formatDate } from "@/lib/format";
 import { useDebounced } from "@/lib/useDebounced";

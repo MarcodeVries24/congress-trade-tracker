@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ALERT_FREQUENCIES, describeAlert } from "@/lib/alertFilters";
 import { AlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { AlertsResponse, SavedAlert, alertUpgradeHref, createAlert, deleteAlert, fetchAlerts, readAlertDraft, updateAlert } from "@/lib/alertsClient";

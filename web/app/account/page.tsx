@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { Cong } from "@/components/Cong";

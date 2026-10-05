@@ -26,7 +26,7 @@ import {
   TradeFilters,
   VOLUME_ESTIMATE_NOTE,
 } from "@/lib/api";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Cong } from "@/components/Cong";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { RowLink } from "@/components/RowLink";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { MemberPhoto } from "./MemberPhoto";
 import type { ProofFace } from "@/lib/upgradeProof";
 

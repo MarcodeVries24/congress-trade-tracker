@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -21,6 +21,18 @@ import {
 import { getPriceSeries } from "@/lib/priceSeries";
 import { getTrade, type TradeDetail } from "@/lib/trade";
 import { issuerSlug } from "@/lib/issuerSlug";
+
+// Served from cache, refreshed at most every six hours: a filing does not
+// change once published (a correction is rare), and the price chart moves
+// once a weekday evening. There are ~65,000 of these pages and crawlers ask
+// for them one after another; rendering each on every request is what ran
+// the function bill up.
+export const revalidate = 21600;
+
+// None built in advance; each is rendered on its first visit, then cached.
+export function generateStaticParams() {
+  return [];
+}
 
 /**
  * One trade: what was traded and by whom, what the stock did while the trade

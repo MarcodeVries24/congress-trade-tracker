@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ASSET_TYPE_LABELS, PAGE_SIZE_OPTIONS, VOLUME_ESTIMATE_NOTE } from "@/lib/api";
 import { Select } from "./Select";
 import { InfoTip } from "./InfoTip";

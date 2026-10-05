@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { AccountMenu } from "./AccountMenu";
 import { ThemeToggle } from "./ThemeToggle";

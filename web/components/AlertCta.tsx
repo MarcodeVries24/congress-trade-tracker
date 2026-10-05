@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { AlertFilters, describeAlert } from "@/lib/alertFilters";
 import { alertDraftHref } from "@/lib/alertsClient";
 

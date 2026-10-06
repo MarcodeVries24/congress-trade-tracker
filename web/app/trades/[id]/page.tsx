@@ -17,7 +17,6 @@ import {
   moveSinceDisclosure,
   moveSinceTrade,
 } from "@/lib/priceMath";
-import { getPriceSeries } from "@/lib/priceSeries";
 import { getTrade, type TradeDetail } from "@/lib/trade";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { TradeChartRange } from "@/components/TradeChartRange";
@@ -107,10 +106,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
   const edgeNow = overall === null || kind === "other" ? null : kind === "buy" ? overall : -overall;
   const priced = Boolean(t.ticker && t.transaction_date && (before !== null || overall !== null));
 
-  const series =
-    priced && t.ticker && t.transaction_date ? await getPriceSeries(t.ticker, offset(t.transaction_date, -MARGIN_DAYS)) : null;
   const aroundEnd = t.filing_date ? offset(t.filing_date, MARGIN_DAYS) : null;
-  const canToggle = Boolean(series && aroundEnd && series.filter((p) => p.d > aroundEnd).length > 20);
 
   const alertHref = t.ticker ? alertDraftHref({ tickers: [t.ticker] }) : null;
 
@@ -233,12 +229,12 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
               ) : null}
             </div>
 
-            {series && series.length > 4 && t.transaction_date ? (
+            {priced && t.ticker && t.transaction_date ? (
               <div className="mt-4">
                 <TradeChartRange
-                  points={series}
+                  ticker={t.ticker}
+                  fromDay={offset(t.transaction_date, -MARGIN_DAYS)}
                   aroundEnd={aroundEnd}
-                  canToggle={canToggle}
                   traded={t.transaction_date}
                   filed={t.filing_date}
                   kind={kind}

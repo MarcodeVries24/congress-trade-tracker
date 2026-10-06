@@ -1,28 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import type { PricePoint } from "@/lib/priceSeries";
 import { TradeWindowChart, type WindowChartProps } from "@/components/TradeWindowChart";
+import { usePriceSeries } from "@/components/usePriceSeries";
 
 type Range = "around" | "today";
 
 /**
  * The trade page's chart with its "Around the trade" / "To today" switch.
  *
- * The switch lives here, in the browser, rather than in a ?range= query: a
- * page that reads its query string has to be rendered per request, and the
- * trade pages are cached so a crawler working through all of them does not
- * run the server for each one.
+ * Drawn in the browser, prices and all: the series comes from /api/prices
+ * (one cached answer per ticker), so rendering a trade page on the server
+ * neither asks the price source nor draws the chart. The switch lives here
+ * too, rather than in a ?range= query, which would make the page render per
+ * request.
  */
 export function TradeChartRange({
-  points,
+  ticker,
+  fromDay,
   aroundEnd,
-  canToggle,
   ...chart
-}: Omit<WindowChartProps, "points"> & { points: PricePoint[]; aroundEnd: string | null; canToggle: boolean }) {
+}: Omit<WindowChartProps, "points"> & { ticker: string; fromDay: string; aroundEnd: string | null }) {
   // To today by default, since that is the headline figure; the close-up
   // around the trade is one tap away.
   const [range, setRange] = useState<Range>("today");
+  const series = usePriceSeries(ticker);
+  if (series === undefined) {
+    // Holds the chart's place while it loads, so nothing below it jumps.
+    return <div aria-hidden className="h-[270px] animate-pulse rounded-lg bg-panel-muted" />;
+  }
+  const points = series?.filter((p) => p.d >= fromDay) ?? [];
+  if (points.length <= 4) return null;
+  const canToggle = Boolean(aroundEnd && points.filter((p) => p.d > aroundEnd).length > 20);
   const shown = range === "around" && aroundEnd ? points.filter((p) => p.d <= aroundEnd) : points;
 
   return (

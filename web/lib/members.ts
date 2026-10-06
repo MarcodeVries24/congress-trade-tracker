@@ -270,7 +270,7 @@ export function getMemberTradeFlow(names: string[]): Promise<TradeFlowQuarter[]>
 }
 
 /** How many trades a member page lists before pointing at the full filter UI. */
-export const MEMBER_PAGE_TRADE_LIMIT = 100;
+export const MEMBER_PAGE_TRADE_LIMIT = 30;
 
 export async function getMemberBySlug(
   slug: string

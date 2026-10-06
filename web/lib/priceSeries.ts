@@ -23,8 +23,21 @@ export function yahooSymbol(ticker: string): string {
   return ticker.trim().toUpperCase().replace(/\./g, "-");
 }
 
+// Every chart cuts its days from the same series per ticker, from here on.
+// Asking the source from each chart's own start date made a cache entry per
+// trade (a month before each trade date), so nearly every trade page fetched
+// afresh; one series per ticker is fetched a few times a day at most.
+export const SERIES_START = "2014-01-01";
+
+/** A ticker's daily closes from `fromDay`, cut from its one cached series. */
 export async function getPriceSeries(ticker: string, fromDay: string): Promise<PricePoint[] | null> {
-  const period1 = Math.floor(new Date(`${fromDay}T00:00:00Z`).getTime() / 1000);
+  const all = await fullSeries(ticker);
+  const points = all?.filter((p) => p.d >= fromDay) ?? [];
+  return points.length ? points : null;
+}
+
+async function fullSeries(ticker: string): Promise<PricePoint[] | null> {
+  const period1 = Math.floor(new Date(`${SERIES_START}T00:00:00Z`).getTime() / 1000);
   // Rounded to the day so the cache key is stable for six hours rather than
   // changing with every request.
   const period2 = Math.floor(Date.now() / 86_400_000) * 86_400 + 2 * 86_400;

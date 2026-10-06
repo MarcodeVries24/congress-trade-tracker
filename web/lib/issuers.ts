@@ -192,7 +192,7 @@ export async function getOtherAssetDirectory(): Promise<AssetGroup[]> {
 }
 
 /** How many trades an issuer page lists before pointing at the full filter UI. */
-export const ISSUER_PAGE_TRADE_LIMIT = 100;
+export const ISSUER_PAGE_TRADE_LIMIT = 30;
 
 /** How many of an issuer's traders the page names. */
 const ISSUER_PAGE_TRADER_LIMIT = 12;

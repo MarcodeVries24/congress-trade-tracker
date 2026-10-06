@@ -1,6 +1,9 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { adminUserId } from "@/lib/admin";
+import { issuerSlug } from "@/lib/issuerSlug";
+import { getMemberSlugsByName } from "@/lib/members";
 
 /**
  * The admin's decision on filings waiting in /admin.
@@ -46,5 +49,27 @@ export async function POST(req: NextRequest) {
     action === "approve" ? [docIds, admin] : [docIds]
   )) as { doc_id: string }[];
 
+  if (action === "approve" && rows.length) await refreshPagesFor(rows.map((r) => r.doc_id));
   return NextResponse.json({ updated: rows.map((r) => r.doc_id) });
+}
+
+/**
+ * Re-renders the member and company pages the approved filings appear on.
+ * Those pages are cached for a day, so publishing is what refreshes them,
+ * straight away, rather than every page on a timer whether or not anything
+ * changed.
+ */
+async function refreshPagesFor(docIds: string[]) {
+  const [rows, slugs] = await Promise.all([
+    sql.query(`SELECT DISTINCT member_name, ticker FROM transactions WHERE doc_id = ANY($1)`, [docIds]),
+    getMemberSlugsByName(),
+  ]);
+  const touched = rows as { member_name: string; ticker: string | null }[];
+  const paths = new Set<string>();
+  for (const { member_name, ticker } of touched) {
+    const slug = slugs.get(member_name);
+    if (slug) paths.add(`/politicians/${slug}`);
+    if (ticker) paths.add(`/issuers/${issuerSlug(ticker)}`);
+  }
+  for (const path of paths) revalidatePath(path);
 }

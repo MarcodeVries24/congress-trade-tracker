@@ -13,10 +13,12 @@ import { getMemberBySlug, getMemberTradeFlow, MEMBER_PAGE_TRADE_LIMIT } from "@/
 import { TradeFlowChart } from "@/components/TradeFlowChart";
 import { TickerLogo } from "@/components/TickerLogo";
 
-// Served from cache, refreshed at most every six hours: new filings arrive a
-// few times a day, and these ~3,000 pages are what crawlers ask for most, so
-// an hourly refresh re-rendered each of them every hour a crawler came by.
-export const revalidate = 21600;
+// Served from cache for a day. Approving filings in /admin re-renders the
+// pages they appear on straight away (see app/api/admin/filings), so new
+// trades do not wait for this; the daily refresh is for the prices in the
+// rows. These ~3,000 pages are what crawlers ask for most, and each render
+// costs about 0.2 s of server CPU.
+export const revalidate = 86400;
 
 // None built in advance (that would be ~3,000 database renders per deploy);
 // each page is rendered on its first visit and then served from cache.

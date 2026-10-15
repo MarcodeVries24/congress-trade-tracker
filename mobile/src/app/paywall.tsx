@@ -196,7 +196,7 @@ export default function PaywallScreen() {
         {followed.length ? (
           <CongSays pose="pro" title={`Ready to watch ${who} for you.`} subtitle="And anyone else in Congress." />
         ) : (
-          <CongSays pose="pro" title="Every trade Congress makes, updated daily." subtitle="Cancel anytime." />
+          <CongSays pose="pro" title="Every trade Congress makes, updated daily." subtitle="Follow anyone in Congress." />
         )}
 
         <View style={styles.benefits}>
@@ -289,6 +289,14 @@ export default function PaywallScreen() {
             {purchases.error}
           </Text>
         ) : null}
+        {/* Said plainly, next to the button, whichever plan and whoever was
+            picked: the worry at this moment is being stuck paying. */}
+        <View style={styles.assurance}>
+          <Icon name="shield-checkmark" size={15} color={c.gain} />
+          <Text variant="footnote" tone="gain" style={styles.semibold}>
+            {chosenTrial ? `${chosenTrial.length} free · Cancel anytime` : 'Cancel anytime'}
+          </Text>
+        </View>
         <Button
           kind="accent"
           label={
@@ -393,5 +401,6 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill },
   footer: { paddingHorizontal: 16, paddingTop: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
   legal: { textAlign: 'center', paddingHorizontal: 8 },
+  assurance: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', columnGap: 20, rowGap: 6 },
 });

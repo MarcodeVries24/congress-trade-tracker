@@ -72,6 +72,13 @@ function Step({
  * stock did before anyone else knew, who did it, the three dates whose gaps are the point of a disclosure, and the
  * filing itself, which is the authority rather than us.
  */
+// "Filed today", "Filed 13d ago", "Filed Feb 6, 2026": only the words are
+// lowercased, never a month.
+function filedLabel(iso: string | null): string {
+  const ago = filedAgo(iso);
+  return ago === 'Today' || ago === 'Yesterday' ? ago.toLowerCase() : ago;
+}
+
 export default function TradeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { c, scheme } = useTheme();
@@ -111,7 +118,7 @@ export default function TradeDetailScreen() {
         <View style={styles.heroTop}>
           <Pill label={tradePill(trade.transaction_type)} tone={tradeTone(trade.transaction_type)} />
           <Text variant="footnote" tone="faint">
-            Filed {filedAgo(trade.filing_date).toLowerCase()}
+            Filed {filedLabel(trade.filing_date)}
           </Text>
         </View>
         <Tap

@@ -867,7 +867,7 @@ function Home() {
 
         {error && (
           <div className="mb-4 rounded-md border border-rose-800 bg-rose-500/10 px-4 py-3 text-sm text-rose-500 dark:text-rose-300">
-            {error}. Check that DATABASE_URL is set and the database is reachable.
+            Couldn&rsquo;t load the trades right now. Please try again in a moment.
           </div>
         )}
 

@@ -53,7 +53,13 @@ export function Segmented<K extends string>({
               }
             }}
             style={styles.option}>
-            <Text variant="callout" color={selected ? c.primaryText : c.textMuted} style={styles.label}>
+            {/* One line: Android measures bold text a touch narrow and would
+                otherwise wrap a short label like "To today" onto two. */}
+            <Text
+              variant="callout"
+              color={selected ? c.primaryText : c.textMuted}
+              numberOfLines={1}
+              style={styles.label}>
               {o.label}
             </Text>
           </Tap>

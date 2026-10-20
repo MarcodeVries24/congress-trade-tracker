@@ -3,6 +3,7 @@
 // writes the file outside the project and sets the variable to its path). A
 // git-ignored copy in mobile/ serves a local build; with neither, the app
 // builds as before, only without push on Android.
+/* global __dirname */
 const fs = require('fs');
 const path = require('path');
 

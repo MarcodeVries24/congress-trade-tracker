@@ -17,6 +17,10 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Firebase: builds get it from EAS (GOOGLE_SERVICES_JSON); see app.config.js
+google-services.json
+# Service account keys (FCM V1, Play) never belong in the repo
+*service-account*.json
 
 # Metro
 .metro-health-check*

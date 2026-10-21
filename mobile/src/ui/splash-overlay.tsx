@@ -6,13 +6,17 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useTheme } from '@/theme';
 
+// The wordmark in each scheme's colours, as in the expo-splash-screen config.
+const LIGHT = require('@/assets/images/splash-icon.png');
+const DARK = require('@/assets/images/splash-icon-dark.png');
+
 /**
- * The hand-off from the native splash: the same icon, the same size, on the
- * same colour, held for a beat and faded out, so the app appears rather than
- * snaps in.
+ * The hand-off from the native splash: the same wordmark, the same size, on
+ * the same colour, held for a beat and faded out, so the app appears rather
+ * than snaps in.
  */
 export function SplashOverlay() {
-  const { c } = useTheme();
+  const { c, scheme } = useTheme();
   const [visible, setVisible] = useState(true);
   if (!visible) return null;
   return (
@@ -25,7 +29,7 @@ export function SplashOverlay() {
             .catch(() => {})
             .finally(() => setTimeout(() => setVisible(false), 450));
         }}>
-        <Image source={require('@/assets/images/splash-icon.png')} style={styles.icon} contentFit="contain" />
+        <Image source={scheme === 'dark' ? DARK : LIGHT} style={styles.icon} contentFit="contain" />
       </View>
     </Animated.View>
   );
@@ -34,5 +38,5 @@ export function SplashOverlay() {
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   // Matches imageWidth in the expo-splash-screen plugin config.
-  icon: { width: 112, height: 112 },
+  icon: { width: 200, height: 200 },
 });

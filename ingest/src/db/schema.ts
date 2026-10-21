@@ -484,4 +484,32 @@ export const SCHEMA_STATEMENTS = [
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
   `CREATE INDEX IF NOT EXISTS idx_push_devices_user ON push_devices(user_id)`,
+  // Feedback sent from the app or the website (POST /api/feedback), read in
+  // /admin/feedback and counted in the daily report. user_id is the Clerk id
+  // when the sender was signed in, NULL from the website without an account;
+  // an account's rows go when the account is deleted, and the daily report
+  // clears anything older than two years.
+  `CREATE TABLE IF NOT EXISTS feedback (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    user_id TEXT,
+    -- Where to reply, if the sender gave one.
+    email TEXT,
+    -- 'idea' | 'bug' | 'data' | 'other' (@congtrade/shared/feedback)
+    kind TEXT NOT NULL,
+    message TEXT NOT NULL,
+    -- 'ios' | 'android' | 'web'
+    source TEXT NOT NULL,
+    app_version TEXT,
+    os_version TEXT,
+    -- The screen or page it was sent from.
+    screen TEXT,
+    -- 'new' | 'read' | 'done', set in /admin/feedback.
+    status TEXT NOT NULL DEFAULT 'new',
+    -- The admin's own note, never shown to the sender.
+    note TEXT,
+    updated_at TIMESTAMPTZ
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id)`,
 ];

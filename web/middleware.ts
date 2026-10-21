@@ -54,7 +54,8 @@ export const config = {
   // call per page view, per crawler request and per public API call.
   //
   // - /account and /admin: pages that check the account on the server.
-  // - The API routes that act for an account.
+  // - The API routes that act for an account, and /api/feedback, which files
+  //   a message under the account when the sender is signed in.
   // - /api/trades only when it carries a Pro filter: the route checks Pro for
   //   those alone (one entry per parameter, as a matcher cannot list
   //   alternatives; keep in step with @congtrade/shared/tradeFilters, which a
@@ -64,7 +65,7 @@ export const config = {
   matcher: [
     "/account(.*)",
     "/admin(.*)",
-    "/api/(account|admin|alerts|push|store|stripe)(.*)",
+    "/api/(account|admin|alerts|feedback|push|store|stripe)(.*)",
     { source: "/api/trades", has: [{ type: "query", key: "members" }] },
     { source: "/api/trades", has: [{ type: "query", key: "tickers" }] },
     { source: "/api/trades", has: [{ type: "query", key: "parties" }] },

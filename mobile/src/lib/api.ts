@@ -13,6 +13,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import type { TradePrices } from "@/lib/prices";
+import type { FeedbackInput } from "@congtrade/shared/feedback";
 import { usesGatedTradeParams } from "@congtrade/shared/tradeFilters";
 
 /**
@@ -561,6 +562,11 @@ export async function registerPushDevice(
 /** Turns them off again. */
 export async function unregisterPushDevice(token: string, options: RequestOptions = {}): Promise<void> {
   await send<{ ok: boolean }>("DELETE", "/api/push/devices", { token }, options);
+}
+
+/** Sends a feedback message; signed in, it is filed under the account. */
+export async function sendFeedback(feedback: FeedbackInput, options: RequestOptions = {}): Promise<void> {
+  await send<{ ok: boolean }>("POST", "/api/feedback", feedback, options);
 }
 
 /** How many trades a draft would have matched: ever, and in the last 90 days. */

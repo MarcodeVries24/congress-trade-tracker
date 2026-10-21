@@ -156,6 +156,18 @@ async function main() {
   // being silent.
   const entitlementErrors = await countEntitlementErrors();
 
+  // Feedback is answered from the inbox, where each message arrives by email;
+  // the report only says what came in and what is still open in
+  // /admin/feedback. Older than two years goes, as the privacy policy says
+  // (left alone on a dry run, which changes nothing).
+  if (!dryRun) await sql.query(`DELETE FROM feedback WHERE created_at < NOW() - INTERVAL '2 years'`);
+  const [{ count: feedbackNew, open: feedbackOpen }] = (await sql.query(
+    `SELECT COUNT(*) FILTER (WHERE created_at > $1)::int AS count,
+            COUNT(*) FILTER (WHERE status <> 'done')::int AS open
+     FROM feedback`,
+    [since]
+  )) as { count: number; open: number }[];
+
   const totalNewTransactions = successful.reduce((sum, r) => sum + r.transaction_count, 0);
   const houseCount = rows.filter((r) => r.chamber === "house").length;
   const senateCount = rows.filter((r) => r.chamber === "senate").length;
@@ -252,6 +264,10 @@ async function main() {
 
       ${reviewSectionHtml(backlog, needsReviewToday, reportDate, MAX_ROWS)}
 
+      <h3 style="margin-bottom:4px;margin-top:24px;">Feedback (${feedbackNew} new)</h3>
+      <p style="color:#666;font-size:13px;margin-top:0;">${feedbackOpen} not yet done.
+        <a href="${SITE_URL}/admin/feedback" style="color:#0070f3;">Open feedback</a></p>
+
       ${
         entitlementErrors > 0
           ? `<h3 style="margin-bottom:4px;margin-top:28px;color:#a12b2b;">Subscription checks failing (${entitlementErrors})</h3>
@@ -281,6 +297,8 @@ These are NOT on the site until reviewed.
 ${reviewTextLines(backlog, MAX_ROWS)}
 
 Publish a reviewed filing with:  npm run review:approve -- <docId>
+
+Feedback: ${feedbackNew} new, ${feedbackOpen} not yet done — ${SITE_URL}/admin/feedback
 ${entitlementErrors > 0 ? `\nWARNING: subscription checks failed for ${entitlementErrors} account(s) in the last 2 days — alerts kept sending. See user_entitlements.last_error.\n` : ""}`;
 
   if (dryRun) {

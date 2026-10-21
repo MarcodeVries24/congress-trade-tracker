@@ -89,7 +89,13 @@ export default function MoreScreen() {
 
         <Group>
           <ListRow icon="settings-outline" label="Settings" onPress={() => router.push('/settings')} />
-          <ListRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/help')} last />
+          <ListRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/help')} />
+          <ListRow
+            icon="chatbubble-ellipses-outline"
+            label="Send feedback"
+            onPress={() => router.push({ pathname: '/feedback', params: { from: 'More' } })}
+            last
+          />
         </Group>
 
         <Group title="Legal">

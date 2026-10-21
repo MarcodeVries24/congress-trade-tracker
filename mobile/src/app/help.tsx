@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { LayoutAnimation, Platform, ScrollView, StyleSheet, UIManager, View } from 'react-native';
 
@@ -110,6 +111,13 @@ export default function HelpScreen() {
           label="Report a data error"
           kind="secondary"
           onPress={() => emailSupport('Data error in CongTrade')}
+          style={styles.full}
+        />
+        <Button
+          label="Send feedback"
+          kind="secondary"
+          icon="chatbubble-ellipses-outline"
+          onPress={() => router.push({ pathname: '/feedback', params: { from: 'Help' } })}
           style={styles.full}
         />
       </View>

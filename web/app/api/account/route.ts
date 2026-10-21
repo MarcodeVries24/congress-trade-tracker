@@ -66,6 +66,7 @@ export async function DELETE() {
   await sql.query(`DELETE FROM push_devices WHERE user_id = $1`, [userId]);
   await sql.query(`DELETE FROM user_entitlements WHERE user_id = $1`, [userId]);
   await sql.query(`DELETE FROM store_account_tokens WHERE clerk_user_id = $1`, [userId]);
+  await sql.query(`DELETE FROM feedback WHERE user_id = $1`, [userId]);
 
   try {
     const client = await clerkClient();

@@ -8,6 +8,7 @@ const COMPANY_LINKS = [
   // for a price, and /upgrade tells a subscriber they are already on Pro.
   { label: "Pricing", href: "/upgrade" },
   { label: "Contact", href: "/about#contact" },
+  { label: "Feedback", href: "/feedback" },
 ];
 
 const RESOURCE_LINKS = [

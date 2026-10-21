@@ -75,6 +75,7 @@ function Navigation() {
         />
         <Stack.Screen name="alert/[id]" options={{ ...modal, title: 'Alert' }} />
         <Stack.Screen name="sign-in" options={{ ...modal, title: 'Account' }} />
+        <Stack.Screen name="feedback" options={modal} />
       </Stack>
     </>
   );

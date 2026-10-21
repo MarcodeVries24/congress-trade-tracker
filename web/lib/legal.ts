@@ -5,4 +5,4 @@
  * Change the date whenever the text changes.
  */
 export const TERMS_VERSION = "October 4, 2026";
-export const PRIVACY_VERSION = "October 4, 2026";
+export const PRIVACY_VERSION = "October 21, 2026";

@@ -37,7 +37,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "I found an error, or have a question. Who do I contact?",
-    a: "Email contact@congtrade.com. Corrections, questions about methodology, and general feedback are all welcome, and we look into every report.",
+    a: "Email contact@congtrade.com, or use the feedback form at congtrade.com/feedback. Corrections, questions about methodology, and general feedback are all welcome, and we look into every report.",
   },
 ];
 

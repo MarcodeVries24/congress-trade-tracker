@@ -6,6 +6,8 @@ import { FilingDecision, ApproveAll } from "@/components/admin/FilingDecision";
 import { Cong } from "@/components/Cong";
 import { MemberPhoto } from "@/components/MemberPhoto";
 import { adminUserId } from "@/lib/admin";
+import { countFeedbackByStatus } from "@/lib/feedback";
+import Link from "@/components/Link";
 import { ALERT_FROM_SQL } from "@/lib/alertFilters";
 import { amountLabel, displayAssetName, type Trade } from "@/lib/api";
 import { sql, PLAUSIBLE_DATES_SQL } from "@/lib/db";
@@ -151,6 +153,12 @@ export default async function AdminPage() {
       ])) as [PendingTrade[], { doc_id: string; raw_text: string }[]])
     : [[], []];
 
+  // Null until the ingest has created the feedback table, so this page never
+  // depends on it.
+  const newFeedback = await countFeedbackByStatus()
+    .then((c) => c.new)
+    .catch(() => null);
+
   const tradesOf = (docId: string) => trades.filter((t) => t.doc_id === docId);
   const issuesOf = (docId: string) => issues.filter((i) => i.doc_id === docId);
 
@@ -167,7 +175,14 @@ export default async function AdminPage() {
                 : `${pendingTotal} waiting, oldest first${pendingTotal > PAGE ? `, ${PAGE} shown` : ""}. Nothing here is on the site or in anyone's alerts until approved.`}
             </p>
           </div>
-          {pending.length > 1 ? <ApproveAll docIds={docIds} /> : null}
+          <div className="flex items-center gap-3">
+            {newFeedback !== null ? (
+              <Link href="/admin/feedback" className="text-sm font-medium text-accent hover:underline">
+                Feedback{newFeedback ? ` (${newFeedback} new)` : ""}
+              </Link>
+            ) : null}
+            {pending.length > 1 ? <ApproveAll docIds={docIds} /> : null}
+          </div>
         </div>
 
         {pendingTotal === 0 ? <Cong mood="all-quiet" width={110} className="mx-auto mt-8" /> : null}

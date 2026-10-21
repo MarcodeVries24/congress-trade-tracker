@@ -43,8 +43,8 @@ export default function PrivacyPage() {
             minimum needed to run that account and subscription, mostly handled by our providers (Clerk for
             accounts; Stripe, Apple or Google for payment) rather than stored by us directly. The one
             exception is email alerts, which need your address and your saved criteria in our own database in order
-            to send anything, and push notifications, which need your device&rsquo;s push token if you turn them on.
-            The apps collect nothing beyond that: no location, no contacts, no analytics and no advertising
+            to send anything, push notifications, which need your device&rsquo;s push token if you turn them on, and
+            feedback, which we keep when you choose to send it. The apps collect nothing beyond that: no location, no contacts, no analytics and no advertising
             identifiers, and a photo only if you choose one as your profile picture.
           </p>
         </LegalSection>
@@ -88,10 +88,21 @@ export default function PrivacyPage() {
           </p>
           <p>
             Every alert email includes a one-click unsubscribe link that switches that alert off without signing in.
-            Deleting an alert deletes its criteria and its sent-history with it. Alerts are the only thing we use
-            your email address for. We don&rsquo;t send marketing, and we don&rsquo;t share the address with
+            Deleting an alert deletes its criteria and its sent-history with it. Alerts, and replying to feedback you
+            send, are the only things we use your email address for. We don&rsquo;t send marketing, and we don&rsquo;t share the address with
             anyone beyond our email delivery provider, Resend, which transmits the message, and Stripe, if you
             subscribe on the website.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="5a. Feedback">
+          <p>
+            If you send feedback from an app or from congtrade.com/feedback, we store your message, the kind you
+            picked, the email address you gave or your account&rsquo;s address if you are signed in, your account ID
+            if you are signed in, and where it came from: the app or the website, the app and system version, and
+            the screen you sent it from. We use it to read and answer your message and to improve CongTrade, and
+            it reaches us by email through Resend. We delete it when you delete your account, and otherwise after
+            two years at the latest.
           </p>
         </LegalSection>
 
@@ -202,7 +213,8 @@ export default function PrivacyPage() {
           <p>
             Under the GDPR we need a legal ground for each use. Ours are: performing our agreement with you, which
             covers your account, your subscription and your alerts; our legitimate interest in keeping the Site
-            secure, preventing abuse and keeping it working, which covers technical logs; a legal obligation, which
+            secure, preventing abuse and keeping it working, which covers technical logs, and in reading and answering
+            the feedback you choose to send us; a legal obligation, which
             covers billing and tax records; and your consent, which we ask for separately, for push notifications
             and, if we ever use them, advertising cookies. Accepting our Terms of Service is not itself consent, and we never
             treat it as though it were.
@@ -223,6 +235,7 @@ export default function PrivacyPage() {
             <li>Your account, name and profile photo: until you delete your account or remove them.</li>
             <li>An alert and its sending history: until you delete the alert or your account.</li>
             <li>A device&rsquo;s push token: as described in section 5.</li>
+            <li>Feedback you send: until you delete your account, and at most two years.</li>
             <li>Subscription and billing records: seven years, because Dutch tax law requires it.</li>
             <li>Technical logs: only for the limited period our hosting provider keeps them, typically days.</li>
           </ul>

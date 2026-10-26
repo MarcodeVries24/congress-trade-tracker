@@ -31,3 +31,6 @@ web/tmp-*.ts
 
 # The Vercel CLI link (project id only)
 .vercel
+
+# What the Senate step saves when eFD serves an unexpected page (search.ts)
+ingest/debug/

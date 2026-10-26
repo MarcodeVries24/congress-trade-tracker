@@ -41,6 +41,16 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      # When eFD serves something other than its search form, the Senate step
+      # saves what it got (search.ts, describeUnexpectedPage) for a look.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: efd-debug
+          path: ingest/debug/
+          if-no-files-found: ignore
+          retention-days: 7
+
       # Price anything newly traded. Gap-fill only — one request per symbol
       # nothing has priced yet, usually none — so it adds seconds, not the
       # hour the monthly full refresh takes (see market-caps.yml). Without it
@@ -51,6 +61,7 @@ jobs:
       # down or rate-limiting should never turn an otherwise good ingest red,
       # and the monthly run picks up whatever this missed.
       - run: npm run sync-market-caps:missing --workspace ingest
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -60,6 +71,7 @@ jobs:
       # arrived in this run is named straight away. Only names that differ are
       # written. An enrichment like the one above: never fails the ingest.
       - run: npm run sync-company-names --workspace ingest
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -71,6 +83,7 @@ jobs:
       # ended yet, and every ticker's latest close, come from the nightly
       # run in prices.yml. An enrichment, so a failure never fails the ingest.
       - run: npm run sync-prices:new --workspace ingest
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -79,11 +92,16 @@ jobs:
       # that just arrived. Last step on purpose — both chambers are already
       # in, so a filing found this cycle goes out in this cycle.
       #
+      # This and the enrichment steps above run even when a chamber's step
+      # failed (`!cancelled()`): the job still ends red, but one chamber's
+      # site being down never holds back the other chamber's trades.
+      #
       # Safe to have here before alerts are switched on: with no
       # ALERT_FROM_EMAIL set, the job prints why and exits 0 without sending
       # (Resend's sandbox sender can only deliver to the account owner, so
       # real user mail needs a verified domain first — see README).
       - run: npm run alerts:send --workspace ingest
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

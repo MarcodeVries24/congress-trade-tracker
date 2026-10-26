@@ -64,8 +64,13 @@ function midpoint(a: Date, b: Date): Date {
  * above 100), so 100 is the real ceiling for what one query can return.
  */
 async function fetchSinglePage(page: Page, startDate: string, endDate: string): Promise<{ rows: RawRow[]; total: number }> {
-  await page.goto(SENATE_EFD.searchUrl, { waitUntil: "domcontentloaded" });
-  await page.check(`input[name="report_type"][value="${SENATE_EFD.periodicTransactionsReportType}"]`);
+  const res = await page.goto(SENATE_EFD.searchUrl, { waitUntil: "domcontentloaded" });
+  const reportType = `input[name="report_type"][value="${SENATE_EFD.periodicTransactionsReportType}"]`;
+  if (!(await page.waitForSelector(reportType, { timeout: 30000 }).catch(() => null))) {
+    await describeUnexpectedPage(page, res?.status() ?? null);
+    throw new Error("The eFD search form has no Periodic Transactions checkbox; see the page described above.");
+  }
+  await page.check(reportType);
   await page.fill('input[name="submitted_start_date"]', startDate);
   await page.fill('input[name="submitted_end_date"]', endDate);
   await page.getByRole("button", { name: "Search Reports" }).click();
@@ -110,6 +115,32 @@ async function fetchSinglePage(page: Page, startDate: string, endDate: string): 
   );
 
   return { rows, total };
+}
+
+/**
+ * Says what eFD served instead of the search form, so a failed run explains
+ * itself: a changed form, a block page or a new agreement step all look the
+ * same from the selector alone. Prints the basics to the log and saves a
+ * screenshot and the HTML to ingest/debug/, which the workflow uploads.
+ */
+async function describeUnexpectedPage(page: Page, status: number | null): Promise<void> {
+  console.error(`  eFD search page: status ${status ?? "?"}, ${page.url()}, title "${await page.title().catch(() => "")}"`);
+  const fields = await page
+    .$$eval("input, select, button", (els) =>
+      els.map((e) => `${e.tagName.toLowerCase()}[name=${e.getAttribute("name")}][type=${e.getAttribute("type")}][value=${e.getAttribute("value")}]`)
+    )
+    .catch(() => [] as string[]);
+  console.error(`  form fields (${fields.length}): ${fields.slice(0, 40).join(" ")}`);
+  const text = await page.locator("body").innerText().catch(() => "");
+  console.error(`  page text: ${text.replace(/\s+/g, " ").slice(0, 600)}`);
+  try {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir("debug", { recursive: true });
+    await writeFile("debug/efd-search.html", await page.content());
+    await page.screenshot({ path: "debug/efd-search.png", fullPage: true });
+  } catch (err) {
+    console.error(`  could not save the page: ${(err as Error).message}`);
+  }
 }
 
 /** Recursively bisects [start, end] until every leaf range's total fits in one page. */

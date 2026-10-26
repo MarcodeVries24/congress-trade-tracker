@@ -27,7 +27,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'How quickly do new trades appear?',
-    a: 'CongTrade is updated daily: we check both disclosure sites and review every new filing before it goes live, so a filing usually shows up within a day of being published. Members have up to 45 days after they are notified of a trade to report it, so the trade itself can be several weeks old by then. Each trade shows both dates.',
+    a: 'House filings are checked several times a day and every new one is reviewed before it goes live, so it usually shows up within a day of being published. The Senate\'s site does not allow automated access, so Senate filings are added by hand and can take a few days longer. Members have up to 45 days after they are notified of a trade to report it, so the trade itself can be several weeks old by then. Each trade shows both dates.',
   },
   {
     q: 'Why are amounts shown as ranges?',

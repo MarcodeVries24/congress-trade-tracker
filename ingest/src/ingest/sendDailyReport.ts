@@ -168,6 +168,16 @@ async function main() {
     [since]
   )) as { count: number; open: number }[];
 
+  // Senate filings now arrive by hand (/admin/senate), so the report says how
+  // fresh they are: the newest one in, and any upload that could not be read.
+  const [{ last: lastSenateFiling }] = (await sql.query(
+    `SELECT MAX(filing_date) AS last FROM filings WHERE chamber = 'senate'`
+  )) as { last: string | null }[];
+  const [{ count: senateFailedUploads }] = (await sql.query(
+    `SELECT COUNT(*)::int AS count FROM senate_uploads WHERE status = 'failed' AND created_at > $1`,
+    [since]
+  )) as { count: number }[];
+
   const totalNewTransactions = successful.reduce((sum, r) => sum + r.transaction_count, 0);
   const houseCount = rows.filter((r) => r.chamber === "house").length;
   const senateCount = rows.filter((r) => r.chamber === "senate").length;
@@ -264,6 +274,12 @@ async function main() {
 
       ${reviewSectionHtml(backlog, needsReviewToday, reportDate, MAX_ROWS)}
 
+      <h3 style="margin-bottom:4px;margin-top:24px;">Senate</h3>
+      <p style="color:#666;font-size:13px;margin-top:0;">Newest Senate filing in CongTrade: ${lastSenateFiling ?? "none"}.${
+        senateFailedUploads ? ` <strong style="color:#a12b2b;">${senateFailedUploads} upload(s) could not be read.</strong>` : ""
+      } New ones are imported by hand:
+        <a href="${SITE_URL}/admin/senate" style="color:#0070f3;">Senate import</a></p>
+
       <h3 style="margin-bottom:4px;margin-top:24px;">Feedback (${feedbackNew} new)</h3>
       <p style="color:#666;font-size:13px;margin-top:0;">${feedbackOpen} not yet done.
         <a href="${SITE_URL}/admin/feedback" style="color:#0070f3;">Open feedback</a></p>
@@ -298,6 +314,7 @@ ${reviewTextLines(backlog, MAX_ROWS)}
 
 Publish a reviewed filing with:  npm run review:approve -- <docId>
 
+Senate: newest filing ${lastSenateFiling ?? "none"}${senateFailedUploads ? `, ${senateFailedUploads} upload(s) could not be read` : ""} — import new ones at ${SITE_URL}/admin/senate
 Feedback: ${feedbackNew} new, ${feedbackOpen} not yet done — ${SITE_URL}/admin/feedback
 ${entitlementErrors > 0 ? `\nWARNING: subscription checks failed for ${entitlementErrors} account(s) in the last 2 days — alerts kept sending. See user_entitlements.last_error.\n` : ""}`;
 

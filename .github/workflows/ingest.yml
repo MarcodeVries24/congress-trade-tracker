@@ -20,12 +20,10 @@ jobs:
 
       - run: npm ci
 
-      # efdsearch.senate.gov (Akamai) blocks Playwright's bundled Chromium
-      # outright but not a real Chrome build — see ingest/src/ingest/senate/
-      # browser.ts. `playwright install chrome` is Playwright's own
-      # provisioning path for the "chrome" channel (as opposed to
-      # `install chromium`, the bundled build) — needed so
-      # chromium.launch({ channel: "chrome" }) has something to find.
+      # Chrome reads the Senate report pages uploaded in /admin/senate
+      # (import-senate-uploads below), offline. `playwright install chrome`
+      # provisions the "chrome" channel that chromium.launch({ channel:
+      # "chrome" }) looks for.
       - run: npx playwright install --with-deps chrome
         working-directory: ingest
 
@@ -37,19 +35,16 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - run: npm run ingest-senate --workspace ingest
+      # Senate reports saved by hand and uploaded in /admin/senate. Since
+      # 23 Oct 2026 efdsearch.senate.gov's bot protection turns the automated
+      # search (ingest-senate, runSenate.ts) away, and getting past a bot
+      # check is not something this project does, so a person opens the new
+      # reports and this reads the saved pages, never contacting eFD. The
+      # automated search stays in the repo for if the Senate grants access.
+      - run: npm run import-senate-uploads --workspace ingest
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      # When eFD serves something other than its search form, the Senate step
-      # saves what it got (search.ts, describeUnexpectedPage) for a look.
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: efd-debug
-          path: ingest/debug/
-          if-no-files-found: ignore
-          retention-days: 7
 
       # Price anything newly traded. Gap-fill only — one request per symbol
       # nothing has priced yet, usually none — so it adds seconds, not the

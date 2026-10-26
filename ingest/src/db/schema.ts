@@ -512,4 +512,25 @@ export const SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id)`,
+  // Senate report pages saved from eFD by the admin and uploaded in
+  // /admin/senate. Since 23 Oct 2026 eFD's bot protection turns away the
+  // automated search, so a person opens the reports and the ingest reads
+  // the saved pages instead (importSenateUploads.ts), without contacting
+  // eFD. The page's HTML is kept until it has been read, then for 90 days.
+  `CREATE TABLE IF NOT EXISTS senate_uploads (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    uploaded_by TEXT NOT NULL,
+    file_name TEXT,
+    -- The report's eFD address: found in the file, or typed in /admin.
+    report_url TEXT NOT NULL,
+    html TEXT NOT NULL,
+    -- 'pending' | 'done' | 'failed'
+    status TEXT NOT NULL DEFAULT 'pending',
+    -- What reading it found, or why it could not.
+    note TEXT,
+    doc_id TEXT,
+    processed_at TIMESTAMPTZ
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_senate_uploads_pending ON senate_uploads(created_at) WHERE status = 'pending'`,
 ];

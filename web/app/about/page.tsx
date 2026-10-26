@@ -17,7 +17,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How often is the data updated?",
-    a: 'CongTrade is updated daily. We check the House Clerk\'s and Senate\'s disclosure systems for newly filed PTRs, and every new filing is reviewed before it is published. The "Last updated" date shown across the site is when we last checked them, which happens several times a day.',
+    a: 'CongTrade is updated daily. We check the House Clerk\'s disclosure system for newly filed PTRs several times a day; the "Last updated" date shown across the site is when we last checked it. The Senate\'s system does not allow automated access, so Senate filings are added by hand and can take a few days longer. Every new filing is reviewed before it is published.',
   },
   {
     q: "Is CongTrade an official government site?",

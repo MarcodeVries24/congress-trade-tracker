@@ -176,6 +176,9 @@ export default async function AdminPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/admin/senate" className="text-sm font-medium text-accent hover:underline">
+              Senate import
+            </Link>
             {newFeedback !== null ? (
               <Link href="/admin/feedback" className="text-sm font-medium text-accent hover:underline">
                 Feedback{newFeedback ? ` (${newFeedback} new)` : ""}

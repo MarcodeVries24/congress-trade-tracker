@@ -20,13 +20,6 @@ jobs:
 
       - run: npm ci
 
-      # Chrome reads the Senate report pages uploaded in /admin/senate
-      # (import-senate-uploads below), offline. `playwright install chrome`
-      # provisions the "chrome" channel that chromium.launch({ channel:
-      # "chrome" }) looks for.
-      - run: npx playwright install --with-deps chrome
-        working-directory: ingest
-
       - run: npm run sync-members --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -41,6 +34,21 @@ jobs:
       # check is not something this project does, so a person opens the new
       # reports and this reads the saved pages, never contacting eFD. The
       # automated search stays in the repo for if the Senate grants access.
+      # Chrome reads the Senate report pages uploaded in /admin/senate
+      # (import-senate-uploads below), offline. `playwright install chrome`
+      # provisions the "chrome" channel that chromium.launch({ channel:
+      # "chrome" }) looks for.
+      #
+      # Installed here, after the House ingest, not at the top: it pulls
+      # system packages from Ubuntu's mirrors, and when those are unreachable
+      # (as on 11 Nov 2026) it used to skip the members sync and the House
+      # ingest along with it. Now a mirror outage costs only the Senate
+      # import, and the timeout stops it waiting ten minutes on DNS.
+      - run: npx playwright install --with-deps chrome
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        working-directory: ingest
+
       - run: npm run import-senate-uploads --workspace ingest
         if: ${{ !cancelled() }}
         env:

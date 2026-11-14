@@ -24,6 +24,9 @@ export const BEST_TRADES_METADATA: Metadata = {
 
 const MARGIN_DAYS = 30;
 
+/** Trades ranked 2nd and on that sit beside the members list, under the featured one. */
+const NEXT_BEST = 9;
+
 function offset(day: string, days: number): string {
   return new Date(new Date(`${day}T00:00:00Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 }
@@ -35,6 +38,10 @@ function windowLabel(days: number): string {
 export async function BestTradesView({ days }: { days: TimingWindow }) {
   const overview = await getTimingOverviewCached(days, { trades: 25, leaders: 15 });
   const [top, ...rest] = overview.trades;
+  // The runners-up sit under the featured trade, beside the members list, so
+  // that column is not left half empty; the ranking carries on below both.
+  const nextBest = rest.slice(0, NEXT_BEST);
+  const more = rest.slice(NEXT_BEST);
   // From a month before the trade to the latest close: the whole run since.
   const series =
     top?.ticker && top.transaction_date
@@ -75,8 +82,14 @@ export async function BestTradesView({ days }: { days: TimingWindow }) {
 
         {top ? (
           <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-5">
-            <div className="lg:col-span-3">
+            <div className="flex flex-col gap-5 lg:col-span-3">
               <FeaturedTimedTrade trade={top} points={series} />
+              {nextBest.length ? (
+                <section className="overflow-hidden rounded-xl border border-line bg-panel">
+                  <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-ink">Next best</h2>
+                  <TimedTradeList trades={nextBest} start={2} />
+                </section>
+              ) : null}
             </div>
             <section className="overflow-hidden rounded-xl border border-line bg-panel lg:col-span-2">
               <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-ink">
@@ -95,12 +108,12 @@ export async function BestTradesView({ days }: { days: TimingWindow }) {
           </p>
         )}
 
-        {rest.length ? (
+        {more.length ? (
           <section className="mt-6 overflow-hidden rounded-xl border border-line bg-panel">
             <h2 className="border-b border-line px-4 py-3 text-sm font-semibold text-ink">
-              Best trades, disclosed in the {windowLabel(days)}
+              More of the best trades, disclosed in the {windowLabel(days)}
             </h2>
-            <TimedTradeList trades={rest} start={2} />
+            <TimedTradeList trades={more} start={2 + NEXT_BEST} />
           </section>
         ) : null}
 

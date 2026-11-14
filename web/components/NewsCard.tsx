@@ -9,10 +9,9 @@ import type { FeedItem } from "@/lib/feeds";
  * which is the whole job. Swapping in real marks later is a component change,
  * not a rewrite.
  *
- * Where a feed offers a picture it is loaded from the publisher's own server
- * and the card links back to them, which is what a media element in a public
- * feed is published for. Where it doesn't, the card falls back to type on a
- * tint rather than leaving a grey hole.
+ * The picture is an Unsplash photo of the topic (lib/newsImages.ts), loaded
+ * from Unsplash's CDN, not the publisher's own picture. Without one the card
+ * falls back to type on a tint rather than leaving a grey hole.
  */
 export function NewsCard({ item, accent = "accent" }: { item: FeedItem; accent?: "accent" | "amber" }) {
   const stripe = accent === "amber" ? "text-amber-500" : "text-accent";
@@ -26,9 +25,8 @@ export function NewsCard({ item, accent = "accent" }: { item: FeedItem; accent?:
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-panel-muted">
         {item.image ? (
-          // eslint-disable-next-line @next/next/no-img-element -- hotlinked
-          // from the publisher rather than pulled through our own optimizer,
-          // which would mean re-hosting their picture on our domain.
+          // eslint-disable-next-line @next/next/no-img-element -- Unsplash's
+          // CDN sizes it already; the optimizer would only re-host it.
           <img
             src={item.image}
             alt=""

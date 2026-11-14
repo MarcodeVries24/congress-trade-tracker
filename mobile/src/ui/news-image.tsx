@@ -6,9 +6,9 @@ import { useTheme } from '@/theme';
 import { Text } from '@/ui/text';
 
 /**
- * A publisher's picture, or its name on a tint when there is none or it will
- * not load, so a card is never a grey hole. (CNBC's image server turns away
- * some clients by user agent; a phone's own is not one of them.)
+ * The card's picture (an Unsplash photo of the topic, chosen by the website's
+ * news API), or the publisher's name on a tint when there is none or it will
+ * not load, so a card is never a grey hole.
  */
 export function NewsImage({
   uri,

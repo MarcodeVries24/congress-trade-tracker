@@ -1,5 +1,5 @@
 import { fetchFeed, type FeedItem } from "./feeds";
-import { articleImage } from "./articleImage";
+import { pictureHeadlines } from "./newsImages";
 
 /**
  * The commercial feeds, kept apart from the agency releases on purpose.
@@ -57,23 +57,6 @@ export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
     };
   }).filter((section) => section.items.length > 0);
 
-  await Promise.all(sections.map((section) => illustrate(section.items)));
+  for (const section of sections) pictureHeadlines(section.items);
   return sections;
-}
-
-/**
- * Fills in the pictures a feed didn't carry, from each article's own og:image.
- *
- * CNBC publishes none in any of its feeds, so every card would otherwise fall
- * back to type, which reads as a page that half-loaded. Anything already
- * carrying one is skipped. Fetched in parallel and individually optional: an
- * article that won't answer in four seconds keeps the typographic card.
- */
-async function illustrate(items: FeedItem[]): Promise<void> {
-  const missing = items.filter((item) => !item.image);
-  if (missing.length === 0) return;
-  const found = await Promise.all(missing.map((item) => articleImage(item.url)));
-  missing.forEach((item, i) => {
-    item.image = found[i];
-  });
 }

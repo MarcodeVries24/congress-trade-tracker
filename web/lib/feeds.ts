@@ -20,12 +20,10 @@ export type FeedItem = {
   /** ISO string, or null when the feed omits or mangles the date. */
   publishedAt: string | null;
   /**
-   * The illustration the feed itself offers, where it offers one.
-   *
-   * None of the feeds currently read carry one, so in practice this is filled
-   * in from the article's own og:image (see lib/articleImage.ts). Either way
-   * the picture is served from the publisher's own domain and shown beside a
-   * headline that links back to them. Not copied, not re-hosted.
+   * The picture shown with the headline. For the news cards this is an
+   * Unsplash photo chosen by topic (lib/newsImages.ts), never the
+   * publisher's own picture, which is licensed to them, not to us. What the
+   * feed itself offers is read here but replaced there.
    */
   image: string | null;
 };

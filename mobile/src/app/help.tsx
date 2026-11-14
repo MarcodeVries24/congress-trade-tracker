@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { LayoutAnimation, Platform, ScrollView, StyleSheet, UIManager, View } from 'react-native';
 
 import { haptic } from '@/lib/haptics';
-import { LINKS, SUPPORT_EMAIL, emailSupport, openPage } from '@/lib/links';
+import { LINKS, OFFICIAL_SOURCES, SUPPORT_EMAIL, emailSupport, openPage } from '@/lib/links';
 import { radius, useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { Cong } from '@/ui/cong';
@@ -95,6 +95,27 @@ export default function HelpScreen() {
         })}
       </View>
 
+      <View style={[styles.card, styles.sources, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Text variant="subhead">Official sources</Text>
+        <Text variant="callout" tone="muted">
+          Every trade comes from these public U.S. government sites, and each one links to its filing there. CongTrade
+          is independent and does not represent any government body.
+        </Text>
+        {OFFICIAL_SOURCES.map((source) => (
+          <Tap key={source.url} onPress={() => openPage(source.url)} style={styles.source}>
+            <Icon name="open-outline" size={18} color={c.accent} />
+            <View style={styles.flex}>
+              <Text variant="callout" style={styles.sourceLabel}>
+                {source.label}
+              </Text>
+              <Text variant="caption" tone="accent">
+                {source.url.replace('https://', '')}
+              </Text>
+            </View>
+          </Tap>
+        ))}
+      </View>
+
       <View style={[styles.contact, { backgroundColor: c.surface, borderColor: c.border }]}>
         <Cong mood="support" width={84} />
         <Text variant="subhead">Still stuck?</Text>
@@ -134,6 +155,9 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 18, paddingBottom: 48 },
   card: { borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  sources: { padding: 18, gap: 10 },
+  source: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 4 },
+  sourceLabel: { fontWeight: '600' },
   item: { paddingHorizontal: 18, paddingVertical: 16, gap: 10 },
   question: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   flex: { flex: 1 },

@@ -51,6 +51,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * A database write, tried again after a pause when the connection drops: a
+ * full run makes thousands of them, and one dropped connection once stopped
+ * a run halfway.
+ */
+async function withRetry<T>(write: () => Promise<T>, attempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await write();
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      await sleep(3000 * attempt);
+    }
+  }
+}
+
 let lastCallAt = 0;
 /** One SEC request, throttled; null for a 404 (the company has no such figure). */
 async function secGet<T>(url: string): Promise<T | null> {
@@ -365,13 +381,21 @@ async function refreshMarketCaps(
       // Logos are not stored: the clients load them from Brandfetch by ticker
       // (@congtrade/shared/brandLogo). logo_checked_at marks the ticker as
       // looked up.
-      await sql.query(
-        `INSERT INTO company_market_caps (ticker, market_cap, source_currency, logo_url, logo_checked_at, updated_at)
-         VALUES ($1, $2, $3, NULL, NOW(), NOW())
-         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, source_currency = EXCLUDED.source_currency,
-           logo_url = NULL, logo_checked_at = NOW(), updated_at = NOW()`,
-        [ticker, cap, cap === null ? null : "USD"]
-      );
+      try {
+        await withRetry(() =>
+          sql.query(
+            `INSERT INTO company_market_caps (ticker, market_cap, source_currency, logo_url, logo_checked_at, updated_at)
+             VALUES ($1, $2, $3, NULL, NOW(), NOW())
+             ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, source_currency = EXCLUDED.source_currency,
+               logo_url = NULL, logo_checked_at = NOW(), updated_at = NOW()`,
+            [ticker, cap, cap === null ? null : "USD"]
+          )
+        );
+      } catch (err) {
+        // Left as it was, to be written next run, rather than stopping a
+        // run that is otherwise half done.
+        console.error(`  ${ticker}: not saved (${(err as Error).message})`);
+      }
     }
     if ((i + 1) % 250 === 0) console.log(`  ...${i + 1}/${rows.length}`);
   }

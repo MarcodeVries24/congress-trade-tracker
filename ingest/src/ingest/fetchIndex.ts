@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import AdmZip from "adm-zip";
 import { HOUSE_CLERK, PATHS } from "../config.js";
+import { realDate } from "./realDate.js";
 
 export interface FilingIndexRow {
   docId: string;
@@ -23,7 +24,7 @@ function toIsoDate(mmddyyyy: string): string | null {
   const m = mmddyyyy.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
   const [, mm, dd, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 export async function fetchYearIndex(

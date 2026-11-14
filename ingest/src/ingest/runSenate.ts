@@ -7,6 +7,7 @@ import { getPaperFilingImageUrls, ocrPaperFiling } from "./senate/ocrPaperReport
 import { SENATE_EFD } from "../config.js";
 import { senateMemberKey } from "./normalizeLastName.js";
 import { recordUnreadSenateFiling, saveSenateFiling } from "./senate/saveFiling.js";
+import { realDate } from "./realDate.js";
 
 const args = process.argv.slice(2);
 const limitArg = args.find((a) => a.startsWith("--limit="))?.split("=")[1];
@@ -33,7 +34,7 @@ function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
   const [, mm, dd, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 async function main() {

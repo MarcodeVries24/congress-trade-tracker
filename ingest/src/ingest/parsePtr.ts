@@ -1,3 +1,4 @@
+import { realDate } from "./realDate.js";
 export interface ParsedTransaction {
   assetName: string;
   ticker: string | null;
@@ -154,7 +155,7 @@ function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
   const [, mm, dd, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 // STOCK Act disclosure brackets, in the exact strings the site's own filter

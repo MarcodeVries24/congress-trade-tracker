@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { realDate } from "../realDate.js";
 
 export interface SenateTransaction {
   transactionDate: string | null; // ISO
@@ -31,7 +32,7 @@ function toIsoDateSlash(s: string): string | null {
   const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
   const [, mm, dd, yyyy] = m;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 function parseAmountRange(range: string): { low: number | null; high: number | null } {

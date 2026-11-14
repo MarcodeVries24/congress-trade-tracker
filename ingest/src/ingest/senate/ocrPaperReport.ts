@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { createWorker, PSM, type Worker } from "tesseract.js";
 import type { Page } from "playwright";
 import type { SenateTransaction } from "./parseReport.js";
+import { realDate } from "../realDate.js";
 
 /**
  * Extracts transaction data from a paper/scanned Senate PTR filing via OCR.
@@ -148,7 +149,7 @@ function toIsoDateSlash(s: string): string | null {
   if (!m) return null;
   const [, mm, dd, yyRaw] = m;
   const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 async function extractWords(worker: Worker, imageBuffer: Buffer): Promise<OcrWord[]> {

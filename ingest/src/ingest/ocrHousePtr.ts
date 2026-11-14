@@ -2,6 +2,7 @@ import { pdf } from "pdf-to-img";
 import sharp from "sharp";
 import { createWorker, PSM, type Worker } from "tesseract.js";
 import type { ParsedTransaction } from "./parsePtr.js";
+import { realDate } from "./realDate.js";
 
 /**
  * Extracts transaction data from a scanned/paper-filed House PTR via OCR.
@@ -447,7 +448,7 @@ function toIsoDateSlash(s: string): string | null {
   // that are actually unambiguous.
   if (yyRaw.length !== 2 && yyRaw.length !== 4) return null;
   const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  return realDate(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`);
 }
 
 type CellValidator = (raw: string) => string | null; // returns normalized value, or null if invalid

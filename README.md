@@ -60,15 +60,17 @@ Both chambers share the rest of the pipeline:
    `congress.gov`'s own CDN.
 7. Also separately, [`syncMarketCaps.ts`](ingest/src/ingest/syncMarketCaps.ts)
    enriches trades with the *current* market cap of the company traded (not
-   a historical value as of the trade date — a free-tier API has no
-   practical way to provide that), via [Finnhub](https://finnhub.io), on a
-   monthly schedule (market cap doesn't move meaningfully day to day the
-   way filings do). Most House OCR rows have an asset name but no ticker, so
-   a one-time-per-name search step resolves a ticker from the name first —
-   accepting only an exact company-name match, since a fuzzy guess here
-   would silently attach the wrong company's market cap to a trade. A trade
-   whose ticker (direct or resolved) isn't found, or isn't a public company
-   Finnhub has a cap for, shows as `Undefined` rather than guessed at.
+   a historical value as of the trade date): shares outstanding as last
+   reported to the [SEC](https://www.sec.gov/search-filings/edgar-application-programming-interfaces)
+   times the latest close, on a monthly schedule and for new tickers after
+   each ingest. Most House OCR rows have an asset name but no ticker, so a
+   one-time-per-name step resolves a ticker from the SEC's list of
+   registrants first, accepting only an exact company-name match, since a
+   fuzzy guess here would silently attach the wrong company's market cap to
+   a trade. A fund, a company the SEC does not list (foreign shares traded
+   over the counter), a foreign filer whose ADR price does not match its
+   share count, or one with no recent share count shows as `Undefined`
+   rather than guessed at.
 8. Once a day, [`sendDailyReport.ts`](ingest/src/ingest/sendDailyReport.ts)
    emails a rollup (via [Resend](https://resend.com)) of everything the
    pipeline touched in the preceding 24 hours — filings split into
@@ -169,18 +171,13 @@ web/      Next.js site — search/filter UI + API routes (app/api/*)
    Chromium gets blocked), so the workflow provisions one first via
    `npx playwright install --with-deps chrome`.
 
-### 3. Market cap enrichment — Finnhub (free, optional)
+### 3. Market cap enrichment — SEC (free, no key)
 
-1. Sign up at [finnhub.io/register](https://finnhub.io/register) (no card)
-   and copy your API key from the dashboard.
-2. Add a GitHub Actions secret named `FINNHUB_API_KEY` with that key.
-3. [.github/workflows/market-caps.yml](.github/workflows/market-caps.yml)
-   runs `npm run sync-market-caps` monthly. The first run is slow (Finnhub's
-   free tier is rate-limited to 60 calls/minute, and it has to resolve every
-   existing tickerless asset name once — see how it works, above); later
-   runs only resolve names new since the last run, so they're much quicker.
-   Skip this step entirely and the site still works fine — every trade's
-   market cap just shows as `Undefined`.
+[.github/workflows/market-caps.yml](.github/workflows/market-caps.yml) runs
+`npm run sync-market-caps` monthly, from the SEC's public data and the
+closes in `price_latest`; no account or key is needed.
+`npm run sync-market-caps:dry-run --workspace ingest` works everything out
+without writing and compares it with the caps stored.
 
 ### 4. Daily ingest report — Resend (free, optional)
 
@@ -288,7 +285,7 @@ npm install
 
 Create `web/.env.local` (see `web/.env.local.example`) with your `DATABASE_URL`.
 For `sync-market-caps` and `send-daily-report`, also create `ingest/.env`
-with `DATABASE_URL` plus `FINNHUB_API_KEY` and/or `RESEND_API_KEY` +
+with `DATABASE_URL` plus `RESEND_API_KEY` +
 `REPORT_EMAIL` as needed. `alerts:send --dry-run` needs only `DATABASE_URL`.
 
 ```bash
@@ -296,7 +293,7 @@ npm run dev                 # Next.js site + API at http://localhost:3000
 npm run ingest               # run the House PTR ingestion CLI once
 npm run ingest-senate        # run the Senate PTR ingestion CLI once (needs Chrome installed)
 npm run sync-members         # refresh member photos/party (House + Senate, cheap)
-npm run sync-market-caps     # refresh company market caps (needs FINNHUB_API_KEY)
+npm run sync-market-caps     # refresh company market caps from the SEC
 npm run send-daily-report    # send the daily ingest report now (needs RESEND_API_KEY, REPORT_EMAIL)
 npm run alerts:send          # send due Pro alerts now (needs RESEND_API_KEY, ALERT_FROM_EMAIL)
 npm run alerts:send -- --dry-run      # print what would go out, send nothing

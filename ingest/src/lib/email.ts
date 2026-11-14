@@ -2,7 +2,7 @@
 // the daily ingest report) since the plan is to reuse this same primitive
 // for end-user-facing notifications later. Raw fetch rather than Resend's
 // SDK, consistent with how every other external API in this project
-// (Finnhub, the House Clerk, Senate eFD) is called — one fewer dependency.
+// (the SEC, the House Clerk, Yahoo's charts) is called — one fewer dependency.
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_API_URL = "https://api.resend.com/emails";

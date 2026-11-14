@@ -25,19 +25,6 @@ export const SENATE_EFD = {
   periodicTransactionsReportType: "11",
 };
 
-export const FINNHUB = {
-  profileUrl: (ticker: string) => `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(ticker)}`,
-  searchUrl: (query: string) => `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}`,
-};
-
-// Finnhub reports a market cap in the *listing's own* currency, so a foreign
-// listing needs converting before it can sit in the same column as a US one
-// (see syncMarketCaps.ts). Finnhub's own /forex/rates is paid-tier, and the
-// ECB feed everyone reaches for first doesn't publish TWD — which the corpus
-// needs, for TSMC. This one is free, needs no key, and carries 160+
-// currencies including TWD, KRW and IDR.
-export const FX_RATES_URL = "https://open.er-api.com/v6/latest/USD";
-
 /**
  * The SEC's list of every ticker it has a registrant for, with the company's
  * name as registered: public data, free to use, and where company names come
@@ -46,6 +33,17 @@ export const FX_RATES_URL = "https://open.er-api.com/v6/latest/USD";
 export const SEC_COMPANY_TICKERS = {
   url: "https://www.sec.gov/files/company_tickers.json",
   userAgent: "CongTrade contact@congtrade.com",
+};
+
+/**
+ * The SEC's lists and XBRL data for market caps (syncMarketCaps.ts): the
+ * fund and ETF tickers, and one reported figure (a "concept") for one
+ * company. Public data; the SEC asks for under 10 requests a second.
+ */
+export const SEC_DATA = {
+  fundTickersUrl: "https://www.sec.gov/files/company_tickers_mf.json",
+  conceptUrl: (cik: string, concept: string) =>
+    `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik.padStart(10, "0")}/${concept}.json`,
 };
 
 export const MEMBERS_REFERENCE = {

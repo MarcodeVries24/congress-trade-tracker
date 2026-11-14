@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { brandLogoUrl } from "@congtrade/shared/brandLogo";
 
 // Deep, saturated tones that all carry white text, chosen from the ticker by a
 // hash so a company always wears the same colour. The app's TickerLogo uses
@@ -34,21 +34,19 @@ function monogram(ticker: string): string {
 }
 
 /**
- * A company's logo, by ticker: a redirect to the logo Finnhub has on file for
- * it, or a lettered tile in the company's colour when there is none.
+ * A company's logo, by ticker: a redirect to Brandfetch's (see
+ * @congtrade/shared/brandLogo), or a lettered tile in the company's colour
+ * for something that is not a ticker. Brandfetch answers 404 for a ticker it
+ * has no logo for, and the image then fails like any other, so the clients
+ * draw their tile.
  *
- * The fallback for a row that did not bring its logo's address along (most
- * lists now do, see LOGO_SQL, and load the provider's image directly). The
- * redirect is cached at the edge for a day and in the browser for a week; a
- * logo almost never changes, and a new one arrives with the monthly
- * market-cap sync.
+ * Only for app versions from before logos were addressed directly: rows
+ * carry Brandfetch's address (LOGO_SQL), and the website and the app build
+ * it from the ticker otherwise. Cached for a day at the edge and a week in
+ * the browser.
  *
  * `?fallback=none` answers 404 instead of a tile, for a client (the app) that
  * draws its own.
- *
- * A ticker nobody has looked up a logo for yet (new to the table, or still in
- * the queue) gets its tile cached for an hour instead, so the real logo shows
- * up soon after the sync finds it rather than a day later.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
@@ -56,20 +54,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tick
   const cache = {
     "cache-control": "public, max-age=604800, s-maxage=86400, stale-while-revalidate=604800",
   };
-  let checked = false;
-
-  if (/^[A-Z0-9.\-]{1,12}$/.test(symbol)) {
-    const rows = (await sql.query(
-      `SELECT logo_url, logo_checked_at IS NOT NULL AS checked FROM company_market_caps WHERE ticker = $1`,
-      [symbol]
-    )) as { logo_url: string | null; checked: boolean }[];
-    const logo = rows[0]?.logo_url;
-    if (logo && /^https:\/\//.test(logo)) {
-      return NextResponse.redirect(logo, { status: 302, headers: cache });
-    }
-    checked = rows[0]?.checked ?? false;
-  }
-  if (!checked) cache["cache-control"] = "public, max-age=3600, s-maxage=3600";
+  const logo = brandLogoUrl(symbol);
+  if (logo) return NextResponse.redirect(logo, { status: 302, headers: cache });
 
   if (req.nextUrl.searchParams.get("fallback") === "none") {
     return new NextResponse(null, { status: 404, headers: cache });

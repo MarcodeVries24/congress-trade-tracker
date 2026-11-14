@@ -236,8 +236,8 @@ export interface MarketCapTier {
 // Standard industry tiers — there's no legally-defined bucketing for market
 // cap the way STOCK Act amount ranges are. "undefined" isn't a cap range at
 // all — it's every trade whose company_market_caps lookup came up empty
-// (no ticker, ticker not a public company Finnhub covers, or not yet
-// refreshed) — see syncMarketCaps.ts.
+// (no ticker, a fund, a company the SEC does not list or a foreign filer,
+// or not yet refreshed) — see syncMarketCaps.ts.
 export const MARKET_CAP_TIERS: MarketCapTier[] = [
   { value: "mega", label: "Mega Cap (≥$200B)", min: 200_000_000_000, max: null },
   { value: "large", label: "Large Cap ($10B–$200B)", min: 10_000_000_000, max: 200_000_000_000 },

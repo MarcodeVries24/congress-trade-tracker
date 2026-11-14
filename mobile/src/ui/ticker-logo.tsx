@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { API_BASE } from '@/lib/api';
+import { brandLogoUrl } from '@congtrade/shared/brandLogo';
 import { useTheme } from '@/theme';
 import { Text } from '@/ui/text';
 
@@ -35,10 +35,10 @@ const missing = new Set<string>();
 const TICKER = /^[A-Z0-9.-]{1,12}$/;
 
 /**
- * A company's logo over a lettered tile in the company's colour: straight
- * from the provider when the row brought its address (`logo`), only the tile
- * when the row says there is none (''), and otherwise from the website's
- * /api/logo, which redirects to the one on file.
+ * A company's logo over a lettered tile in the company's colour, from
+ * Brandfetch: the address the row brought (`logo`) or, without one, the one
+ * built from the ticker; only the tile when the row says there is none ('').
+ * A ticker Brandfetch has no logo for fails to load, and keeps the tile.
  *
  * The tile is drawn first and the logo fades in on top once it has loaded, so
  * a slow network shows the tile rather than a blank, and a ticker with no
@@ -99,7 +99,7 @@ function Mark({ ticker, logo, size }: { ticker: string | null; logo?: string | n
       ) : null}
       {showLogo ? (
         <Image
-          source={{ uri: logo || `${API_BASE}/api/logo/${encodeURIComponent(symbol)}?fallback=none` }}
+          source={{ uri: logo || brandLogoUrl(symbol) || undefined }}
           style={[StyleSheet.absoluteFill, { opacity: loaded ? 1 : 0 }]}
           contentFit="contain"
           cachePolicy="memory-disk"

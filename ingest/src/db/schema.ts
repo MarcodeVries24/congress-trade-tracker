@@ -161,27 +161,20 @@ export const SCHEMA_STATEMENTS = [
     failed INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT ingest_runs_singleton CHECK (id)
   )`,
-  // One row per ticker actually traded, refreshed weekly by syncMarketCaps.ts
-  // — the *current* market cap, not a historical value as of the trade date
-  // (a free-tier API has no practical way to get that, and it's not what
-  // "enrich with the current market cap" asked for anyway). A ticker that
-  // exists here but has a NULL market_cap was looked up but the provider
-  // didn't have a cap for it (e.g. a fund/ETF, not a company) — still
-  // recorded so the weekly refresh doesn't keep re-querying a known miss.
+  // One row per ticker actually traded, refreshed monthly by syncMarketCaps.ts
+  // — the *current* market cap, not a historical value as of the trade date.
+  // Shares outstanding from the SEC times the latest close. A NULL
+  // market_cap was looked up and could not be
+  // worked out: a fund, a company the SEC does not list, a foreign filer, or
+  // one with no recent share count. See syncMarketCaps.ts.
   `CREATE TABLE IF NOT EXISTS company_market_caps (
     ticker TEXT PRIMARY KEY,
     market_cap BIGINT,
     company_name TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
-  // market_cap is always USD. Finnhub reports it in the listing's own
-  // currency, which went unnoticed until /issuers sorted by it and put SK
-  // Hynix above Nvidia: 55 of 2,068 priced tickers — Japanese, Korean,
-  // Taiwanese, Indonesian and Indian listings — held a number in KRW, JPY,
-  // TWD, IDR or INR. This records which currency the figure was converted
-  // *from*, so the same mistake is visible in the data rather than only in
-  // an implausible ranking. NULL for a row written before the conversion
-  // existed, or one whose provider gave no currency.
+  // market_cap is always USD. This records the currency the figure was
+  // worked out in: "USD" for every cap, NULL where there is none.
   `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS source_currency TEXT`,
   // Most House OCR rows (paper filings — see ocrHousePtr.ts) have an asset
   // name but no ticker, so they'd never match company_market_caps directly.
@@ -410,14 +403,13 @@ export const SCHEMA_STATEMENTS = [
     PRIMARY KEY (provider, id)
   )`,
   // ---------------------------------------------------------------------
-  // Company logos. Finnhub's profile already carries one, and the monthly
-  // market-cap sync was fetching that profile and throwing the logo away.
-  // NULL means none on file (most funds and many foreign listings), which
-  // the site and the app turn into a lettered tile rather than a gap.
+  // Company logos: no longer stored. The site and the app load them from
+  // Brandfetch by ticker (@congtrade/shared/brandLogo), so this stays NULL.
   // ---------------------------------------------------------------------
   `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS logo_url TEXT`,
-  // When the profile was last read for a logo, found or not, so a ticker with
-  // none on file is not asked about again on every gap-fill run.
+  // When the ticker was last looked up by the market-cap sync, found or not,
+  // so it is not asked about again on every gap-fill run (and the site knows
+  // to draw the tile rather than ask for a logo).
   `ALTER TABLE company_market_caps ADD COLUMN IF NOT EXISTS logo_checked_at TIMESTAMPTZ`,
   // ---------------------------------------------------------------------
   // What a stock did around a trade: the close on the day it was traded,

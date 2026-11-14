@@ -1,3 +1,4 @@
+import { BRANDFETCH_CLIENT_ID } from "@congtrade/shared/brandLogo";
 /**
  * SQL fragments shared by every query that reads the trade corpus.
  *
@@ -60,10 +61,12 @@ export const PLAUSIBLE_DATES_SQL = `((NULLIF(f.filing_date, '')::date - NULLIF(t
 export const VOLUME_MIDPOINT_SQL = `SUM((COALESCE(t.amount_low, 0) + COALESCE(t.amount_high, t.amount_low, 0)) / 2.0)`;
 
 /**
- * A company's logo for the browser to load straight from the provider, so a
- * list of trades does not send one request per logo through this site:
- * the logo's address, '' when it has been looked up and there is none (the
- * lettered tile is drawn without asking), or NULL when it has not been looked
- * up yet (the browser falls back to /api/logo). Needs `cmc` joined.
+ * A company's logo for the browser or the app to load straight from
+ * Brandfetch, so a list of trades does not send one request per logo through
+ * this site: the same address brandLogoUrl (@congtrade/shared/brandLogo)
+ * builds, written in SQL so rows carry it. NULL for a ticker with no
+ * company_market_caps row yet, and the client builds it then. A ticker
+ * Brandfetch has no logo for fails to load, and the client draws its tile.
+ * Needs `cmc` joined.
  */
-export const LOGO_SQL = `CASE WHEN cmc.logo_url ~ '^https://' THEN cmc.logo_url WHEN cmc.logo_checked_at IS NOT NULL THEN '' END`;
+export const LOGO_SQL = `CASE WHEN cmc.ticker ~ '^[A-Za-z0-9.-]{1,12}$' THEN 'https://cdn.brandfetch.io/ticker/' || replace(upper(cmc.ticker), '.', '-') || '/w/128/h/128/fallback/404/icon.png?c=${BRANDFETCH_CLIENT_ID}' END`;

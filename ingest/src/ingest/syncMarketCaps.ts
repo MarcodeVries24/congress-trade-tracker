@@ -1,63 +1,146 @@
 import "../loadEnv.js";
 import { sql, ensureSchema } from "../db/index.js";
-import { FINNHUB, FX_RATES_URL } from "../config.js";
+import { SEC_COMPANY_TICKERS, SEC_DATA } from "../config.js";
 
 /**
- * Enriches trades with the *current* market cap of the company traded —
- * not a historical value as of the trade date, which a free-tier API has no
- * practical way to provide. Runs monthly (see .github/workflows/market-caps.yml).
+ * Market caps, and tickers for asset names that came without one, from the
+ * SEC's public data. Runs monthly in full (market-caps.yml) and, for tickers
+ * never looked up, after every ingest (--missing-only).
  *
- * Two passes, split so the (slow, fuzzy) name-resolution work is a one-time
- * cost per asset name rather than repeated every month:
+ * A market cap here is shares outstanding, as the company last reported them
+ * to the SEC, times the latest close in price_latest. Both sides are public
+ * or already ours, so no market-data licence is involved, and the figure is
+ * in dollars from the start.
  *
- *  1. resolveNewAssetNames — most House OCR rows (paper filings) have an
- *     asset name but no ticker, so they'd never match a market cap looked
- *     up by ticker. For any asset_name not already in asset_name_tickers,
- *     search Finnhub by that name and accept the result only if its company
- *     name matches *exactly* after normalizing away punctuation/legal
- *     suffixes — a fuzzy/best-effort match risks silently attaching the
- *     wrong company's market cap to a trade, which is worse than leaving it
- *     unresolved. Every name gets a row either way (ticker or NULL) so this
- *     pass never repeats itself for a name it's already seen.
- *  2. refreshMarketCaps — (re)fetches the market cap for every ticker
- *     actually in play (directly extracted, or resolved by name above).
- *     This is the part that actually changes month to month.
+ * What it cannot do, and leaves as no cap (shown as "Undefined") rather than
+ * guess:
+ *  - a company the SEC does not list: foreign shares traded over the counter
+ *    (Bayer's BAYRY, Nestle's NSRGY), and tickers retired by a takeover;
+ *  - a foreign issuer that files a 20-F or 40-F: it reports its *ordinary*
+ *    shares, and the ticker's price is for an ADR that can stand for several
+ *    of them (one TSM is five TSMC shares), so the product would be wrong;
+ *  - a company whose latest share count is stale (Berkshire's cover page
+ *    has carried none since 2011);
+ *  - funds and ETFs, which have no market cap in this sense.
  *
- * Everything written to company_market_caps.market_cap is USD. Finnhub
- * reports the figure in the listing's *own* currency, which is easy to miss
- * because the overwhelming majority of the corpus is US-listed: it surfaced
- * only when the issuer list was sorted by market cap and put SK Hynix, whose
- * cap was in won, above Nvidia. Non-USD listings are converted here, and a
- * listing whose currency can't be converted is left untouched rather than
- * written in the wrong unit.
+ * Shares come from the cover-page figure (dei:EntityCommonStockSharesOutstanding)
+ * and, where a company reports that per share class only, so it is missing
+ * from the API (Alphabet), from the weighted-average basic share count in
+ * its latest results, which covers every class.
+ *
+ *   --missing-only   only tickers never looked up (after each ingest)
+ *   --dry-run        compute everything, write nothing, and compare with the
+ *                    caps already stored
  */
 
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
-if (!FINNHUB_API_KEY) {
-  throw new Error("FINNHUB_API_KEY is not set. Get a free key at https://finnhub.io/register and set it in ingest/.env (or as a GitHub Actions secret).");
-}
-
-// Finnhub's free tier allows 60 calls/minute; this keeps every endpoint
-// comfortably under that regardless of which pass is running.
-const MIN_CALL_INTERVAL_MS = 1100;
+const SEC_HEADERS = { "user-agent": SEC_COMPANY_TICKERS.userAgent };
+// The SEC asks for fewer than 10 requests a second.
+const SEC_INTERVAL_MS = 150;
+// A share count older than this is not trusted (about 15 months: a company
+// files at least every quarter, so anything this old has stopped filing).
+const FRESH_DAYS = 460;
+// Annual and current reports of foreign private issuers.
+const FOREIGN_FORMS = /^(20-F|40-F|6-K)/;
+const SHARE_CONCEPTS = ["dei/EntityCommonStockSharesOutstanding", "us-gaap/WeightedAverageNumberOfSharesOutstandingBasic"];
+// Fewer shares than this is a figure filed in thousands by mistake (Tempus
+// AI's 180,049 for some 180 million), not a listed company that small.
+const MIN_SHARES = 1_000_000;
+const MIN_SEC_ENTRIES = 5000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const LEGAL_SUFFIX = /\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLC|LP|PLC|GROUP|HOLDINGS?|TRUST|CLASS\s+[A-Z])\b/g;
-
-// Undocumented, but verified directly: Finnhub's free-tier /search rejects
-// any query over 20 characters with a 422 ("q too long") — most full
-// company names exceed that. The acceptance check below still compares
-// against the *full* original name, so truncating the query just narrows
-// the candidate pool going in; it can't turn a truncated prefix into a
-// false-positive match.
-const FINNHUB_SEARCH_MAX_LEN = 20;
-function searchQueryFor(name: string): string {
-  return name.trim().slice(0, FINNHUB_SEARCH_MAX_LEN);
+let lastCallAt = 0;
+/** One SEC request, throttled; null for a 404 (the company has no such figure). */
+async function secGet<T>(url: string): Promise<T | null> {
+  for (let attempt = 0; ; attempt++) {
+    const wait = SEC_INTERVAL_MS - (Date.now() - lastCallAt);
+    if (wait > 0) await sleep(wait);
+    lastCallAt = Date.now();
+    const res = await fetch(url, { headers: SEC_HEADERS });
+    if (res.status === 404) return null;
+    if ((res.status === 429 || res.status >= 500) && attempt < 2) {
+      await sleep(5000 * (attempt + 1));
+      continue;
+    }
+    if (!res.ok) throw new Error(`SEC answered ${res.status} for ${url}`);
+    return (await res.json()) as T;
+  }
 }
+
+/** Tickers as the SEC writes them: BRK.B is BRK-B there. */
+function secKey(ticker: string): string {
+  return ticker.trim().toUpperCase().replace(/\./g, "-");
+}
+
+interface SecCompany {
+  cik: string;
+  title: string;
+  /**
+   * The company's first ticker in the SEC's list, its main listing. Other
+   * tickers under the same company can be bonds or notes (Alphabet's GOOGN
+   * and GOOGM), whose price says nothing about the shares.
+   */
+  primary: string;
+}
+
+/** Every ticker the SEC has a registrant for. Listed by size, so the first entry for a ticker is the one in use. */
+async function secCompanies(): Promise<Map<string, SecCompany>> {
+  const data = await secGet<Record<string, { cik_str: number; ticker: string; title: string }>>(SEC_COMPANY_TICKERS.url);
+  const entries = Object.values(data ?? {});
+  if (entries.length < MIN_SEC_ENTRIES) throw new Error(`SEC company list has only ${entries.length} entries`);
+  const byTicker = new Map<string, SecCompany>();
+  const primaryByCik = new Map<string, string>();
+  for (const e of entries) {
+    const cik = String(e.cik_str);
+    const key = secKey(e.ticker);
+    if (!primaryByCik.has(cik)) primaryByCik.set(cik, key);
+    if (!byTicker.has(key)) byTicker.set(key, { cik, title: e.title, primary: primaryByCik.get(cik)! });
+  }
+  return byTicker;
+}
+
+/** Fund and ETF tickers: { fields: [cik, seriesId, classId, symbol], data: [...] }. */
+async function secFundTickers(): Promise<Set<string>> {
+  const data = await secGet<{ fields: string[]; data: unknown[][] }>(SEC_DATA.fundTickersUrl);
+  const at = data?.fields.indexOf("symbol") ?? -1;
+  return new Set((data?.data ?? []).map((row) => secKey(String(row[at >= 0 ? at : 3]))));
+}
+
+type Shares = { shares: number; asOf: string; concept: string } | { foreign: true } | null;
+
+interface ConceptFact {
+  end: string;
+  val: number;
+  form?: string;
+}
+
+const sharesByCik = new Map<string, Shares>();
+
+/** The company's latest share count, whether it is a foreign filer, or null if there is none recent. */
+async function latestShares(cik: string): Promise<Shares> {
+  if (sharesByCik.has(cik)) return sharesByCik.get(cik)!;
+  let found: Shares = null;
+  for (const concept of SHARE_CONCEPTS) {
+    const data = await secGet<{ units?: Record<string, ConceptFact[]> }>(SEC_DATA.conceptUrl(cik, concept));
+    const facts = data?.units?.shares ?? [];
+    if (!facts.length) continue;
+    const latest = facts.reduce((a, b) => (b.end > a.end ? b : a));
+    if (latest.form && FOREIGN_FORMS.test(latest.form)) {
+      found = { foreign: true };
+      break;
+    }
+    const ageDays = (Date.now() - new Date(`${latest.end}T00:00:00Z`).getTime()) / 86_400_000;
+    if (ageDays > FRESH_DAYS || !(latest.val >= MIN_SHARES)) continue;
+    found = { shares: latest.val, asOf: latest.end, concept: concept.split("/")[1] };
+    break;
+  }
+  sharesByCik.set(cik, found);
+  return found;
+}
+
+const LEGAL_SUFFIX = /\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLC|LP|PLC|GROUP|HOLDINGS?|TRUST|CLASS\s+[A-Z])\b/g;
 
 function normalizeCompanyName(name: string): string {
   return name
@@ -68,103 +151,22 @@ function normalizeCompanyName(name: string): string {
     .trim();
 }
 
-let lastCallAt = 0;
-async function finnhubGet<T>(url: string): Promise<T> {
-  const wait = MIN_CALL_INTERVAL_MS - (Date.now() - lastCallAt);
-  if (wait > 0) await sleep(wait);
-  lastCallAt = Date.now();
-
-  const fullUrl = `${url}&token=${FINNHUB_API_KEY}`;
-  let res = await fetch(fullUrl);
-  if (res.status === 429) {
-    await sleep(5000);
-    lastCallAt = Date.now();
-    res = await fetch(fullUrl);
-  }
-  if (!res.ok) throw new Error(`Finnhub request failed: ${res.status}`);
-  return res.json() as Promise<T>;
-}
-
-interface FinnhubSearchResult {
-  result: { symbol: string; description: string; type: string }[];
-}
-
-interface FinnhubProfile {
-  /** In millions of `currency` — NOT of USD. See toUsdMarketCap. */
-  marketCapitalization?: number;
-  /** The listing's own currency: "USD", "JPY", "KRW", "TWD", … */
-  currency?: string;
-  name?: string;
-  /** A URL on Finnhub's static host, or "" when none is on file. */
-  logo?: string;
-}
-
-/** Units of the currency per 1 USD, e.g. { JPY: 157.2, KRW: 1368.6 }. */
-type FxRates = Record<string, number>;
-
-/**
- * Today's rates, or null if they couldn't be fetched.
- *
- * Fetched once per run rather than per ticker: they move by fractions of a
- * percent inside the hour this takes, and a market cap is a rounded headline
- * figure anyway.
- */
-async function fetchFxRates(): Promise<FxRates | null> {
-  try {
-    const res = await fetch(FX_RATES_URL);
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = (await res.json()) as { result?: string; rates?: FxRates };
-    if (data.result !== "success" || !data.rates || typeof data.rates.EUR !== "number") {
-      throw new Error("unexpected response shape");
-    }
-    return { ...data.rates, USD: 1 };
-  } catch (err) {
-    console.error(`FX rates unavailable (${(err as Error).message}).`);
-    return null;
-  }
-}
-
-/**
- * A profile's market cap as whole USD.
- *
- * Returns undefined — distinct from null — when the figure exists but can't
- * be trusted in USD: an unknown currency, or a run with no FX rates. The
- * caller leaves such a ticker's stored value alone rather than overwriting
- * it with a number in the wrong currency, which is the bug this exists to
- * prevent. null means the provider genuinely has no cap (a fund, say).
- */
-function toUsdMarketCap(profile: FinnhubProfile, rates: FxRates | null): number | null | undefined {
-  const millions = profile.marketCapitalization;
-  if (typeof millions !== "number" || millions <= 0) return null;
-
-  const currency = (profile.currency ?? "").toUpperCase();
-  if (currency === "USD") return Math.round(millions * 1_000_000);
-  if (!currency) return undefined;
-
-  const perUsd = rates?.[currency];
-  if (typeof perUsd !== "number" || perUsd <= 0) return undefined;
-  return Math.round((millions * 1_000_000) / perUsd);
-}
-
 /**
  * A ticker the filer typed into the asset name itself.
  *
  * Senate reports especially often leave the ticker column blank and write
- * "Infineon Technologies AG (IFNNY)" instead — 424 published rows carry a
- * symbol only their name knows about, so they match no ticker filter, reach
- * no issuer page and get no market cap.
+ * "Infineon Technologies AG (IFNNY)" instead, so the row matches no ticker
+ * filter, reaches no issuer page and gets no market cap.
  *
  * Only a symbol at the very *end* counts, after something that reads as a
  * company name (an optional trailing "[ST]" type code is allowed, since the
  * House template puts one there). That rules out the parentheses these names
- * are otherwise full of — "DOW CHEMICAL COMPANY (THE) 4.8% 11/30/2028",
- * "Brazilian SELIC (LFT) Bonds", "GS FINANCE CORP. LINKED TO ESTX BANKS
- * (EUR)" — none of which are trailing.
+ * are otherwise full of, as in "DOW CHEMICAL COMPANY (THE) 4.8% 11/30/2028".
  *
- * Structure alone is not enough to be safe, though: "UnitedHealth Group
- * Incorporated Common Stock (DE)" is shaped exactly like a real one, and DE
- * is Deere's ticker. Every candidate is confirmed against the provider's own
- * name for that symbol before it is believed.
+ * Structure alone is not enough, though: "UnitedHealth Group Incorporated
+ * Common Stock (DE)" is shaped exactly like a real one, and DE is Deere's
+ * ticker. Every candidate is confirmed against the SEC's name for that
+ * symbol before it is believed.
  */
 const EMBEDDED_TICKER = /\(([A-Z]{1,5}(?:\.[A-Z])?)\)\s*(?:\[[A-Za-z]{1,3}\])?\s*$/;
 
@@ -172,32 +174,25 @@ export function embeddedTickerCandidate(assetName: string): { symbol: string; co
   const match = assetName.match(EMBEDDED_TICKER);
   if (!match || match.index === undefined) return null;
   const company = assetName.slice(0, match.index).trim();
-  // Something has to be named. Deliberately not "at least two words" — that
-  // would drop a legitimate "Tesla (TSLA)", and the provider check below is
-  // what actually keeps a wrong symbol out.
   if (!/[A-Za-z]/.test(company)) return null;
   return { symbol: match[1], company };
 }
 
 // Words that describe the *instrument* rather than name the company, and the
-// legal-form suffixes that differ between how a filer writes a name and how a
-// data provider does. Stripped from both sides before comparing.
+// legal-form suffixes that differ between how a filer writes a name and how
+// the SEC does. Stripped from both sides before comparing.
 const INSTRUMENT_WORDS =
   /\b(SPONSORED|UNSPONSORED|ADR|ADS|COMMON STOCK|ORDINARY SHARES?|DEPOSITARY SHARES?|CLASS [A-Z]|COMMON|SHARES?|STOCK|NEW)\b/g;
 const LEGAL_FORMS = /\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLC|LP|PLC|NV|SA|SAU|SE|AG|SPA|ASA|AB|AS|OY|OYJ|ABP|GROUP|HOLDINGS?|THE)\b/g;
 
-/**
- * Two names for the same company, allowing for how differently they get
- * written down. Dots come out first so "Mitsui O.S.K." and "Mitsui OSK"
- * agree; a provider name that is a prefix of the filed one counts, because
- * the filing usually appends descriptors the provider leaves off.
- */
-function sameCompany(filed: string, provider: string): boolean {
+/** Two names for the same company, allowing for how differently they get written down. */
+function sameCompany(filed: string, registered: string): boolean {
   const normalize = (value: string) =>
     value
       .toUpperCase()
       .replace(/\(.*?\)/g, " ")
-      .replace(/[.'\u2019]/g, "")
+      .replace(/\/[A-Z]{2,3}\/?/g, " ")
+      .replace(/[.'’]/g, "")
       .replace(/[,&/-]/g, " ")
       .replace(/\s+/g, " ")
       .replace(INSTRUMENT_WORDS, " ")
@@ -206,231 +201,216 @@ function sameCompany(filed: string, provider: string): boolean {
       .replace(/\s+/g, " ")
       .trim();
   const a = normalize(filed);
-  const b = normalize(provider);
+  const b = normalize(registered);
   if (!a || !b) return false;
   return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
-/**
- * Fills in tickers the filer wrote into the asset name.
- *
- * Runs before the name search below, and overrides it: these names are
- * already in asset_name_tickers as confirmed misses, because a search for
- * "Infineon Technologies AG (IFNNY)" finds nothing. The symbol in the
- * parentheses is far better evidence than that search ever was.
- *
- * The provider intermittently answers with an empty object rather than an
- * error, so an empty name is retried once before it is taken at face value —
- * without that, roughly a third of real tickers looked unverifiable.
- */
-async function resolveEmbeddedTickers(): Promise<void> {
+async function saveAssetTicker(assetName: string, ticker: string | null): Promise<void> {
+  await sql.query(
+    `INSERT INTO asset_name_tickers (asset_name, ticker, resolved_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (asset_name) DO UPDATE SET ticker = EXCLUDED.ticker, resolved_at = NOW()`,
+    [assetName, ticker]
+  );
+}
+
+/** Fills in tickers the filer wrote into the asset name, where the SEC's name for that symbol agrees. */
+async function resolveEmbeddedTickers(companies: Map<string, SecCompany>, dryRun: boolean): Promise<void> {
   const rows = (await sql.query(`
     SELECT DISTINCT t.asset_name FROM transactions t
     WHERE (t.ticker IS NULL OR t.ticker = '')
       AND t.asset_name ~ '\\([A-Z]{1,5}(\\.[A-Z])?\\)[[:space:]]*(\\[[A-Za-z]{1,3}\\])?[[:space:]]*$'
   `)) as { asset_name: string }[];
-
   const candidates = rows
-    .map((r) => ({ assetName: r.asset_name, ...(embeddedTickerCandidate(r.asset_name) ?? {}) }))
-    .filter((c): c is { assetName: string; symbol: string; company: string } => "symbol" in c);
-
-  if (candidates.length === 0) {
+    .map((r) => ({ assetName: r.asset_name, found: embeddedTickerCandidate(r.asset_name) }))
+    .filter((c): c is { assetName: string; found: { symbol: string; company: string } } => c.found !== null);
+  if (!candidates.length) {
     console.log("No asset names carry an unextracted ticker.");
     return;
   }
-  console.log(`Checking ${candidates.length} asset name(s) that appear to carry their own ticker...`);
 
   let confirmed = 0;
   let rejected = 0;
-  let failed = 0;
+  let unknown = 0;
   let rowsFixed = 0;
-
-  for (const { assetName, symbol, company } of candidates) {
-    try {
-      let profile = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(symbol));
-      if (!profile.name) profile = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(symbol));
-
-      if (!profile.name || !sameCompany(company, profile.name)) {
-        rejected++;
-        if (profile.name) console.log(`  rejected ${symbol}: "${company}" is not "${profile.name}"`);
-        continue;
-      }
-
-      const result = (await sql.query(
-        `UPDATE transactions SET ticker = $1 WHERE asset_name = $2 AND (ticker IS NULL OR ticker = '')`,
-        [symbol, assetName]
-      )) as unknown as { rowCount?: number };
-      await sql.query(
-        `INSERT INTO asset_name_tickers (asset_name, ticker, resolved_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (asset_name) DO UPDATE SET ticker = EXCLUDED.ticker, resolved_at = NOW()`,
-        [assetName, symbol]
-      );
-      confirmed++;
-      rowsFixed += result?.rowCount ?? 0;
-    } catch (err) {
-      failed++;
-      console.error(`  profile failed for "${symbol}": ${(err as Error).message}`);
+  for (const { assetName, found } of candidates) {
+    const company = companies.get(secKey(found.symbol));
+    if (!company) {
+      unknown++;
+      continue;
     }
+    if (!sameCompany(found.company, company.title)) {
+      rejected++;
+      continue;
+    }
+    confirmed++;
+    if (dryRun) continue;
+    const result = (await sql.query(
+      `UPDATE transactions SET ticker = $1 WHERE asset_name = $2 AND (ticker IS NULL OR ticker = '')`,
+      [found.symbol, assetName]
+    )) as unknown as { rowCount?: number };
+    await saveAssetTicker(assetName, found.symbol);
+    rowsFixed += result?.rowCount ?? 0;
   }
-  console.log(`Embedded tickers: ${confirmed} confirmed (${rowsFixed} rows), ${rejected} rejected, ${failed} failed.`);
+  console.log(
+    `Embedded tickers: ${confirmed} confirmed${dryRun ? "" : ` (${rowsFixed} rows)`}, ${rejected} named a different company, ` +
+      `${unknown} not listed by the SEC.`
+  );
 }
 
-async function resolveNewAssetNames(): Promise<void> {
+/**
+ * A ticker for each asset name not seen before, when its name is exactly the
+ * name of one SEC registrant (after normalizing punctuation and legal
+ * suffixes). Anything less exact stays unresolved: attaching the wrong
+ * company's data to a trade is worse than having none.
+ */
+async function resolveNewAssetNames(companies: Map<string, SecCompany>, dryRun: boolean): Promise<void> {
   const rows = (await sql.query(`
     SELECT DISTINCT t.asset_name FROM transactions t
     WHERE (t.ticker IS NULL OR t.ticker = '')
       AND NOT EXISTS (SELECT 1 FROM asset_name_tickers ant WHERE ant.asset_name = t.asset_name)
   `)) as { asset_name: string }[];
-
-  if (rows.length === 0) {
+  if (!rows.length) {
     console.log("No new asset names to resolve.");
     return;
   }
-  console.log(`Resolving ${rows.length} new asset name(s) to a ticker...`);
+
+  // First registrant per name: the list is in order of size, so where two
+  // tickers share a name (share classes), the larger listing wins.
+  const byName = new Map<string, string>();
+  for (const [ticker, company] of companies) {
+    const name = normalizeCompanyName(company.title);
+    if (name && !byName.has(name)) byName.set(name, ticker);
+  }
 
   let resolved = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const name = rows[i].asset_name;
-    let ticker: string | null = null;
-    try {
-      const data = await finnhubGet<FinnhubSearchResult>(FINNHUB.searchUrl(searchQueryFor(name)));
-      const target = normalizeCompanyName(name);
-      const match = (data.result ?? []).find((r) => normalizeCompanyName(r.description ?? "") === target);
-      if (match) {
-        ticker = match.symbol;
-        resolved++;
-      }
-    } catch (err) {
-      console.error(`  search failed for "${name}": ${(err as Error).message}`);
-    }
-    await sql.query(
-      `INSERT INTO asset_name_tickers (asset_name, ticker, resolved_at) VALUES ($1, $2, NOW())
-       ON CONFLICT (asset_name) DO UPDATE SET ticker = EXCLUDED.ticker, resolved_at = NOW()`,
-      [name, ticker]
-    );
-    if ((i + 1) % 100 === 0) console.log(`  ...${i + 1}/${rows.length} (${resolved} resolved so far)`);
+  for (const { asset_name } of rows) {
+    const ticker = byName.get(normalizeCompanyName(asset_name)) ?? null;
+    if (ticker) resolved++;
+    if (!dryRun) await saveAssetTicker(asset_name, ticker);
   }
-  console.log(`Resolved ${resolved}/${rows.length} new asset names to a ticker (the rest go to Undefined — no confident match).`);
+  console.log(`Asset names: ${resolved} of ${rows.length} new names matched an SEC registrant exactly.`);
 }
 
-/**
- * @param mode  'all' refreshes every ticker; 'missing' only tickers with no row
- *              at all; 'logos' only tickers whose profile has never been read
- *              for a logo, which is every ticker once, the first time.
- *
- * The monthly full refresh keeps caps current, but it leaves a gap: a ticker
- * first traded on the 2nd shows "Undefined" for the next 51 days, because
- * nothing looks it up until the following month. Running this in gap-fill mode
- * after each ingest closes that to a few hours, and costs one request per
- * genuinely new symbol — usually none at all.
- *
- * A failed lookup writes no row, so gap-fill also retries anything the last
- * full run couldn't reach.
- */
-async function refreshMarketCaps(mode: "all" | "missing" | "logos" = "all"): Promise<void> {
-  const missingOnly = mode === "missing";
+type Outcome = "cap" | "fund" | "not at SEC" | "foreign filer" | "no recent share count" | "no price";
+
+async function refreshMarketCaps(
+  companies: Map<string, SecCompany>,
+  funds: Set<string>,
+  missingOnly: boolean,
+  dryRun: boolean
+): Promise<void> {
   const rows = (await sql.query(`
-    SELECT t.ticker FROM (
+    SELECT t.ticker, cmc.market_cap::float8 AS old_cap FROM (
       SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker != ''
       UNION
       SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL
     ) t
+    LEFT JOIN company_market_caps cmc ON cmc.ticker = t.ticker
     LEFT JOIN (SELECT ticker, COUNT(*) AS n FROM transactions GROUP BY ticker) traded ON traded.ticker = t.ticker
-    ${
-      mode === 'missing'
-        ? // Never looked up here. A row can exist with only the SEC name in it.
-          "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
-        : mode === 'logos'
-          ? "WHERE NOT EXISTS (SELECT 1 FROM company_market_caps c WHERE c.ticker = t.ticker AND c.logo_checked_at IS NOT NULL)"
-          : ""
-    }
+    ${missingOnly ? "WHERE cmc.logo_checked_at IS NULL" : ""}
     -- Most-traded first, so a run cut short has done the tickers people see.
     ORDER BY COALESCE(traded.n, 0) DESC, t.ticker
-  `)) as { ticker: string }[];
-
-  if (rows.length === 0) {
+  `)) as { ticker: string; old_cap: number | null }[];
+  if (!rows.length) {
     console.log(missingOnly ? "No tickers are missing a market-cap lookup." : "No tickers to refresh.");
     return;
   }
-  console.log(`${missingOnly ? "Looking up" : "Refreshing"} market cap for ${rows.length} ticker(s)...`);
+  console.log(`${missingOnly ? "Looking up" : "Refreshing"} market caps for ${rows.length} ticker(s) from the SEC...`);
 
-  const rates = await fetchFxRates();
-  if (rates) console.log(`FX rates loaded for ${Object.keys(rates).length} currencies.`);
-  else console.warn("  Non-USD listings will be left as they are until rates are available again.");
+  const prices = new Map(
+    (
+      (await sql.query(`SELECT ticker, close::float8 AS close FROM price_latest WHERE status = 'ok' AND close > 0`)) as {
+        ticker: string;
+        close: number;
+      }[]
+    ).map((r) => [r.ticker, r.close])
+  );
 
-  let updated = 0;
-  let noCap = 0;
-  let skipped = 0;
-  let failed = 0;
-  const converted = new Map<string, number>();
+  const counts = new Map<Outcome, number>();
+  const compared: { ticker: string; oldCap: number; newCap: number }[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const ticker = rows[i].ticker;
+    const { ticker, old_cap } = rows[i];
+    let outcome: Outcome;
+    let cap: number | null = null;
     try {
-      const data = await finnhubGet<FinnhubProfile>(FINNHUB.profileUrl(ticker));
-      const logo = data.logo?.trim() || null;
-      const marketCap = toUsdMarketCap(data, rates);
-      if (marketCap === undefined) {
-        // Can't be expressed in USD right now. Writing what the provider
-        // gave would put a figure in yen or won into a column every other
-        // row reads as dollars, so the cap is left exactly as it was. The
-        // logo has no such problem and is kept.
-        skipped++;
-        await sql.query(
-          `INSERT INTO company_market_caps (ticker, logo_url, logo_checked_at, updated_at) VALUES ($1, $2, NOW(), NOW())
-           ON CONFLICT (ticker) DO UPDATE SET logo_url = EXCLUDED.logo_url, logo_checked_at = NOW()`,
-          [ticker, logo]
-        );
-        continue;
-      }
-      if (marketCap !== null) {
-        updated++;
-        const currency = (data.currency ?? "USD").toUpperCase();
-        if (currency !== "USD") converted.set(currency, (converted.get(currency) ?? 0) + 1);
+      const company = companies.get(secKey(ticker));
+      if (!company) {
+        outcome = funds.has(secKey(ticker)) ? "fund" : "not at SEC";
       } else {
-        noCap++;
+        const shares = await latestShares(company.cik);
+        if (shares === null) outcome = "no recent share count";
+        else if ("foreign" in shares) outcome = "foreign filer";
+        else {
+          // Priced by the company's main listing where we have it: a note
+          // trading under the same company is priced like a bond.
+          const close = prices.get(company.primary) ?? prices.get(company.primary.replace(/-/g, ".")) ?? prices.get(ticker);
+          if (!close) outcome = "no price";
+          else {
+            cap = Math.round(shares.shares * close);
+            outcome = "cap";
+          }
+        }
       }
-      await sql.query(
-        // No company name from here: names come from the SEC (syncCompanyNames).
-        `INSERT INTO company_market_caps (ticker, market_cap, source_currency, logo_url, logo_checked_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap,
-           source_currency = EXCLUDED.source_currency, logo_url = EXCLUDED.logo_url, logo_checked_at = NOW(),
-           updated_at = NOW()`,
-        [ticker, marketCap, (data.currency ?? "").toUpperCase() || null, logo]
-      );
     } catch (err) {
-      failed++;
-      console.error(`  profile failed for "${ticker}": ${(err as Error).message}`);
+      // An SEC hiccup leaves this ticker as it was, to be tried next run.
+      console.error(`  ${ticker}: ${(err as Error).message}`);
+      continue;
     }
-    if ((i + 1) % 200 === 0) console.log(`  ...${i + 1}/${rows.length}`);
+    counts.set(outcome, (counts.get(outcome) ?? 0) + 1);
+    if (cap !== null && old_cap) compared.push({ ticker, oldCap: old_cap, newCap: cap });
+
+    if (!dryRun) {
+      // Logos are not stored: the clients load them from Brandfetch by ticker
+      // (@congtrade/shared/brandLogo). logo_checked_at marks the ticker as
+      // looked up.
+      await sql.query(
+        `INSERT INTO company_market_caps (ticker, market_cap, source_currency, logo_url, logo_checked_at, updated_at)
+         VALUES ($1, $2, $3, NULL, NOW(), NOW())
+         ON CONFLICT (ticker) DO UPDATE SET market_cap = EXCLUDED.market_cap, source_currency = EXCLUDED.source_currency,
+           logo_url = NULL, logo_checked_at = NOW(), updated_at = NOW()`,
+        [ticker, cap, cap === null ? null : "USD"]
+      );
+    }
+    if ((i + 1) % 250 === 0) console.log(`  ...${i + 1}/${rows.length}`);
   }
-  console.log(
-    `Market caps: ${updated} updated, ${noCap} had no cap on file (e.g. a fund, not a company), ` +
-      `${skipped} left alone (no usable currency), ${failed} failed.`
-  );
-  if (converted.size) {
-    const summary = [...converted.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}\u00d7${n}`).join(", ");
-    console.log(`  Converted to USD from: ${summary}`);
+
+  const order: Outcome[] = ["cap", "fund", "not at SEC", "foreign filer", "no recent share count", "no price"];
+  console.log(`Market caps: ${order.map((o) => `${counts.get(o) ?? 0} ${o}`).join(", ")}.`);
+
+  if (dryRun && compared.length) {
+    const ratios = compared.map((c) => c.newCap / c.oldCap).sort((a, b) => a - b);
+    const within = (pct: number) => ratios.filter((r) => Math.abs(r - 1) <= pct / 100).length;
+    const pctOf = (n: number) => `${((n / ratios.length) * 100).toFixed(0)}%`;
+    console.log(
+      `\nAgainst the caps stored now (${compared.length} tickers with both): median ratio ${ratios[Math.floor(ratios.length / 2)].toFixed(3)}, ` +
+        `within 10%: ${pctOf(within(10))}, within 25%: ${pctOf(within(25))}, off by more than 2x: ${pctOf(ratios.filter((r) => r > 2 || r < 0.5).length)}.`
+    );
+    const far = [...compared].sort((a, b) => Math.abs(Math.log(b.newCap / b.oldCap)) - Math.abs(Math.log(a.newCap / a.oldCap)));
+    const fmt = (n: number) => `$${(n / 1e9).toFixed(1)}B`;
+    console.log("Furthest apart: " + far.slice(0, 15).map((c) => `${c.ticker} ${fmt(c.oldCap)}→${fmt(c.newCap)}`).join(", "));
   }
 }
 
 async function main() {
-  // `--missing-only` is the cheap mode meant to run after every ingest: it
-  // skips the name-resolution sweep and looks up only tickers nothing has
-  // priced yet. The full run stays monthly (see market-caps.yml).
-  // `--logos` reads the profile of every ticker whose logo has never been
-  // looked for: a one-time backfill, then nothing, since the other two modes
-  // record the logo as they go.
   const args = process.argv.slice(2);
-  const mode = args.includes("--missing-only") ? "missing" : args.includes("--logos") ? "logos" : "all";
+  const missingOnly = args.includes("--missing-only");
+  const dryRun = args.includes("--dry-run");
 
   await ensureSchema();
-  if (mode === "all") {
-    await resolveEmbeddedTickers();
-    await resolveNewAssetNames();
+  const [companies, funds] = await Promise.all([secCompanies(), secFundTickers()]);
+  console.log(`SEC lists: ${companies.size} company tickers, ${funds.size} fund tickers.${dryRun ? " (dry run: nothing is written)" : ""}`);
+
+  if (!missingOnly) {
+    await resolveEmbeddedTickers(companies, dryRun);
+    await resolveNewAssetNames(companies, dryRun);
   }
-  await refreshMarketCaps(mode);
+  await refreshMarketCaps(companies, funds, missingOnly, dryRun);
+
+  // No logo addresses are kept (see above), including for tickers this run
+  // did not reach.
+  if (!dryRun) await sql.query(`UPDATE company_market_caps SET logo_url = NULL WHERE logo_url IS NOT NULL`);
 }
 
 main().catch((err) => {

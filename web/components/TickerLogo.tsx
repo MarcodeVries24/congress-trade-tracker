@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { brandLogoUrl } from "@congtrade/shared/brandLogo";
 
 const TONES = [
   "#101729",
@@ -22,13 +23,12 @@ function hash(s: string): number {
 }
 
 /**
- * A company's logo. Straight from the provider when the row brought its
- * address along (`logo`, from LOGO_SQL), so a list of trades costs this site
- * no request per logo; the lettered tile at once when the row says there is
- * none (''); and from /api/logo, which redirects to the one on file or
- * answers with a tile, when the row does not know. If the logo itself then fails to load (the
- * provider's host has gaps), the tile is drawn here instead, so a ticker
- * never shows as a broken image.
+ * A company's logo, from Brandfetch: the address the row brought along
+ * (`logo`, from LOGO_SQL) or, when it has none, the one built from the
+ * ticker, so a list of trades costs this site no request per logo. The
+ * lettered tile at once when the row says there is none (''), and when the
+ * logo fails to load, which is how Brandfetch says it has none for this
+ * ticker, so a ticker never shows as a broken image.
  *
  * Logos sit on white even in dark mode: most are drawn for a white page, and
  * a dark mark on the dark panel would vanish.
@@ -44,7 +44,8 @@ export function TickerLogo({
   size?: number;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(logo === "");
+  const src = logo === "" ? null : logo || brandLogoUrl(ticker);
+  const [failed, setFailed] = useState(!src);
   const label =
     ticker
       .replace(/[^A-Za-z0-9.]/g, "")
@@ -76,11 +77,10 @@ export function TickerLogo({
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-line bg-white ${className}`}
       style={{ width: size, height: size, borderRadius: radius }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- the provider's
-          own address (or a redirect to it), which Next's optimizer would
-          re-host instead. */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- Brandfetch's own
+          address, which it requires: Next's optimizer would re-host it. */}
       <img
-        src={logo || `/api/logo/${encodeURIComponent(ticker)}`}
+        src={src ?? undefined}
         alt=""
         width={size}
         height={size}

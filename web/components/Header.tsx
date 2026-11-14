@@ -41,7 +41,7 @@ export function Header() {
         <nav className="hidden items-center gap-1 sm:flex">
           <Link
             href="/trades"
-            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
+            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
           >
             All Trades
           </Link>
@@ -77,7 +77,7 @@ export function Header() {
           <SignedOut>
             <Link
               href="/upgrade"
-              className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
+              className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
             >
               Pricing
             </Link>

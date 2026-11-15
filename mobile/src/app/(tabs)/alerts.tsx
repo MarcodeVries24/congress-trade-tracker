@@ -132,7 +132,7 @@ export default function AlertsScreen() {
           <View style={styles.faces}>
             {follows.members.slice(0, 4).map((m, i) => (
               <View key={m.slug} style={[styles.face, { marginLeft: i ? -10 : 0, borderColor: c.background }]}>
-                <Avatar uri={m.photo_url} name={m.name} party={m.party} size={28} />
+                <Avatar uri={m.photo_url} name={m.name} party={m.party} size={FACE} />
               </View>
             ))}
           </View>
@@ -209,6 +209,10 @@ export default function AlertsScreen() {
   );
 }
 
+/** The watchlist faces: photo size, and the ring that separates them. */
+const FACE = 28;
+const FACE_RING = 2;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40 },
@@ -225,7 +229,18 @@ const styles = StyleSheet.create({
   emailText: { flex: 1, gap: 2 },
   followRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 18 },
   faces: { flexDirection: 'row' },
-  face: { borderWidth: 2, borderRadius: 18 },
+  // A ring in the background colour around each 28pt photo, so the overlap
+  // reads as separate faces. Sized exactly and rounded to half of that: a
+  // radius past half the width draws a lopsided shape on iOS, not a circle.
+  face: {
+    width: FACE + 2 * FACE_RING,
+    height: FACE + 2 * FACE_RING,
+    borderRadius: FACE / 2 + FACE_RING,
+    borderWidth: FACE_RING,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   followText: { flex: 1 },
   manage: { fontWeight: '700', textDecorationLine: 'underline' },
   sectionHead: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 4 },

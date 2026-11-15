@@ -7,6 +7,7 @@ import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { useAccess } from '@/lib/access';
 import { useFollows } from '@/lib/follows';
 import { haptic } from '@/lib/haptics';
+import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { LINKS, SITE, openPage } from '@/lib/links';
 import { useOnboarding } from '@/lib/onboarding';
 import { usePush } from '@/lib/push';
@@ -18,9 +19,11 @@ import { Text } from '@/ui/text';
 /**
  * Settings: the account, notifications, and the data this device keeps.
  *
- * Destructive rows ask twice in place (the label changes to "Tap again to
+ * Clearing rows ask twice in place (the label changes to "Tap again to
  * confirm") rather than through a dialog, so they behave the same everywhere,
- * the web preview included.
+ * the web preview included. Sign out asks in a dialog (confirmSignOut).
+ * Delete account is not here but on the Account page, so it is never
+ * mistaken for Sign out.
  */
 export default function SettingsScreen() {
   const { c } = useTheme();
@@ -72,26 +75,17 @@ export default function SettingsScreen() {
               ? openPage(`${SITE}/account`)
               : openPage(store === 'google' ? LINKS.manageGoogle : LINKS.manageApple)
           }
+          last={!isSignedIn}
         />
         {isSignedIn ? (
-          <>
-            <ListRow icon="log-out-outline" label="Sign out" onPress={() => void signOut()} chevron={false} />
-            <ListRow
-              icon="trash-outline"
-              label="Delete account"
-              destructive
-              onPress={() => router.push('/sign-in')}
-              last
-            />
-          </>
-        ) : (
           <ListRow
-            icon="trash-outline"
-            label="How to delete an account"
-            onPress={() => openPage(LINKS.deleteAccount)}
+            icon="log-out-outline"
+            label="Sign out"
+            onPress={() => confirmSignOut(signOut)}
+            chevron={false}
             last
           />
-        )}
+        ) : null}
       </Group>
 
       <Group title="Notifications">
@@ -143,7 +137,23 @@ export default function SettingsScreen() {
 
       <Group title="About">
         <ListRow icon="globe-outline" label="congtrade.com" onPress={() => openPage(SITE)} />
-        <ListRow icon="information-circle-outline" label="About CongTrade" onPress={() => openPage(LINKS.about)} last />
+        <ListRow
+          icon="information-circle-outline"
+          label="About CongTrade"
+          onPress={() => openPage(LINKS.about)}
+          last={Boolean(isSignedIn)}
+        />
+        {/* Signed in, deleting is one level down, on the Account page
+            (AccountPanel), away from Sign out. Signed out there is nothing
+            on this phone to delete, only the website's instructions. */}
+        {isSignedIn ? null : (
+          <ListRow
+            icon="trash-outline"
+            label="How to delete an account"
+            onPress={() => openPage(LINKS.deleteAccount)}
+            last
+          />
+        )}
       </Group>
 
       <Text variant="footnote" tone="faint" style={styles.version}>

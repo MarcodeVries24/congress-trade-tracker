@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useAccess } from '@/lib/access';
 import { API_BASE } from '@/lib/api';
+import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import { usePush } from '@/lib/push';
@@ -142,7 +143,13 @@ export function AccountPanel() {
       </Group>
 
       <Group>
-        <ListRow icon="log-out-outline" label="Sign out" chevron={false} onPress={() => void push.signOut()} last />
+        <ListRow
+          icon="log-out-outline"
+          label="Sign out"
+          chevron={false}
+          onPress={() => confirmSignOut(push.signOut)}
+          last
+        />
       </Group>
 
       {!confirming ? (
@@ -208,7 +215,8 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   bold: { fontWeight: '700' },
   underline: { textDecorationLine: 'underline' },
-  deleteLink: { alignItems: 'center', paddingVertical: 6 },
+  // Set further down than the gap between groups, so it reads as apart from Sign out.
+  deleteLink: { alignItems: 'center', paddingVertical: 6, marginTop: 16 },
   confirm: { gap: 12, padding: 18, borderRadius: radius.xl, borderWidth: 1 },
   warnIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   storeWarning: { gap: 6, padding: 12, borderRadius: radius.md },

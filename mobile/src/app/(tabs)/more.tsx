@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { useAccess } from '@/lib/access';
 import { useFollows } from '@/lib/follows';
+import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { LINKS, openPage } from '@/lib/links';
 import { usePush } from '@/lib/push';
 import { radius, useTheme } from '@/theme';
@@ -110,7 +111,7 @@ export default function MoreScreen() {
         </Group>
 
         {isSignedIn ? (
-          <Button label="Log Out" icon="log-out-outline" kind="secondary" onPress={() => void signOut()} />
+          <Button label="Sign out" icon="log-out-outline" kind="secondary" onPress={() => confirmSignOut(signOut)} />
         ) : (
           <Button label="Sign in" icon="log-in-outline" onPress={() => router.push('/sign-in')} />
         )}

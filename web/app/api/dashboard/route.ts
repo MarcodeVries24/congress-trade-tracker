@@ -52,7 +52,11 @@ function latestUniqueQuery(assetTypeFilter: string): string {
   return `
     SELECT sub.*
     FROM (
-      SELECT DISTINCT ON (t.member_name) ${TRADE_COLUMNS}
+      SELECT DISTINCT ON (t.member_name) ${TRADE_COLUMNS},
+             -- How many trades the row stands for: everything the member
+             -- disclosed that same day (in this view), so a single row of a
+             -- 400-trade filing doesn't read as the whole of it.
+             COUNT(*) OVER (PARTITION BY t.member_name, f.filing_date)::int AS same_day_count
       FROM transactions t
       JOIN filings f ON f.doc_id = t.doc_id
       ${MEMBER_JOIN}
@@ -71,7 +75,7 @@ export async function GET() {
   const stockValues = ASSET_TYPE_VALUES.ST; // ["ST", "Stock", "Non-Public Stock"]
   const stockPlaceholders = stockValues.map((_, i) => `$${i + 1}`).join(", ");
 
-  const [latestTradesStocks, latestTradesAll, topPoliticians, topByVolume, topStocks, biggestTrades, chamberBreakdown, partyBreakdown] =
+  const [latestTradesStocks, latestTradesAll, topPoliticians, topByVolume, topStocks, biggestTrades, chamberBreakdown, partyBreakdown, lastWeek] =
     await Promise.all([
       sql.query(latestUniqueQuery(`AND t.asset_type_code IN (${stockPlaceholders})`), stockValues),
       sql.query(latestUniqueQuery("")),
@@ -134,6 +138,18 @@ export async function GET() {
          WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL} AND COALESCE(mh.party, mr.party) IS NOT NULL
          GROUP BY COALESCE(mh.party, mr.party)`
       ),
+      // Trades disclosed in the last seven days, both views, for the Latest
+      // Trades header: the card shows one row per member, and this says how
+      // much is actually coming in behind those rows.
+      sql.query(
+        `SELECT COUNT(*)::int AS all_assets,
+                COUNT(*) FILTER (WHERE t.asset_type_code IN (${stockPlaceholders}))::int AS stocks
+         FROM transactions t
+         JOIN filings f ON f.doc_id = t.doc_id
+         WHERE ${PUBLISHED_FILING_SQL} AND ${PLAUSIBLE_DATES_SQL}
+           AND NULLIF(f.filing_date, '')::date >= CURRENT_DATE - 6`,
+        stockValues
+      ),
     ]);
 
   // Every card that names a member links to that member's page, so each row
@@ -154,6 +170,7 @@ export async function GET() {
       biggestTrades: withSlug(biggestTrades),
       chamberBreakdown,
       partyBreakdown,
+      disclosedLastWeek: (lastWeek as { all_assets: number; stocks: number }[])[0] ?? { all_assets: 0, stocks: 0 },
     },
   });
 }

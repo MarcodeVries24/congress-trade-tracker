@@ -79,6 +79,11 @@ export default function Home() {
   const totalChamberCount = dashboard ? dashboard.chamberBreakdown.reduce((sum, c) => sum + c.count, 0) : 0;
   const totalPartyCount = dashboard ? dashboard.partyBreakdown.reduce((sum, p) => sum + p.count, 0) : 0;
   const latestTrades = dashboard ? (assetFilter === "stocks" ? dashboard.latestTradesStocks : dashboard.latestTradesAll) : [];
+  const lastWeekCount = dashboard?.disclosedLastWeek
+    ? assetFilter === "stocks"
+      ? dashboard.disclosedLastWeek.stocks
+      : dashboard.disclosedLastWeek.all_assets
+    : 0;
 
   return (
     <>
@@ -135,6 +140,9 @@ export default function Home() {
           {/* Latest Trades */}
           <Card
             title="Latest Trades"
+            subtitle={
+              lastWeekCount ? `${lastWeekCount.toLocaleString("en-US")} disclosed in the last 7 days` : undefined
+            }
             // Carries the toggle through to the full list. Without it "All
             // assets" then "View all" landed on /trades, which defaults to
             // stocks, so the one click that widened the view was undone by
@@ -186,6 +194,14 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="shrink-0 whitespace-nowrap text-right">
+                          {trade.same_day_count && trade.same_day_count > 1 ? (
+                            <span
+                              className="mr-1.5 text-[10px] text-ink-faint"
+                              title={`${trade.same_day_count - 1} more trades disclosed by this member the same day`}
+                            >
+                              +{(trade.same_day_count - 1).toLocaleString("en-US")} more
+                            </span>
+                          ) : null}
                           <span title={badge.title} className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
                           <div className="mt-1 text-xs text-ink-muted">{compactAmountRange(trade.amount_low, trade.amount_high, amountLabel(trade.amount_range))}</div>
                         </div>
@@ -391,12 +407,15 @@ export default function Home() {
 
 function Card({
   title,
+  subtitle,
   href,
   actions,
   className = "",
   children,
 }: {
   title: string;
+  /** A short note beside the title. */
+  subtitle?: React.ReactNode;
   href?: string;
   actions?: React.ReactNode;
   className?: string;
@@ -405,7 +424,10 @@ function Card({
   return (
     <section className={`flex flex-col overflow-hidden rounded-lg border border-line bg-panel ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <h2 className="text-sm font-semibold text-ink">
+          {title}
+          {subtitle ? <span className="ml-2 text-xs font-normal text-ink-faint">{subtitle}</span> : null}
+        </h2>
         <div className="flex items-center gap-3">
           {actions}
           {href && (

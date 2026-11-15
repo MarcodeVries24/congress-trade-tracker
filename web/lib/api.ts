@@ -99,6 +99,8 @@ export interface DashboardTrade {
   company_name: string | null;
   /** The logo to load straight from the provider: see LOGO_SQL. */
   logo_url?: string | null;
+  /** Trades the member disclosed the same day as this one, this one included. */
+  same_day_count?: number;
 }
 
 export interface DashboardPolitician {
@@ -138,6 +140,8 @@ export interface DashboardStock {
 export interface DashboardData {
   latestTradesStocks: DashboardTrade[];
   latestTradesAll: DashboardTrade[];
+  /** Trades disclosed in the last seven days, in each Latest Trades view. */
+  disclosedLastWeek?: { all_assets: number; stocks: number };
   topPoliticians: DashboardPolitician[];
   topByVolume: DashboardVolumeLeader[];
   topStocks: DashboardStock[];

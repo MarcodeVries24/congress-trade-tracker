@@ -12,10 +12,12 @@ export function PriceTradesChartLive({
   ticker,
   fromDay,
   trades,
+  note,
 }: {
   ticker: string;
   fromDay: string;
   trades: ChartTrade[];
+  note?: string;
 }) {
   const series = usePriceSeries(ticker);
   if (series === undefined) return <div aria-hidden className="mt-5 h-[300px] animate-pulse rounded-lg bg-panel-muted" />;
@@ -23,7 +25,7 @@ export function PriceTradesChartLive({
   if (points.length < 10) return null;
   return (
     <div className="mt-5">
-      <PriceTradesChart ticker={ticker} points={points} trades={trades} />
+      <PriceTradesChart ticker={ticker} points={points} trades={trades} note={note} />
     </div>
   );
 }

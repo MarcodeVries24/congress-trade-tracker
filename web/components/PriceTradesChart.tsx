@@ -60,19 +60,22 @@ export function PriceTradesChart({
   points,
   trades,
   ticker,
+  note,
 }: {
   points: PricePoint[];
   trades: ChartTrade[];
   ticker: string;
+  /** A line under the title, e.g. that only the most recent trades are drawn. */
+  note?: string;
 }) {
   if (points.length < 10) return null;
   return (
     <>
       <div className="lg:hidden">
-        <Chart points={points} trades={trades} ticker={ticker} width={NARROW} />
+        <Chart points={points} trades={trades} ticker={ticker} note={note} width={NARROW} />
       </div>
       <div className="hidden lg:block">
-        <Chart points={points} trades={trades} ticker={ticker} width={WIDE} />
+        <Chart points={points} trades={trades} ticker={ticker} note={note} width={WIDE} />
       </div>
     </>
   );
@@ -82,11 +85,13 @@ function Chart({
   points,
   trades,
   ticker,
+  note,
   width: WIDTH,
 }: {
   points: PricePoint[];
   trades: ChartTrade[];
   ticker: string;
+  note?: string;
   width: number;
 }) {
   const PLOT_W = WIDTH - PAD_LEFT - PAD_RIGHT;
@@ -158,7 +163,10 @@ function Chart({
   return (
     <figure className="rounded-lg border border-line bg-panel p-4">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-sm font-medium text-ink">{ticker} price, with Congress&rsquo;s trades on it</span>
+        <span>
+          <span className="block text-sm font-medium text-ink">{ticker} price, with Congress&rsquo;s trades on it</span>
+          {note ? <span className="mt-0.5 block text-[11px] text-ink-faint">{note}</span> : null}
+        </span>
         <span className="flex flex-wrap items-center gap-3 text-xs text-ink-muted">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Purchase

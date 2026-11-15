@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { appleApiConfigured, describeAppleError, subscriptionStatusFor } from "@/lib/appleStore";
-import { accountTokenFor } from "@/lib/storeAccountToken";
+import {
+  accountStillExists,
+  accountTokenFor,
+  releaseAppleSubscription,
+  userForAccountToken,
+} from "@/lib/storeAccountToken";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
 /**
@@ -47,18 +52,37 @@ export async function POST(req: NextRequest) {
 
   // The transaction has to belong to this account. The token is the UUID we
   // issued for this user, not the Clerk id, because that is all StoreKit will
-  // carry. A mismatch means someone is presenting somebody else's transaction:
-  // say it grants them nothing rather than attaching it to whoever is signed in.
+  // carry. A mismatch means the subscription was bought signed in as someone
+  // else. While that account exists it keeps it: one Apple Account's
+  // subscription does not unlock several CongTrade accounts. Once it has
+  // been deleted (or the token was never ours to resolve), the subscription
+  // belongs to nobody, and it moves to the account restoring it, so someone
+  // who deleted their account and made a new one is not locked out of what
+  // they are still paying for.
   const expectedToken = await accountTokenFor(userId);
+  const subscriptionId = transaction.originalTransactionId ?? originalTransactionId;
   if (transaction.appAccountToken && transaction.appAccountToken !== expectedToken) {
-    console.error("[apple] transaction belongs to another account", { userId, originalTransactionId });
-    return NextResponse.json({ entitled: false, reason: "other-account" }, { status: 409 });
+    const holder = await userForAccountToken(transaction.appAccountToken);
+    if (holder && holder !== userId && (await accountStillExists(holder))) {
+      console.error("[apple] transaction belongs to another account", { userId, originalTransactionId });
+      return NextResponse.json(
+        {
+          entitled: false,
+          reason: "other-account",
+          error:
+            "This App Store subscription belongs to a different CongTrade account. Sign in with the account you subscribed with.",
+        },
+        { status: 409 }
+      );
+    }
+    console.info("[apple] subscription moved from a deleted account", { userId, from: holder, originalTransactionId });
+    await releaseAppleSubscription(subscriptionId, userId);
   }
 
   await upsertSubscription({
     clerkUserId: userId,
     provider: "apple",
-    providerAccountId: transaction.originalTransactionId ?? originalTransactionId,
+    providerAccountId: subscriptionId,
     providerSubscriptionId: transaction.transactionId ?? null,
     status,
     productId: transaction.productId ?? null,

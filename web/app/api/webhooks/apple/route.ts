@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appleNotificationsConfigured, statusForNotification, verifyNotification, verifyTransaction } from "@/lib/appleStore";
-import { userForAccountToken } from "@/lib/storeAccountToken";
+import { appleSubscriptionHolder, userForAccountToken } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -66,8 +66,14 @@ export async function POST(req: NextRequest) {
   // only carries UUIDs and drops anything else silently. Resolving it is the
   // only thing tying a receipt to an account, so a purchase we cannot resolve
   // is recorded nowhere rather than attached to a guess.
+  //
+  // Whoever holds the subscription now comes first: after it has moved from a
+  // deleted account (see the store route) the token, fixed in the purchase,
+  // still names the old one.
   const accountToken = transaction.appAccountToken;
-  const clerkUserId = accountToken ? await userForAccountToken(accountToken) : null;
+  const clerkUserId =
+    (transaction.originalTransactionId ? await appleSubscriptionHolder(transaction.originalTransactionId) : null) ??
+    (accountToken ? await userForAccountToken(accountToken) : null);
   if (!clerkUserId) {
     console.error("[apple] could not resolve the purchase to an account", {
       notificationUUID,

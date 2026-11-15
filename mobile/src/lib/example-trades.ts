@@ -59,56 +59,77 @@ function toExample(t: ExampleSource): Example {
 
 // Picked members whose pages are asked for their trades, at most: one request each.
 const MEMBERS_ASKED = 5;
-// How far back a picked member's trade may have been filed to be the example.
-const FILED_WITHIN_DAYS = 365;
+// The newest filings by anyone, when nobody was picked or they have no stock trades.
+const LATEST_ASKED = 40;
+
+// The fields fromLatestFiling reads, on a feed trade and on a member page's trade alike.
+type Dated = {
+  ticker: string | null;
+  transaction_type: string;
+  company_name?: string | null;
+  amount_low: number | null;
+  filing_date: string | null;
+};
+
+const isStockBuyOrSale = (t: Dated & { asset_type_code?: string | null }) =>
+  !!t.ticker && /^[PS]/i.test(t.transaction_type) && (t.asset_type_code ?? 'ST') === 'ST';
 
 /**
- * The trade the plans screen shows as an example alert, always a real one:
+ * The trade to show from the newest filing among these: the latest filed,
+ * and within that filing, one with a company the SEC names rather than a raw
+ * filed asset name (which can be long and in capitals, "PT BANK CENTRAL ASIA
+ * TBK UNSPONSORED ADR"), the biggest first.
+ */
+function fromLatestFiling<T extends Dated>(trades: T[]): T | undefined {
+  const newest = trades.reduce((max, t) => ((t.filing_date ?? '') > max ? (t.filing_date ?? '') : max), '');
+  return trades
+    .filter((t) => (t.filing_date ?? '') === newest)
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.company_name)) - Number(Boolean(a.company_name)) || (b.amount_low ?? 0) - (a.amount_low ?? 0)
+    )[0];
+}
+
+/** The plans screen's example alert, and what to call it above the card. */
+export type AlertExample = { example: Example; label: 'Latest trade' | 'From a filing' };
+
+/**
+ * The trade the plans screen shows as an example alert, always a real one,
+ * from the latest filing:
  *
- * 1. by someone picked during setup, so the example is about them: their
- *    biggest stock purchase or sale filed in the last year (else their
- *    latest), a company the SEC names before a raw filed asset name, which
- *    can be long and in capitals ("PT BANK CENTRAL ASIA TBK UNSPONSORED ADR");
- * 2. else the biggest recent one by anyone;
- * 3. else, offline, a well-known filed one.
+ * 1. of someone picked during setup, so the example is about them;
+ * 2. else of anyone;
+ * 3. else, offline, a well-known filed one, labelled as such.
  *
  * Picked members come from their pages' free endpoint: a member filter on
  * /api/trades is a Pro filter, and nobody on the plans screen has Pro.
  */
-export async function fetchAlertExample(filedNames: string[], signal?: AbortSignal): Promise<Example> {
+export async function fetchAlertExample(filedNames: string[], signal?: AbortSignal): Promise<AlertExample> {
   const slugs = [...new Set(filedNames.map(memberSlug))].slice(0, MEMBERS_ASKED);
   const pages = await Promise.all(slugs.map((slug) => fetchPolitician(slug, { signal }).catch(() => null)));
-  const since = new Date(Date.now() - FILED_WITHIN_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const theirs = pages.flatMap((page) =>
-    page
-      ? page.trades
-          .filter((t) => t.ticker && /^[PS]/i.test(t.transaction_type) && (t.asset_type_code ?? 'ST') === 'ST')
-          .map((t) => ({ page, t }))
-      : []
+  const theirs = fromLatestFiling(
+    pages.flatMap((page) =>
+      page
+        ? page.trades
+            .filter(isStockBuyOrSale)
+            .map((t) => ({
+              ...t,
+              member_name: page.profile.display,
+              party: page.profile.party,
+              photo_url: page.profile.photo_url,
+            }))
+        : []
+    )
   );
-  const recent = theirs.filter(({ t }) => (t.filing_date ?? '') >= since);
-  const best = (recent.length ? recent : theirs).sort(
-    (a, b) =>
-      Number(Boolean(b.t.company_name)) - Number(Boolean(a.t.company_name)) ||
-      (recent.length ? (b.t.amount_low ?? 0) - (a.t.amount_low ?? 0) : 0) ||
-      (b.t.filing_date ?? '').localeCompare(a.t.filing_date ?? '')
-  )[0];
-  if (best) {
-    const { profile } = best.page;
-    return toExample({
-      ...best.t,
-      member_name: profile.display,
-      party: profile.party,
-      photo_url: profile.photo_url,
-    });
-  }
+  if (theirs) return { example: toExample(theirs), label: 'Latest trade' };
   try {
-    const res = await fetchTrades({ limit: RECENT, assetTypes: ['ST'] }, { signal });
-    return biggestRecent(res.data)[0] ?? FALLBACK[0];
+    const res = await fetchTrades({ limit: LATEST_ASKED, assetTypes: ['ST'] }, { signal });
+    const anyone = fromLatestFiling(res.data.filter((t) => isStockBuyOrSale(t) && t.photo_url));
+    if (anyone) return { example: toExample(anyone), label: 'Latest trade' };
   } catch (e) {
     if (signal?.aborted) throw e;
-    return FALLBACK[0];
   }
+  return { example: FALLBACK[0], label: 'From a filing' };
 }
 
 // How many of the latest filings to look through for the biggest: the 200

@@ -8,7 +8,7 @@ import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
-import { fetchAlertExample, type Example } from '@/lib/example-trades';
+import { fetchAlertExample, type AlertExample } from '@/lib/example-trades';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod, Trial } from '@/lib/products';
@@ -131,15 +131,16 @@ export default function PaywallScreen() {
   const followed = [...new Set(answers.members.map(memberDisplayNameFromFiledName))];
   const who = followed.length === 1 ? followed[0] : `${followed[0]} and ${followed.length - 1} more`;
 
-  // A real trade, as an alert would announce it: theirs when someone was
-  // picked and has a recent stock trade, else the biggest recent one, else a
-  // well-known filed one when the feed cannot be reached.
-  const [example, setExample] = useState<Example | null>(null);
+  // A real trade, as an alert would announce it, from the latest filing:
+  // theirs when someone was picked and has stock trades, else anyone's, else
+  // a well-known filed one when the feed cannot be reached.
+  const [shown, setShown] = useState<AlertExample | null>(null);
+  const example = shown?.example;
   const filed = answers.members.join('|');
   useEffect(() => {
     const controller = new AbortController();
     fetchAlertExample(filed ? filed.split('|') : [], controller.signal)
-      .then(setExample)
+      .then(setShown)
       .catch(() => {});
     return () => controller.abort();
   }, [filed]);
@@ -206,9 +207,9 @@ export default function PaywallScreen() {
                   <Text variant="caption" tone="muted" style={styles.semibold}>
                     CONGTRADE
                   </Text>
-                  {/* So it is not taken for a real notification. */}
+                  {/* What it is, so it is not taken for a notification of their own. */}
                   <Text variant="caption" tone="faint">
-                    Example
+                    {shown?.label}
                   </Text>
                 </View>
                 <Text variant="callout" style={styles.bold} numberOfLines={1}>

@@ -1,3 +1,4 @@
+import { createPrivateKey } from "node:crypto";
 import {
   APIError,
   APIException,
@@ -113,7 +114,9 @@ function signedDataVerifier(environment: Environment): SignedDataVerifier {
 export function describeAppleError(err: unknown): string {
   if (err instanceof APIException) {
     const code = typeof err.apiError === "number" ? (APIError[err.apiError] ?? err.apiError) : null;
-    return [`App Store API ${err.httpStatusCode}`, code, err.errorMessage].filter(Boolean).join(", ");
+    const said = [`App Store API ${err.httpStatusCode}`, code, err.errorMessage].filter(Boolean).join(", ");
+    // Apple turned the credentials down: say what we hold, without saying it.
+    return err.httpStatusCode === 401 ? `${said} (${credentialsCheck()})` : said;
   }
   if (err instanceof VerificationException) {
     const cause = err.cause instanceof Error && err.cause.message ? ` (${err.cause.message})` : "";
@@ -121,6 +124,32 @@ export function describeAppleError(err: unknown): string {
   }
   if (err instanceof Error) return err.message || err.name;
   return String(err);
+}
+
+/**
+ * What the App Store Server API credentials look like, for a 401: whether
+ * each is the right shape, never the values. The key id is shown by its last
+ * four characters, which is how App Store Connect lists keys anyway.
+ */
+function credentialsCheck(): string {
+  const keyId = process.env.APPLE_KEY_ID?.trim() ?? "";
+  const issuer = process.env.APPLE_ISSUER_ID?.trim() ?? "";
+  const pem = process.env.APPLE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim() ?? "";
+  let key = "unreadable";
+  try {
+    const k = createPrivateKey(pem);
+    const curve = k.asymmetricKeyDetails?.namedCurve;
+    key = k.asymmetricKeyType === "ec" && curve === "prime256v1" ? "EC P-256, as Apple issues" : `${k.asymmetricKeyType} ${curve ?? ""}`.trim();
+  } catch {
+    key = pem.includes("BEGIN PRIVATE KEY") ? "has the PEM lines but does not parse" : "no -----BEGIN PRIVATE KEY----- line";
+  }
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(issuer);
+  return [
+    `key id …${keyId.slice(-4)} (${keyId.length} characters${keyId.length === 10 ? "" : ", expected 10"})`,
+    `issuer ${uuid ? "is a UUID" : "is not a UUID"}`,
+    `private key ${key}`,
+    `bundle ${BUNDLE_ID}`,
+  ].join("; ");
 }
 
 /** The first environment's answer that verifies; every environment's failure if none does. */

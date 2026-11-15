@@ -239,15 +239,22 @@ export async function subscriptionStatusFor(originalTransactionId: string): Prom
   transaction: JWSTransactionDecodedPayload;
 } | null> {
   // Production first; a sandbox purchase is "not found" there (404), and is
-  // then asked of the sandbox.
+  // then asked of the sandbox. Before the app's first release Apple's
+  // production API answers 401 to every call, credentials or not, so a 401
+  // there is passed on to the sandbox too: TestFlight and App Review, the
+  // only purchases there are then, are all sandbox. A 401 from the sandbox
+  // as well is a real credentials problem, and both answers are reported.
   let statuses = null;
+  const failures: string[] = [];
   for (const environment of ENVIRONMENTS) {
     try {
       statuses = await appStoreApi(environment).getAllSubscriptionStatuses(originalTransactionId);
       break;
     } catch (err) {
-      const notFound = err instanceof APIException && err.httpStatusCode === 404;
-      if (!notFound || environment === ENVIRONMENTS[ENVIRONMENTS.length - 1]) throw err;
+      const elsewhere = err instanceof APIException && (err.httpStatusCode === 404 || err.httpStatusCode === 401);
+      if (!elsewhere) throw err;
+      failures.push(`${environment}: ${describeAppleError(err)}`);
+      if (environment === ENVIRONMENTS[ENVIRONMENTS.length - 1]) throw new Error(failures.join("; "));
     }
   }
   for (const group of statuses?.data ?? []) {

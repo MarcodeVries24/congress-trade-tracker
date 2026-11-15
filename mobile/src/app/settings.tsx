@@ -64,7 +64,7 @@ export default function SettingsScreen() {
           icon="person-circle-outline"
           label={isSignedIn ? 'Account' : 'Sign in'}
           detail={isSignedIn ? (user?.primaryEmailAddress?.emailAddress ?? undefined) : 'Same account as the website'}
-          onPress={() => router.push('/sign-in')}
+          onPress={() => router.push({ pathname: '/sign-in', params: { manage: '1' } })}
         />
         <ListRow
           icon="card-outline"

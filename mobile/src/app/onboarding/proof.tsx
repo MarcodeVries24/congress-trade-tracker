@@ -10,7 +10,8 @@ import { fetchStats, type SiteStats } from '@/lib/api';
 import { useOnboarding } from '@/lib/onboarding';
 
 /**
- * The last screen before the paywall, and the only one that argues.
+ * The last question screen, and the only one that argues. Then the account
+ * step, always, so going back from the plans lands there.
  *
  * The numbers are fetched rather than written down, because a hardcoded
  * "65,000+ trades" is a claim that quietly goes stale and a fetched one cannot.
@@ -43,11 +44,10 @@ export default function ProofScreen() {
     <OnboardingStep
       step={5}
       title="I read every official filing, so you don't have to."
-      continueLabel="See the plans"
       onContinue={async () => {
         await finish();
-        // Pushed, not replaced, so the plans screen can go back to the steps.
-        nav.go('/paywall');
+        // Pushed, not replaced, so each screen can go back to the one before.
+        nav.go('/onboarding/account');
       }}>
       <View style={styles.grid}>
         {figures.map((f) => (

@@ -18,7 +18,7 @@ import { Icon, type IconName } from '@/ui/icon';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
-export const ONBOARDING_STEPS = 5;
+export const ONBOARDING_STEPS = 6;
 
 /**
  * Cong's pose on each screen he asks from (design "CongTrade avatar
@@ -37,7 +37,8 @@ const POSES = {
   pro: require('../../assets/images/cong/pro.webp'),
 };
 export type CongPose = keyof typeof POSES;
-const STEP_POSES: CongPose[] = ['goal', 'chamber', 'members', 'notify', 'filings'];
+// The account step rings the bell again: it is where alerts get somewhere to go.
+const STEP_POSES: CongPose[] = ['goal', 'chamber', 'members', 'notify', 'filings', 'notify'];
 
 // Where each step's back arrow leads, by step number: step 1 goes back to the
 // welcome screen.
@@ -48,6 +49,7 @@ const STEP_ROUTES = [
   '/onboarding/members',
   '/onboarding/notify',
   '/onboarding/proof',
+  '/onboarding/account',
 ] as const;
 
 /**
@@ -73,7 +75,7 @@ export function useStepBack(step: number) {
 /**
  * The frame every onboarding question sits in.
  *
- * One component rather than five copies, so the progress bar, the spacing and
+ * One component rather than six copies, so the progress bar, the spacing and
  * the position of the continue button cannot drift between steps. A flow where
  * the button moves between screens feels broken even when nothing is.
  *
@@ -91,16 +93,19 @@ export function OnboardingStep({
   continueLabel = 'Continue',
   canContinue = true,
   skip,
+  skipLabel = 'Skip',
   back = true,
 }: {
   step: number;
   title: string;
   subtitle?: string;
   children?: ReactNode;
-  onContinue: () => void;
+  /** Without it, no button at the bottom: the step's own content moves on (the account step). */
+  onContinue?: () => void;
   continueLabel?: string;
   canContinue?: boolean;
   skip?: () => void;
+  skipLabel?: string;
   back?: boolean;
 }) {
   const { c } = useTheme();
@@ -128,7 +133,7 @@ export function OnboardingStep({
         {skip ? (
           <Tap onPress={skip} hitSlop={10}>
             <Text variant="callout" tone="muted" style={styles.skip}>
-              Skip
+              {skipLabel}
             </Text>
           </Tap>
         ) : (
@@ -146,13 +151,17 @@ export function OnboardingStep({
         </Animated.View>
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: insets.bottom + 14, borderTopColor: c.border, backgroundColor: c.background },
-        ]}>
-        <Button label={continueLabel} onPress={onContinue} disabled={!canContinue} />
-      </View>
+      {onContinue ? (
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: insets.bottom + 14, borderTopColor: c.border, backgroundColor: c.background },
+          ]}>
+          <Button label={continueLabel} onPress={onContinue} disabled={!canContinue} />
+        </View>
+      ) : (
+        <View style={{ height: insets.bottom }} />
+      )}
     </View>
   );
 }

@@ -24,14 +24,16 @@ import { Text } from '@/ui/text';
  * which plan, managing or cancelling it, sign out, and delete.
  *
  * Deletion is here because Apple requires an app that creates accounts to let
- * people delete them from inside the app, not only by email. It asks once, in
+ * people delete them from inside the app, not only by email. It shows only
+ * with `showDelete`, which Settings > Account passes: the same page opened
+ * from the avatar or the profile card is for the plan and signing out. It asks once, in
  * place, rather than through Alert, which does nothing on the web preview.
  *
  * A store subscription is named before anything is deleted. Deleting the
  * account cannot stop Apple or Google from charging, only the person can, and
  * finding that out from next week's receipt would be the worst way to learn it.
  */
-export function AccountPanel() {
+export function AccountPanel({ showDelete = false }: { showDelete?: boolean } = {}) {
   const { c } = useTheme();
   const router = useRouter();
   const { signOut, getToken } = useAuth();
@@ -152,54 +154,62 @@ export function AccountPanel() {
         />
       </Group>
 
-      {!confirming ? (
-        <Tap
-          onPress={() => {
-            haptic.select();
-            setConfirming(true);
-          }}
-          style={styles.deleteLink}>
-          <Text variant="callout" tone="loss" style={styles.bold}>
-            Delete account
-          </Text>
-        </Tap>
-      ) : (
-        <View style={[styles.confirm, { backgroundColor: c.surface, borderColor: c.loss }]}>
-          <View style={[styles.warnIcon, { backgroundColor: c.lossSoft }]}>
-            <Icon name="warning" size={22} color={c.loss} />
-          </View>
-          <Text variant="subhead">Delete your account?</Text>
-          <Text variant="callout" tone="muted">
-            This deletes your account, your sign-in and your saved alerts, straight away and for good. Billing records
-            are kept for seven years because Dutch law requires it. Follows on this phone stay until you remove the app.
-          </Text>
-
-          {storeRenewing.map((store) => (
-            <View key={store} style={[styles.storeWarning, { backgroundColor: c.lossSoft }]}>
-              <Text variant="caption">
-                Your {store === 'apple' ? 'App Store' : 'Google Play'} subscription will keep renewing. Deleting your
-                account does not cancel it. Cancel it first.
+      {/* Only from Settings > Account, where someone goes to manage the account.
+          The avatar and the profile card open this page too, to look at the plan
+          or sign out, and a delete link there is too easily tapped by mistake. */}
+      {showDelete ? (
+        <>
+          {!confirming ? (
+            <Tap
+              onPress={() => {
+                haptic.select();
+                setConfirming(true);
+              }}
+              style={styles.deleteLink}>
+              <Text variant="callout" tone="loss" style={styles.bold}>
+                Delete account
               </Text>
-              <Tap onPress={() => openPage(store === 'apple' ? LINKS.manageApple : LINKS.manageGoogle)}>
-                <Text variant="caption" style={[styles.bold, styles.underline]}>
-                  Manage subscriptions
-                </Text>
-              </Tap>
-            </View>
-          ))}
+            </Tap>
+          ) : (
+            <View style={[styles.confirm, { backgroundColor: c.surface, borderColor: c.loss }]}>
+              <View style={[styles.warnIcon, { backgroundColor: c.lossSoft }]}>
+                <Icon name="warning" size={22} color={c.loss} />
+              </View>
+              <Text variant="subhead">Delete your account?</Text>
+              <Text variant="callout" tone="muted">
+                This deletes your account, your sign-in and your saved alerts, straight away and for good. Billing
+                records are kept for seven years because Dutch law requires it. Follows on this phone stay until you
+                remove the app.
+              </Text>
 
-          <Button label="Delete permanently" kind="danger" loading={busy} onPress={deleteAccount} />
-          <Button
-            label="Keep my account"
-            kind="ghost"
-            disabled={busy}
-            onPress={() => {
-              setConfirming(false);
-              setError(null);
-            }}
-          />
-        </View>
-      )}
+              {storeRenewing.map((store) => (
+                <View key={store} style={[styles.storeWarning, { backgroundColor: c.lossSoft }]}>
+                  <Text variant="caption">
+                    Your {store === 'apple' ? 'App Store' : 'Google Play'} subscription will keep renewing. Deleting
+                    your account does not cancel it. Cancel it first.
+                  </Text>
+                  <Tap onPress={() => openPage(store === 'apple' ? LINKS.manageApple : LINKS.manageGoogle)}>
+                    <Text variant="caption" style={[styles.bold, styles.underline]}>
+                      Manage subscriptions
+                    </Text>
+                  </Tap>
+                </View>
+              ))}
+
+              <Button label="Delete permanently" kind="danger" loading={busy} onPress={deleteAccount} />
+              <Button
+                label="Keep my account"
+                kind="ghost"
+                disabled={busy}
+                onPress={() => {
+                  setConfirming(false);
+                  setError(null);
+                }}
+              />
+            </View>
+          )}
+        </>
+      ) : null}
 
       {error ? (
         <Text variant="caption" tone="loss" style={styles.center}>

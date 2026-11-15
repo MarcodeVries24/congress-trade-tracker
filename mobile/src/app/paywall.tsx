@@ -1,5 +1,6 @@
 import { memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { getProPricing } from '@congtrade/shared/plans';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,11 +9,13 @@ import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
+import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { fetchAlertExample, type AlertExample } from '@/lib/example-trades';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod, Trial } from '@/lib/products';
 import { useOnboarding } from '@/lib/onboarding';
+import { usePush } from '@/lib/push';
 import { usePurchases } from '@/lib/use-purchases';
 import { CongSays, ONBOARDING_STEPS, STEP_TOP_BAR, useStepBack } from '@/components/onboarding-step';
 import { radius, useTheme } from '@/theme';
@@ -81,6 +84,10 @@ export default function PaywallScreen() {
   const goBack = useStepBack(ONBOARDING_STEPS + 1);
   const access = useAccess();
   const { refresh } = access;
+  const { isSignedIn } = useAuth();
+  const email = useUser().user?.primaryEmailAddress?.emailAddress;
+  // Through push, so this phone's push token is unregistered with the account it belonged to.
+  const { signOut } = usePush();
   const purchases = usePurchases(useCallback(() => void refresh(), [refresh]));
 
   // Also how signing in gets someone past this screen: an account that already
@@ -113,7 +120,9 @@ export default function PaywallScreen() {
     haptic.commit();
     if (access.status === 'signed-out') {
       setPending(period);
-      router.push('/sign-in');
+      // Someone who passed the account step with "Not now": a new account,
+      // most likely, so the screen says so rather than "Welcome back".
+      router.push({ pathname: '/sign-in', params: { intent: 'create' } });
     } else void buy(period);
   };
 
@@ -186,9 +195,25 @@ export default function PaywallScreen() {
           website, and for a store reviewer holding a test login. */}
       <View style={[styles.top, { paddingTop: insets.top + STEP_TOP_BAR.paddingTop }]}>
         <IconButton name="chevron-back" label="Back" onPress={goBack} size={STEP_TOP_BAR.row} />
-        <Tap onPress={() => router.push('/sign-in')} hitSlop={10}>
+        {/* Signed in already (on the account step, say), the way to another
+            account is to leave this one first: asked, then signed out, then
+            the sign-in screen, which closes itself once they are in. */}
+        <Tap
+          onPress={() =>
+            isSignedIn
+              ? confirmSignOut(signOut, {
+                  wording: {
+                    title: 'Use another account?',
+                    message: email ? `You'll be signed out of ${email} first.` : "You'll be signed out first.",
+                    confirm: 'Switch',
+                  },
+                  then: () => router.push('/sign-in'),
+                })
+              : router.push('/sign-in')
+          }
+          hitSlop={10}>
           <Text variant="callout" tone="muted" style={styles.semibold}>
-            Sign in
+            {isSignedIn ? 'Switch account' : 'Sign in'}
           </Text>
         </Tap>
       </View>

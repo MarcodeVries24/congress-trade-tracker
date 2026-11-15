@@ -1,16 +1,19 @@
 import "../loadEnv.js";
-import { chromium } from "playwright";
+import { chromium, type Browser, type Page } from "playwright";
 import { senateReportPath } from "@congtrade/shared/senateReport";
 import { sql, ensureSchema } from "../db/index.js";
 import { senateMemberKey } from "./normalizeLastName.js";
 import { parseSenateReportPage } from "./senate/parseReport.js";
+import { readSenatePdfReport } from "./senate/readPdfReport.js";
 import { readSenateReportHeader } from "./senate/reportHeader.js";
 import { senateDocId } from "./senate/reportId.js";
 import { recordUnreadSenateFiling, saveSenateFiling, type SenateFilingRecord } from "./senate/saveFiling.js";
 
 /**
- * Reads the Senate report pages uploaded in /admin/senate (senate_uploads)
- * into filings and transactions, exactly as the automated search used to.
+ * Reads the Senate reports uploaded in /admin/senate (senate_uploads) into
+ * filings and transactions, exactly as the automated search used to. A
+ * report arrives as its saved HTML page or printed to PDF
+ * (senate/readPdfReport.ts).
  *
  * eFD's bot protection has turned the automated search away since 23 Oct
  * 2026, so the admin opens the new reports in an ordinary browser and saves
@@ -30,14 +33,24 @@ const KEEP_DAYS = 90;
 interface Upload {
   id: string;
   file_name: string | null;
-  report_url: string;
-  html: string;
+  /** Null for a PDF uploaded without one: its footer gives it. */
+  report_url: string | null;
+  html: string | null;
+  /** The printed report, base64, in place of html. */
+  pdf: string | null;
 }
 
-async function finish(id: string, status: "done" | "failed", note: string, docId: string | null = null) {
+async function finish(
+  id: string,
+  status: "done" | "failed",
+  note: string,
+  docId: string | null = null,
+  reportUrl: string | null = null
+) {
   await sql.query(
-    `UPDATE senate_uploads SET status = $2, note = $3, doc_id = $4, processed_at = NOW() WHERE id = $1::bigint`,
-    [id, status, note, docId]
+    `UPDATE senate_uploads SET status = $2, note = $3, doc_id = $4, report_url = COALESCE(report_url, $5), processed_at = NOW()
+     WHERE id = $1::bigint`,
+    [id, status, note, docId, reportUrl]
   );
 }
 
@@ -46,7 +59,7 @@ async function main() {
   await sql.query(`DELETE FROM senate_uploads WHERE created_at < NOW() - INTERVAL '${KEEP_DAYS} days'`);
 
   const uploads = (await sql.query(
-    `SELECT id::text, file_name, report_url, html FROM senate_uploads WHERE status = 'pending' ORDER BY created_at, id`
+    `SELECT id::text, file_name, report_url, html, pdf FROM senate_uploads WHERE status = 'pending' ORDER BY created_at, id`
   )) as Upload[];
   if (!uploads.length) {
     console.log("No Senate uploads waiting.");
@@ -54,22 +67,35 @@ async function main() {
   }
   console.log(`Reading ${uploads.length} uploaded Senate report(s)...`);
 
-  const browser = await chromium.launch({ headless: true, channel: "chrome" });
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  // The saved pages still point at eFD's scripts, styles and images; none of
-  // them is fetched.
-  await context.route("**/*", (route) => route.abort());
-  const page = await context.newPage();
+  // Only saved HTML pages need the browser; PDFs are read without one.
+  let browser: Browser | null = null;
+  const openPage = async (): Promise<Page> => {
+    browser ??= await chromium.launch({ headless: true, channel: "chrome" });
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    // The saved pages still point at eFD's scripts, styles and images; none of
+    // them is fetched.
+    await context.route("**/*", (route) => route.abort());
+    return context.newPage();
+  };
+  let page: Page | null = null;
 
   let read = 0;
   let failed = 0;
   for (const upload of uploads) {
     const label = upload.file_name ?? `upload #${upload.id}`;
     try {
-      const ref = senateReportPath(upload.report_url);
+      const printed = upload.pdf ? await readSenatePdfReport(new Uint8Array(Buffer.from(upload.pdf, "base64"))) : null;
+      const ref = senateReportPath(upload.report_url ?? printed?.address ?? "");
       if (!ref) {
         failed++;
-        await finish(upload.id, "failed", "Not an eFD report address.");
+        await finish(
+          upload.id,
+          "failed",
+          printed
+            ? "No eFD address in the PDF's footer. Print it with “Headers and footers” on, or upload it again with the address filled in."
+            : "Not an eFD report address."
+        );
+        console.log(`  ${label}: no report address`);
         continue;
       }
       const docId = senateDocId(ref);
@@ -79,19 +105,24 @@ async function main() {
       }[];
       const status = existing[0]?.parse_status;
       if (status && !["pending", "unsupported", "failed"].includes(status)) {
-        await finish(upload.id, "done", `Already in CongTrade (${status}), left as it is.`, docId);
+        await finish(upload.id, "done", `Already in CongTrade (${status}), left as it is.`, docId, ref.url);
         console.log(`  ${label}: already in (${status})`);
         continue;
       }
 
-      await page.setContent(upload.html, { waitUntil: "domcontentloaded" });
-      const header = await readSenateReportHeader(page);
+      if (!printed) {
+        page ??= await openPage();
+        await page.setContent(upload.html ?? "", { waitUntil: "domcontentloaded" });
+      }
+      const header = printed ? printed.header : await readSenateReportHeader(page!);
       if (!header) {
         failed++;
         await finish(
           upload.id,
           "failed",
-          "Couldn't find the senator's name and filing date. Save the report page itself, not the search results."
+          "Couldn't find the senator's name and filing date. Save the report page itself, not the search results.",
+          null,
+          ref.url
         );
         console.log(`  ${label}: no name or filing date found`);
         continue;
@@ -107,17 +138,33 @@ async function main() {
 
       if (ref.kind === "paper") {
         await recordUnreadSenateFiling(filing, "unsupported");
-        await finish(upload.id, "done", "Paper filing: not read automatically; it is in the review queue.", docId);
+        await finish(upload.id, "done", "Paper filing: not read automatically; it is in the review queue.", docId, ref.url);
         console.log(`  ${label}: ${header.filerName}, paper filing, sent to review`);
         read++;
         continue;
       }
 
-      const transactions = await parseSenateReportPage(page);
+      const transactions = printed ? (printed.hasTable ? printed.transactions : null) : await parseSenateReportPage(page!);
       if (transactions === null) {
         await recordUnreadSenateFiling(filing, "unsupported");
-        await finish(upload.id, "done", "No transactions table in the page; it is in the review queue.", docId);
+        await finish(upload.id, "done", "No transactions table in the page; it is in the review queue.", docId, ref.url);
         console.log(`  ${label}: ${header.filerName}, no transactions table`);
+        read++;
+        continue;
+      }
+      // A PDF is read from where its text sits, so a count that disagrees
+      // with the report's own means a row was missed or split: a person
+      // reads it instead.
+      if (printed && printed.declared !== null && printed.declared !== transactions.length) {
+        await recordUnreadSenateFiling(filing, "unsupported");
+        await finish(
+          upload.id,
+          "done",
+          `Read ${transactions.length} of the ${printed.declared} transactions in the PDF, so it went to the review queue instead.`,
+          docId,
+          ref.url
+        );
+        console.log(`  ${label}: ${header.filerName}, ${transactions.length} of ${printed.declared} rows, sent to review`);
         read++;
         continue;
       }
@@ -126,7 +173,8 @@ async function main() {
         upload.id,
         "done",
         `${header.filerName}, filed ${header.filingDate}: ${transactions.length} ${transactions.length === 1 ? "transaction" : "transactions"}, waiting for approval.`,
-        docId
+        docId,
+        ref.url
       );
       console.log(`  ${label}: ${header.filerName}, ${transactions.length} transactions`);
       read++;
@@ -137,7 +185,7 @@ async function main() {
     }
   }
 
-  await browser.close();
+  await (browser as Browser | null)?.close();
   console.log(`\nDone. ${read} read, ${failed} failed.`);
   if (failed && !read) process.exit(1);
 }

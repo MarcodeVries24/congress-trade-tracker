@@ -132,6 +132,37 @@ export function stripAssetDetail(cell: string | undefined): string {
   return name;
 }
 
+/**
+ * One row of an eFD transactions table, as its cells read:
+ * #, Transaction Date, Owner, Ticker, Asset Name, Asset Type, Type, Amount, Comment.
+ * Shared by the saved HTML page (below) and a page printed to PDF
+ * (readPdfReport.ts), so the two store a report the same way. Null when the
+ * row has too few cells to be a transaction.
+ */
+export function senateTransactionFromCells(cells: string[]): SenateTransaction | null {
+  if (cells.length < 8) return null;
+  const [, dateCell, ownerCell, tickerCell, assetNameCell, assetTypeCell, typeCell, amountCell] = cells;
+
+  const ownerKey = ownerCell.trim().toLowerCase();
+  const owner = ownerKey in OWNER_MAP ? OWNER_MAP[ownerKey] : ownerCell || null;
+
+  const typeKey = typeCell.trim().toLowerCase();
+  const transactionType = TYPE_MAP[typeKey] ?? typeCell;
+
+  const { low, high } = parseAmountRange(amountCell);
+  return {
+    transactionDate: toIsoDateSlash(dateCell),
+    owner,
+    ticker: normalizeTickerCell(tickerCell),
+    assetName: stripAssetDetail(assetNameCell) || "(unknown asset)",
+    assetTypeCode: assetTypeCell || null,
+    transactionType,
+    amountRange: amountCell,
+    amountLow: low,
+    amountHigh: high,
+  };
+}
+
 export async function parseSenateReportPage(page: Page): Promise<SenateTransaction[] | null> {
   const hasTable = await page.locator("table thead th", { hasText: "Transaction Date" }).count();
   if (hasTable === 0) return null;
@@ -142,30 +173,8 @@ export async function parseSenateReportPage(page: Page): Promise<SenateTransacti
 
   const transactions: SenateTransaction[] = [];
   for (const cells of rawRows) {
-    // #, Transaction Date, Owner, Ticker, Asset Name, Asset Type, Type, Amount, Comment
-    if (cells.length < 8) continue;
-    const [, dateCell, ownerCell, tickerCell, assetNameCell, assetTypeCell, typeCell, amountCell] = cells;
-
-    const ownerKey = ownerCell.trim().toLowerCase();
-    const owner = ownerKey in OWNER_MAP ? OWNER_MAP[ownerKey] : ownerCell || null;
-
-    const typeKey = typeCell.trim().toLowerCase();
-    const transactionType = TYPE_MAP[typeKey] ?? typeCell;
-
-    const ticker = normalizeTickerCell(tickerCell);
-    const { low, high } = parseAmountRange(amountCell);
-
-    transactions.push({
-      transactionDate: toIsoDateSlash(dateCell),
-      owner,
-      ticker,
-      assetName: stripAssetDetail(assetNameCell) || "(unknown asset)",
-      assetTypeCode: assetTypeCell || null,
-      transactionType,
-      amountRange: amountCell,
-      amountLow: low,
-      amountHigh: high,
-    });
+    const t = senateTransactionFromCells(cells);
+    if (t) transactions.push(t);
   }
 
   return transactions;

@@ -525,4 +525,10 @@ export const SCHEMA_STATEMENTS = [
     processed_at TIMESTAMPTZ
   )`,
   `CREATE INDEX IF NOT EXISTS idx_senate_uploads_pending ON senate_uploads(created_at) WHERE status = 'pending'`,
+  // A report can also arrive printed to PDF (Print > Save as PDF), kept here
+  // base64-encoded in place of the HTML. Its address is then read from the
+  // footer Chrome prints, so it may be unknown until the ingest reads it.
+  `ALTER TABLE senate_uploads ADD COLUMN IF NOT EXISTS pdf TEXT`,
+  `ALTER TABLE senate_uploads ALTER COLUMN html DROP NOT NULL`,
+  `ALTER TABLE senate_uploads ALTER COLUMN report_url DROP NOT NULL`,
 ];

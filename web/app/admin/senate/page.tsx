@@ -18,7 +18,8 @@ interface UploadRow {
   id: string;
   created_at: string;
   file_name: string | null;
-  report_url: string;
+  /** Null until the ingest has read a PDF uploaded without it. */
+  report_url: string | null;
   status: "pending" | "done" | "failed";
   note: string | null;
 }
@@ -92,7 +93,9 @@ export default async function SenateImportPage() {
           </li>
           <li>
             Open each report that is new and save it: <strong>⌘S</strong>, format <strong>Webpage, HTML Only</strong>{" "}
-            (Chrome) or <strong>Page Source</strong> (Safari).
+            (Chrome) or <strong>Page Source</strong> (Safari). Or print it with <strong>⌘P</strong>,{" "}
+            <strong>Save as PDF</strong>, keeping <strong>Headers and footers</strong> on so the report&apos;s address is
+            printed at the bottom.
           </li>
           <li>Drop the saved files below and upload them.</li>
         </ol>
@@ -105,14 +108,18 @@ export default async function SenateImportPage() {
             {uploads.map((u) => (
               <li key={u.id} className="px-4 py-3 text-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <a
-                    href={u.report_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="truncate font-medium text-ink hover:underline"
-                  >
-                    {u.file_name ?? u.report_url}
-                  </a>
+                  {u.report_url ? (
+                    <a
+                      href={u.report_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="truncate font-medium text-ink hover:underline"
+                    >
+                      {u.file_name ?? u.report_url}
+                    </a>
+                  ) : (
+                    <span className="truncate font-medium text-ink">{u.file_name ?? `Upload #${u.id}`}</span>
+                  )}
                   <span className={`text-xs font-medium ${STATUS_CLASS[u.status]}`}>
                     {STATUS_LABEL[u.status]} · {when(u.created_at)}
                   </span>

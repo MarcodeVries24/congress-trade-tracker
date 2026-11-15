@@ -13,6 +13,7 @@ import { PushProvider } from '@/lib/push';
 import { useCountOpenDays } from '@/lib/review-prompt';
 import { tokenCache } from '@/lib/token-cache';
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { PushAfterPro } from '@/ui/push-after-pro';
 import { SplashOverlay } from '@/ui/splash-overlay';
 
 SplashScreen.preventAutoHideAsync();
@@ -80,6 +81,7 @@ function Navigation() {
         <Stack.Screen name="sign-in" options={{ ...modal, title: 'Account' }} />
         <Stack.Screen name="feedback" options={modal} />
       </Stack>
+      <PushAfterPro />
     </>
   );
 }

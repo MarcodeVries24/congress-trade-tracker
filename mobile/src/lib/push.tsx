@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Linking, Platform } from 'react-native';
 
 import { fetchAlerts, registerPushDevice, unregisterPushDevice } from '@/lib/api';
+import { noteAlertTapped } from '@/lib/review-prompt';
 import { fromAlertFilters } from '@/lib/trade-filters';
 import { useAuthedRequest } from '@/lib/use-api';
 
@@ -239,6 +240,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       void Notifications.clearLastNotificationResponseAsync().catch(() => {});
       const data = response.notification.request.content.data as { type?: string; alertId?: string } | undefined;
       if (data?.type !== 'alert' || !data.alertId) return;
+      noteAlertTapped();
       void (async () => {
         try {
           const list = await fetchAlerts(await authed());

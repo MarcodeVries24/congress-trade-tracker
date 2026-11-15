@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as StoreReview from 'expo-store-review';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { useAccess } from '@/lib/access';
@@ -13,7 +13,8 @@ import { useAccess } from '@/lib/access';
  * prompt, and Apple's guidelines allow only the system prompt. Instead the
  * prompt is kept for moments when someone is likely getting value out of the
  * app: a subscriber who has opened it on a few different days, right after
- * they set up an alert or followed a politician.
+ * they set up an alert, followed a politician, or looked at a trade an alert
+ * brought them to.
  *
  * The systems decide whether the prompt actually appears (iOS at most three
  * times a year, Google by its own quota), so this only picks the moment, and
@@ -23,8 +24,13 @@ import { useAccess } from '@/lib/access';
 const KEY = 'review-prompt.v1';
 /** Distinct days the app was opened before asking. */
 const MIN_OPEN_DAYS = 3;
-/** Between two asks, whether or not the system showed the first. */
-const ASK_EVERY_DAYS = 90;
+/**
+ * Between two asks, whether or not the system showed the first. iOS shows the
+ * prompt at most three times a year anyway; Google's limit is its own.
+ */
+const ASK_EVERY_DAYS = 60;
+/** How long after an alert notification is tapped a trade still counts as "from the alert". */
+const FROM_ALERT_MS = 30 * 60_000;
 /** Lets the screen that was closed (an alert sheet) finish animating away. */
 const DELAY_MS = 900;
 
@@ -93,4 +99,35 @@ export function useAskForReview() {
       }
     })();
   }, [status]);
+}
+
+/** When an alert notification was last tapped (push.tsx), in this run of the app. */
+let alertTappedAt = 0;
+
+/** Called when an alert notification opens the app on that alert's trades. */
+export function noteAlertTapped() {
+  alertTappedAt = Date.now();
+}
+
+/**
+ * For the trade screen: when someone who came in through an alert notification
+ * goes back from a trade, they have just had what the app is for, which is a
+ * good moment to ask (if it is due). Counts once per notification tap.
+ */
+export function useAskAfterAlertTrade() {
+  const askForReview = useAskForReview();
+  // The latest one, so the check below runs once, on leaving the screen, and
+  // not each time the subscription status settles while it is open.
+  const ask = useRef(askForReview);
+  useEffect(() => {
+    ask.current = askForReview;
+  }, [askForReview]);
+  useEffect(
+    () => () => {
+      if (!alertTappedAt || Date.now() - alertTappedAt > FROM_ALERT_MS) return;
+      alertTappedAt = 0;
+      ask.current();
+    },
+    []
+  );
 }

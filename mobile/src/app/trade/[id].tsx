@@ -15,6 +15,7 @@ import {
   tradeVerb,
 } from '@/lib/format';
 import { openPage } from '@/lib/links';
+import { useAskAfterAlertTrade } from '@/lib/review-prompt';
 import { recallTrade } from '@/lib/trade-cache';
 import { ASSET_TYPES } from '@/lib/trade-filters';
 import { partyTone, radius, shadow, useTheme } from '@/theme';
@@ -84,6 +85,8 @@ export default function TradeDetailScreen() {
   const { c, scheme } = useTheme();
   const router = useRouter();
   const follows = useFollows();
+  // Leaving a trade an alert led to may bring up the rating prompt.
+  useAskAfterAlertTrade();
   const trade = recallTrade(Number(id));
 
   if (!trade) {

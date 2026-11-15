@@ -166,7 +166,7 @@ export default async function IssuerPage({ params }: { params: Promise<{ slug: s
                 fromDay={chartFrom}
                 note={
                   issuer.trade_count > ISSUER_PAGE_TRADE_LIMIT
-                    ? `Shows the ${ISSUER_PAGE_TRADE_LIMIT} most recent trades only.`
+                    ? `Shows the ${ISSUER_PAGE_TRADE_LIMIT} most recently disclosed trades only.`
                     : undefined
                 }
                 trades={trades.map((t) => ({

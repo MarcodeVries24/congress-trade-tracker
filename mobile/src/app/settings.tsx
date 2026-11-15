@@ -9,7 +9,6 @@ import { useFollows } from '@/lib/follows';
 import { haptic } from '@/lib/haptics';
 import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { LINKS, SITE, openPage } from '@/lib/links';
-import { useOnboarding } from '@/lib/onboarding';
 import { usePush } from '@/lib/push';
 import { useTheme } from '@/theme';
 import { ListRow } from '@/ui/list-row';
@@ -34,7 +33,6 @@ export default function SettingsScreen() {
   const { user } = useUser();
   const { status, renewing } = useAccess();
   const follows = useFollows();
-  const { reset } = useOnboarding();
   const [confirm, setConfirm] = useState<'follows' | 'onboarding' | null>(null);
 
   const store = renewing.includes('apple')
@@ -129,7 +127,12 @@ export default function SettingsScreen() {
           last
           onPress={() =>
             ask('onboarding', () => {
-              void reset().then(() => router.replace('/onboarding'));
+              // The welcome screen clears the answers itself once it is open
+              // (see `redo` there). Cleared here, the root layout would see
+              // setup undone while this screen is still showing and open a
+              // second welcome screen without `redo`, which sends a
+              // subscriber straight back into the app.
+              router.replace({ pathname: '/onboarding', params: { redo: '1' } });
             })
           }
         />

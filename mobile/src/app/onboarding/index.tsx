@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
@@ -40,7 +40,7 @@ export default function WelcomeScreen() {
   // Back here because their Pro ran out, not new: told so, and sent straight
   // to the plans, since they have been through the questions before.
   const ended = status === 'free' && endedAt ? endedAt : null;
-  const { finish } = useOnboarding();
+  const { finish, reset } = useOnboarding();
   const [examples, setExamples] = useState<{
     rows: Example[];
     recent: boolean;
@@ -65,17 +65,28 @@ export default function WelcomeScreen() {
   // app, so it skips this screen and goes on to the questions, then the
   // plans. Only right after a sign-in started here: someone signed in who
   // goes back from the first question to this screen stays on it.
+  //
+  // Not when they came here on purpose from Settings ("Redo the setup
+  // questions", `redo=1`): a subscriber doing that would otherwise be sent
+  // straight back into the app, and the button would seem to do nothing.
+  const redo = useLocalSearchParams<{ redo?: string }>().redo === '1';
+  // Settings > "Redo the setup questions" opens this screen with `redo`, and
+  // the answers are cleared here, once it is open: cleared before, the root
+  // layout would redirect here a second time, without `redo`.
+  useEffect(() => {
+    if (redo) void reset();
+  }, [redo, reset]);
   const signingIn = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (status === 'pro') {
+      if (status === 'pro' && (!redo || signingIn.current)) {
         signingIn.current = false;
         void finish().then(() => router.replace('/'));
       } else if (signingIn.current && status !== 'loading') {
         signingIn.current = false;
         if (status === 'free') router.push('/onboarding/goal');
       }
-    }, [status, finish, router])
+    }, [status, redo, finish, router])
   );
 
   // The disc is 1.55 times Cong's width; keep it inside what is left.

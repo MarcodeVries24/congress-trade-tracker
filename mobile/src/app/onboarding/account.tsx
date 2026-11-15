@@ -1,10 +1,12 @@
 import { memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { AuthOptions } from '@/components/auth-options';
 import { OnboardingStep, useOnboardingNav } from '@/components/onboarding-step';
+import { useAccess } from '@/lib/access';
 import { useOnboarding } from '@/lib/onboarding';
 import { radius, useTheme } from '@/theme';
 import { Icon } from '@/ui/icon';
@@ -34,6 +36,10 @@ export default function AccountStep() {
   const { user } = useUser();
   const { answers } = useOnboarding();
   const { c } = useTheme();
+  const router = useRouter();
+  // A subscriber redoing the questions (Settings) has no plan to pick: "Done"
+  // takes them back into the app with the new answers.
+  const pro = useAccess().status === 'pro';
 
   const followed = [...new Set(answers.members.map(memberDisplayNameFromFiledName))];
   const forWhom = followed.length === 1 ? `for ${followed[0]} ` : '';
@@ -44,6 +50,7 @@ export default function AccountStep() {
   useEffect(() => {
     if (isSignedIn && signingIn.current) {
       signingIn.current = false;
+      // The plans close themselves for an account that has Pro already.
       nav.go('/paywall');
     }
   }, [isSignedIn, nav]);
@@ -62,8 +69,8 @@ export default function AccountStep() {
         }
         skip={isSignedIn ? undefined : () => nav.go('/paywall')}
         skipLabel="Not now"
-        continueLabel="See the plans"
-        onContinue={isSignedIn ? () => nav.go('/paywall') : undefined}>
+        continueLabel={pro ? 'Done' : 'See the plans'}
+        onContinue={isSignedIn ? () => (pro ? router.replace('/') : nav.go('/paywall')) : undefined}>
         {isSignedIn ? (
           <View style={[styles.signedIn, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Icon name="checkmark-circle" size={22} color={c.gain} />

@@ -7,6 +7,7 @@ import { getPolitician } from '@/lib/detail-cache';
 import { tradesFromPolitician } from '@/lib/detail-trades';
 import { useFollows } from '@/lib/follows';
 import { compactUSD, shortDate } from '@/lib/format';
+import { useAskForReview } from '@/lib/review-prompt';
 import { byMonth } from '@/lib/group';
 import { rememberTrades } from '@/lib/trade-cache';
 import { useAuthedRequest } from '@/lib/use-api';
@@ -35,6 +36,7 @@ export default function PoliticianScreen() {
   const router = useRouter();
   const authed = useAuthedRequest();
   const follows = useFollows();
+  const askForReview = useAskForReview();
   const [detail, setDetail] = useState<PoliticianDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,15 +111,17 @@ export default function PoliticianScreen() {
           <View style={styles.flex}>
             <FollowButton
               following={following}
-              onPress={() =>
-                follows.toggleMember({
+              onPress={() => {
+                const nowFollowing = follows.toggleMember({
                   slug: p.slug,
                   name: p.display,
                   photo_url: p.photo_url,
                   party: p.party,
                   subtitle,
-                })
-              }
+                });
+                // Following someone is a good moment to ask for a rating (if it is due).
+                if (nowFollowing) askForReview();
+              }}
             />
           </View>
           <View style={styles.flex}>

@@ -15,6 +15,7 @@ import { createAlert, deleteAlert, previewAlert, updateAlert, type AlertFilters,
 import { recallAlert } from '@/lib/alert-cache';
 import { haptic } from '@/lib/haptics';
 import { usePush } from '@/lib/push';
+import { useAskForReview } from '@/lib/review-prompt';
 import { countActive, fromAlertFilters, toAlertFilters, type TradeFilters } from '@/lib/trade-filters';
 import { useAuthedRequest } from '@/lib/use-api';
 import { useDebounced } from '@/lib/use-paged';
@@ -120,6 +121,7 @@ export default function AlertEditorScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const authed = useAuthedRequest();
+  const askForReview = useAskForReview();
   const push = usePush();
   const existing = id === 'new' ? undefined : recallAlert(id);
 
@@ -214,6 +216,8 @@ export default function AlertEditorScreen() {
       else await createAlert(body, await authed());
       haptic.success();
       router.back();
+      // A new alert set up is a good moment to ask for a rating (if it is due).
+      if (!existing) askForReview();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the alert.');
     } finally {

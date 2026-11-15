@@ -10,6 +10,7 @@ import { AccessProvider, useAccess } from '@/lib/access';
 import { FollowsProvider } from '@/lib/follows';
 import { OnboardingProvider, useOnboarding } from '@/lib/onboarding';
 import { PushProvider } from '@/lib/push';
+import { useCountOpenDays } from '@/lib/review-prompt';
 import { tokenCache } from '@/lib/token-cache';
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 import { SplashOverlay } from '@/ui/splash-overlay';
@@ -39,6 +40,8 @@ function Navigation() {
   // already subscribed, and a store reviewer, get in by signing in.
   const { locked } = useAccess();
   const onSignIn = segments[0] === 'sign-in';
+  // For the rating prompt, which waits until the app has been used on a few days.
+  useCountOpenDays();
 
   // Pushed screens get a flat header on the page colour with a bare back
   // chevron: the content carries the title, as in the apps this is modelled on.

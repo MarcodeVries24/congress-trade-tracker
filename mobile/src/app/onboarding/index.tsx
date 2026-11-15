@@ -5,8 +5,9 @@ import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
-import { fetchTrades, type Trade } from '@/lib/api';
-import { amountLabel, assetLabel, compactUSD, memberName, shortDate } from '@/lib/format';
+import { fetchTrades } from '@/lib/api';
+import { biggestRecent, FALLBACK, RECENT, type Example } from '@/lib/example-trades';
+import { shortDate } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { useOnboarding } from '@/lib/onboarding';
 import { radius, useTheme } from '@/theme';
@@ -20,108 +21,8 @@ import { TickerLogo } from '@/ui/ticker-logo';
 
 // Room the text, the examples and the buttons below Cong need, so he can
 // take the rest.
-const BELOW = 470;
+const BELOW = 494;
 
-type Example = {
-  key: string;
-  name: string;
-  party: string | null;
-  photo: string | null;
-  ticker: string;
-  company: string;
-  verb: string;
-  amount: string;
-  traded: string | null;
-};
-
-// How many of the latest filings to look through for the biggest: the 200
-// newest stock trades are about the last couple of weeks of disclosures.
-const RECENT = 200;
-// Purchases and sales made this recently; exchanges are left out, as share
-// swaps say little on their own.
-const TRADED_WITHIN_DAYS = 90;
-
-/**
- * The biggest recent stock trades, one per member, from the newest filings:
- * the largest disclosed brackets first, among purchases and sales made in the
- * last 90 days that have a ticker and a photo of who made them. Worked out here from the free feed, since sorting
- * by size within a date window is a Pro filter on the API.
- */
-function biggestRecent(trades: Trade[]): Example[] {
-  const seen = new Set<string>();
-  // Traded in the last 90 days, not only filed in them: a late filing of a
-  // year-old trade is not "recent" to anyone reading it.
-  const since = new Date(Date.now() - TRADED_WITHIN_DAYS * 86_400_000).toISOString().slice(0, 10);
-  return trades
-    .filter((t) => t.ticker && t.photo_url && t.amount_low)
-    .filter((t) => /^[PS]/i.test(t.transaction_type) && (t.transaction_date ?? '') >= since)
-    .sort(
-      (a, b) => (b.amount_low ?? 0) - (a.amount_low ?? 0) || (b.filing_date ?? '').localeCompare(a.filing_date ?? '')
-    )
-    .filter((t) => {
-      const who = t.member_slug ?? t.member_name;
-      if (seen.has(who)) return false;
-      seen.add(who);
-      return true;
-    })
-    .slice(0, 3)
-    .map((t) => ({
-      key: String(t.id),
-      name: memberName(t),
-      party: t.party,
-      photo: t.photo_url,
-      ticker: t.ticker!,
-      company: assetLabel(t),
-      // "Sold part of" costs the company name its room in this short row.
-      verb: /^P/i.test(t.transaction_type) ? 'Bought' : 'Sold',
-      amount:
-        t.amount_low && t.amount_high
-          ? `${compactUSD(t.amount_low)} – ${compactUSD(t.amount_high)}`
-          : amountLabel(t.amount_range),
-      traded: t.transaction_date,
-    }));
-}
-
-/**
- * Three well-known real trades, as filed, for when the recent ones cannot be
- * loaded (offline on first launch): the screen should never show an empty
- * card.
- */
-const FALLBACK: Example[] = [
-  {
-    key: 'pelosi-nvda',
-    name: 'Nancy Pelosi',
-    party: 'Democrat',
-    photo: 'https://bioguide.congress.gov/bioguide/photo/P/P000197.jpg',
-    ticker: 'NVDA',
-    company: 'NVIDIA',
-    verb: 'Bought',
-    amount: '$1M – $5M',
-    traded: '2024-07-26',
-  },
-  {
-    key: 'tuberville-intc',
-    name: 'Tommy Tuberville',
-    party: 'Republican',
-    photo: 'https://bioguide.congress.gov/bioguide/photo/T/T000278.jpg',
-    ticker: 'INTC',
-    company: 'Intel',
-    verb: 'Bought',
-    amount: '$100K – $250K',
-    traded: '2024-05-08',
-  },
-  {
-    key: 'greene-unh',
-    name: 'Marjorie Taylor Greene',
-    party: 'Republican',
-    photo: 'https://bioguide.congress.gov/bioguide/photo/G/G000596.jpg',
-    ticker: 'UNH',
-    company: 'UnitedHealth',
-    verb: 'Bought',
-    amount: '$15K – $50K',
-    traded: '2025-05-14',
-  },
-];
 
 /**
  * The first screen anyone sees: Cong, the mascot, waving hello, one line of
@@ -271,6 +172,15 @@ export default function WelcomeScreen() {
                 </View>
               ))}
         </View>
+        {/* The disclosures are published free, as news (the U.S. law on these
+            reports allows commercial use only by news media publishing to the
+            general public); Pro pays for the tools. Said here, at the start,
+            rather than on the plans screen. Plain text, not a link: Apple
+            rejects links to a site that sells subscriptions outside the App
+            Store. */}
+        <Text variant="caption" tone="faint" style={styles.center}>
+          Every trade is free to read on congtrade.com.
+        </Text>
       </Animated.View>
 
       <View style={styles.footer}>
@@ -327,4 +237,5 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 16, paddingTop: 20, gap: 12 },
   signIn: { alignItems: 'center', paddingVertical: 4 },
   bold: { fontWeight: '700' },
+  center: { textAlign: 'center' },
 });

@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { fetchPolitician, fetchTrades, type Trade } from '@/lib/api';
 import { assetLabel, compactAmount, memberName, tradeVerb } from '@/lib/format';
+import { memberSlug } from '@/lib/member-slug';
 import { radius, useTheme } from '@/theme';
 import { Avatar } from '@/ui/avatar';
 import { Text } from '@/ui/text';
@@ -116,17 +117,6 @@ function asFiling(
     what: `${tradeVerb(t.transaction_type)} ${assetLabel(t)} (${t.ticker})`,
     amount: compactAmount(t.amount_range),
   };
-}
-
-/** A member's page slug from a filed spelling: web/lib/memberSlug.ts, which the API resolves. */
-function memberSlug(name: string): string {
-  return name
-    .replace(/^Hon\.\s+/i, '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 /**

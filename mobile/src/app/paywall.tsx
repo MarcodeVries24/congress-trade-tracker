@@ -1,12 +1,14 @@
 import { memberDisplayNameFromFiledName } from '@congtrade/shared/memberDisplay';
 import { getProPricing } from '@congtrade/shared/plans';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Image } from 'expo-image';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccess } from '@/lib/access';
+import { fetchAlertExample, type Example } from '@/lib/example-trades';
 import { haptic } from '@/lib/haptics';
 import { LINKS, openPage } from '@/lib/links';
 import type { BillingPeriod, Trial } from '@/lib/products';
@@ -16,12 +18,9 @@ import { CongSays, ONBOARDING_STEPS, STEP_TOP_BAR, useStepBack } from '@/compone
 import { radius, useTheme } from '@/theme';
 import { Button, IconButton } from '@/ui/button';
 import { Icon } from '@/ui/icon';
+import { Skeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
-
-// Weeks in each billing period, for the per-week figure under the longer
-// plans; the same 52 / 12 the shared pricing uses for its savings.
-const WEEKS: Record<BillingPeriod, number> = { weekly: 1, monthly: 52 / 12, annual: 52 };
 
 // Where the subscription is managed: only the store this phone buys from.
 const STORE = Platform.select({ ios: 'App Store', android: 'Google Play', default: 'app store' });
@@ -33,15 +32,24 @@ const PERIOD_WORD: Record<BillingPeriod, string> = { weekly: 'week', monthly: 'm
 // gets, and none at all when they have had one before.
 const PREVIEW_TRIAL: Trial = { length: '14 days', offerToken: null };
 
+// Inside a plan card, border included, so a picked card's content sits where
+// an unpicked one's does.
+const PLAN_PADDING = 14;
+
+// The app's own icon, at the corner of the example alert, as a notification shows it.
+const APP_ICON = require('../../assets/images/icon.png');
+
 /**
  * The paywall.
  *
  * Cong asks from the same place as on the setup steps before it, by name for
  * whoever was picked there, so the setup reads as something Pro switches on
- * rather than answers thrown away. Then the most recent real filing, theirs
- * when there is one, as proof the feed is live; three one-line reasons; and the plans, with the longer
- * ones priced per week so the saving is plain. Nothing here is invented: no
- * reviews, no counts of other subscribers.
+ * rather than answers thrown away. It reads top to bottom: an alert as it
+ * would arrive, made from a real recent filing (theirs when there is one);
+ * then "Choose your plan", Yearly first, the picked plan opening to show
+ * what Pro includes (the same on every plan); then the button. Each thing
+ * is said once. Nothing here is invented: no reviews, no counts of other
+ * subscribers, no made-up trades.
  *
  * Yearly is preselected, with its free trial: the trial removes the risk of
  * the larger commitment, and the weekly and monthly plans are cheap enough to
@@ -117,35 +125,29 @@ export default function PaywallScreen() {
         ? PREVIEW_TRIAL
         : null;
 
-  // The longer plans' price per week: in the store's currency when it gives a
-  // number, from the shared euro pricing in the preview with no store.
-  const perWeek = (p: BillingPeriod): string | null => {
-    if (p === 'weekly') return null;
-    const product = purchases.products.find((x) => x.period === p);
-    if (product) {
-      if (!product.price || !product.currency) return null;
-      try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: product.currency }).format(
-          product.price / WEEKS[p]
-        );
-      } catch {
-        return null;
-      }
-    }
-    const total = Number(p === 'monthly' ? pricing.monthly : pricing.annualTotal);
-    return `${pricing.currencySymbol}${(total / WEEKS[p]).toFixed(2)}`;
-  };
-
   // Whoever was picked during setup, once each: a member can be filed under
   // several spellings and the answers keep all of them.
   const { answers } = useOnboarding();
   const followed = [...new Set(answers.members.map(memberDisplayNameFromFiledName))];
   const who = followed.length === 1 ? followed[0] : `${followed[0]} and ${followed.length - 1} more`;
 
-  // Naming who was picked, without suggesting Pro is limited to them: it
-  // covers every member, and anyone can be followed later.
+  // A real trade, as an alert would announce it: theirs when someone was
+  // picked and has a recent stock trade, else the biggest recent one, else a
+  // well-known filed one when the feed cannot be reached.
+  const [example, setExample] = useState<Example | null>(null);
+  const filed = answers.members.join('|');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAlertExample(filed ? filed.split('|') : [], controller.signal)
+      .then(setExample)
+      .catch(() => {});
+    return () => controller.abort();
+  }, [filed]);
+
+  // What Pro includes, shown inside the picked plan. Naming who was picked,
+  // without suggesting Pro is limited to them: it covers every member, and
+  // anyone can be followed later.
   const benefits = [
-    "Every member's trades, updated daily",
     followed.length === 1
       ? `Alerts for ${followed[0]} and all of Congress`
       : followed.length > 1
@@ -154,11 +156,14 @@ export default function PaywallScreen() {
     'The best-timed trades, and how they did since',
   ];
 
+  // Yearly first: it is the one preselected, with the trial, so the choice
+  // reads from the recommended plan down.
   const plans: { key: BillingPeriod; title: string; price: string; badge?: string }[] = [
     {
-      key: 'weekly',
-      title: 'Weekly',
-      price: storePrice('weekly') ?? `${pricing.currencySymbol}${pricing.weekly}`,
+      key: 'annual',
+      title: 'Yearly',
+      price: storePrice('annual') ?? `${pricing.currencySymbol}${pricing.annualTotal}`,
+      badge: pricing.annualSavingPercent ? `Save ${pricing.annualSavingPercent}%` : undefined,
     },
     {
       key: 'monthly',
@@ -166,12 +171,7 @@ export default function PaywallScreen() {
       price: storePrice('monthly') ?? `${pricing.currencySymbol}${pricing.monthly}`,
       badge: pricing.monthlySavingVsWeeklyPercent ? `Save ${pricing.monthlySavingVsWeeklyPercent}%` : undefined,
     },
-    {
-      key: 'annual',
-      title: 'Yearly',
-      price: storePrice('annual') ?? `${pricing.currencySymbol}${pricing.annualTotal}`,
-      badge: pricing.annualSavingPercent ? `Save ${pricing.annualSavingPercent}%` : undefined,
-    },
+    { key: 'weekly', title: 'Weekly', price: storePrice('weekly') ?? `${pricing.currencySymbol}${pricing.weekly}` },
   ];
   const chosen = plans.find((p) => p.key === period)!;
   const chosenTrial = trialFor(chosen.key);
@@ -193,84 +193,125 @@ export default function PaywallScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {followed.length ? (
-          <CongSays pose="pro" title={`Ready to watch ${who} for you.`} subtitle="And anyone else in Congress." />
-        ) : (
-          <CongSays pose="pro" title="Every trade Congress makes, updated daily." subtitle="Follow anyone in Congress." />
-        )}
+        {/* Top to bottom: what Pro does (an alert, as it arrives), then the
+            choice, with what is included inside it, and the button. */}
+        <CongSays pose="pro" title={followed.length ? `Ready to watch ${who} for you.` : 'Your alerts are ready.'} />
 
-        <View style={styles.benefits}>
-          {benefits.map((b, i) => (
-            <Animated.View key={i} entering={FadeInDown.duration(380).delay(80 + i * 60)} style={styles.benefit}>
-              <View style={[styles.check, { backgroundColor: c.accentSoft }]}>
-                <Icon name="checkmark" size={14} color={c.accent} />
+        <Animated.View entering={FadeInDown.duration(420).delay(60)} style={styles.exampleWrap}>
+          <View style={[styles.notification, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <Image source={APP_ICON} style={[styles.appIcon, { borderColor: c.border }]} />
+            {example ? (
+              <View style={styles.flex}>
+                <View style={styles.notificationHead}>
+                  <Text variant="caption" tone="muted" style={styles.semibold}>
+                    CONGTRADE
+                  </Text>
+                  {/* So it is not taken for a real notification. */}
+                  <Text variant="caption" tone="faint">
+                    Example
+                  </Text>
+                </View>
+                <Text variant="callout" style={styles.bold} numberOfLines={1}>
+                  {example.name} {example.verb.toLowerCase()} {example.ticker}
+                </Text>
+                <Text variant="footnote" tone="muted" numberOfLines={1}>
+                  {example.amount} · {example.company}
+                </Text>
               </View>
-              <Text variant="callout" style={styles.flex}>
-                {b}
-              </Text>
-            </Animated.View>
-          ))}
-        </View>
+            ) : (
+              <View style={[styles.flex, styles.skeletonText]}>
+                <Skeleton width="30%" height={10} />
+                <Skeleton width="70%" height={12} />
+                <Skeleton width="50%" height={10} />
+              </View>
+            )}
+          </View>
+        </Animated.View>
 
         <View style={styles.plans}>
+          <Text variant="label" tone="faint" style={styles.plansLabel}>
+            CHOOSE YOUR PLAN
+          </Text>
           {plans.map((p) => {
             const selected = period === p.key;
             return (
-              <Tap
-                key={p.key}
-                scaleTo={0.98}
-                onPress={() => {
-                  haptic.select();
-                  setPeriod(p.key);
-                }}
-                accessibilityState={{ selected }}
-                style={[
-                  styles.plan,
-                  {
-                    backgroundColor: selected ? c.accentSoft : c.surface,
-                    borderColor: selected ? c.accent : c.border,
-                    borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
-                  },
-                ]}>
-                <View
+              // The card grows to show what Pro includes when it is picked,
+              // and the ones below glide down to make room.
+              <Animated.View key={p.key} layout={LinearTransition.duration(240)}>
+                <Tap
+                  scaleTo={0.98}
+                  onPress={() => {
+                    haptic.select();
+                    setPeriod(p.key);
+                  }}
+                  accessibilityState={{ selected }}
                   style={[
-                    styles.radio,
-                    selected ? { borderColor: c.accent, backgroundColor: c.accent } : { borderColor: c.borderStrong },
+                    styles.plan,
+                    {
+                      backgroundColor: selected ? c.accentSoft : c.surface,
+                      borderColor: selected ? c.accent : c.border,
+                      borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+                      // The thicker border of the picked card is taken off
+                      // its padding, so nothing inside moves when it is picked.
+                      padding: PLAN_PADDING - (selected ? 2 : StyleSheet.hairlineWidth),
+                    },
                   ]}>
-                  {selected ? <Icon name="checkmark" size={14} color="#FFFFFF" /> : null}
-                </View>
-                <View style={[styles.flex, styles.planText]}>
-                  <View style={styles.planHead}>
-                    <Text variant="subhead">{p.title}</Text>
-                    {p.badge ? (
-                      <View style={[styles.badge, { backgroundColor: c.accent }]}>
-                        <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
-                          {p.badge}
-                        </Text>
+                  <View style={styles.planRow}>
+                    <View
+                      style={[
+                        styles.radio,
+                        selected
+                          ? { borderColor: c.accent, backgroundColor: c.accent }
+                          : { borderColor: c.borderStrong },
+                      ]}>
+                      {selected ? <Icon name="checkmark" size={14} color="#FFFFFF" /> : null}
+                    </View>
+                    <View style={[styles.flex, styles.planText]}>
+                      <View style={styles.planHead}>
+                        <Text variant="subhead">{p.title}</Text>
+                        {p.badge ? (
+                          <View style={[styles.badge, { backgroundColor: c.accent }]}>
+                            <Text variant="footnote" color="#FFFFFF" style={styles.bold}>
+                              {p.badge}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
+                      {trialFor(p.key) ? (
+                        <Text variant="caption" tone="accent" style={styles.semibold}>
+                          {trialFor(p.key)!.length} free
+                        </Text>
+                      ) : null}
+                    </View>
+                    {/* One price per plan; the badge already says what the
+                    longer ones save. */}
+                    <Text variant="subhead">
+                      {p.price}
+                      <Text variant="footnote" tone="muted">
+                        {' '}
+                        / {PERIOD_WORD[p.key]}
+                      </Text>
+                    </Text>
                   </View>
-                  {trialFor(p.key) ? (
-                    <Text variant="caption" tone="accent" style={styles.semibold}>
-                      {trialFor(p.key)!.length} free
-                    </Text>
+                  {/* What Pro includes, the same on every plan: shown in the
+                    picked one only, so the screen holds one list, not three. */}
+                  {selected ? (
+                    <Animated.View
+                      entering={FadeIn.duration(220).delay(80)}
+                      exiting={FadeOut.duration(120)}
+                      style={styles.included}>
+                      {benefits.map((b) => (
+                        <View key={b} style={styles.benefit}>
+                          <Icon name="checkmark" size={16} color={c.accent} />
+                          <Text variant="footnote" style={styles.flex}>
+                            {b}
+                          </Text>
+                        </View>
+                      ))}
+                    </Animated.View>
                   ) : null}
-                </View>
-                <View style={styles.price}>
-                  <Text variant="subhead">
-                    {p.price}
-                    <Text variant="footnote" tone="muted">
-                      {' '}
-                      / {PERIOD_WORD[p.key]}
-                    </Text>
-                  </Text>
-                  {perWeek(p.key) ? (
-                    <Text variant="caption" tone={selected ? 'accent' : 'muted'} style={styles.semibold}>
-                      {perWeek(p.key)} / week
-                    </Text>
-                  ) : null}
-                </View>
-              </Tap>
+                </Tap>
+              </Animated.View>
             );
           })}
         </View>
@@ -289,14 +330,6 @@ export default function PaywallScreen() {
             {purchases.error}
           </Text>
         ) : null}
-        {/* Said plainly, next to the button, whichever plan and whoever was
-            picked: the worry at this moment is being stuck paying. */}
-        <View style={styles.assurance}>
-          <Icon name="shield-checkmark" size={15} color={c.gain} />
-          <Text variant="footnote" tone="gain" style={styles.semibold}>
-            {chosenTrial ? `${chosenTrial.length} free · Cancel anytime` : 'Cancel anytime'}
-          </Text>
-        </View>
         <Button
           kind="accent"
           label={
@@ -310,24 +343,13 @@ export default function PaywallScreen() {
           disabled={!purchases.available}
           onPress={subscribe}
         />
-        {chosenTrial ? (
-          <Text variant="caption" tone="faint" style={styles.legal}>
-            {chosenTrial.length} free, then {chosen.price} a {PERIOD_WORD[chosen.key]}, renewing automatically. Cancel
-            in your {STORE} settings at least 24 hours before the trial ends and you pay nothing.
-          </Text>
-        ) : (
-          <Text variant="caption" tone="faint" style={styles.legal}>
-            {chosen.price} a {PERIOD_WORD[chosen.key]}, renews automatically. Cancel in your {STORE} settings at least
-            24 hours before it renews.
-          </Text>
-        )}
-        {/* The disclosures themselves are published free, as news (the U.S.
-            law on these reports allows commercial use only by news media
-            publishing to the general public); Pro pays for the tools. Plain
-            text rather than a link: Apple rejects links from an app to a
-            site that sells subscriptions outside the App Store. */}
+        {/* What it costs after the trial, that it renews, and how to stop
+            it, in one line under the button (with the store's own sheet,
+            this is what guideline 3.1.2 asks for). The 24-hour rule is in
+            the store descriptions and the terms. */}
         <Text variant="caption" tone="faint" style={styles.legal}>
-          Every trade is free to read on congtrade.com. Pro adds the app, filters and alerts.
+          {chosenTrial ? `${chosenTrial.length} free, then ` : ''}
+          {chosen.price} a {PERIOD_WORD[chosen.key]}. Renews automatically until you cancel in your {STORE} settings.
         </Text>
         <View style={styles.links}>
           {/* Apple requires a visible way to restore a purchase: someone who
@@ -382,25 +404,31 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   semibold: { fontWeight: '600' },
   center: { textAlign: 'center' },
-  benefits: { gap: 10, paddingTop: 22, paddingHorizontal: 4 },
-  benefit: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  check: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  plans: { paddingTop: 22, gap: 10 },
-  price: { alignItems: 'flex-end', gap: 1 },
-  plan: {
+  exampleWrap: { paddingTop: 18 },
+  notification: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
   },
+  // The icon is white, so an edge keeps it from melting into the card.
+  appIcon: { width: 38, height: 38, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
+  notificationHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  skeletonText: { gap: 6 },
+  plansLabel: { paddingHorizontal: 4 },
+  benefit: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  plans: { paddingTop: 22, gap: 10 },
+  plan: { borderRadius: radius.xl },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Under the plan's name, past the radio (24) and its gap (12).
+  included: { gap: 6, marginTop: 10, marginLeft: 36 },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   planText: { gap: 2 },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill },
   footer: { paddingHorizontal: 16, paddingTop: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
   legal: { textAlign: 'center', paddingHorizontal: 8 },
-  assurance: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', columnGap: 20, rowGap: 6 },
 });

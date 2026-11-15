@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { appleApiConfigured, subscriptionStatusFor } from "@/lib/appleStore";
+import { appleApiConfigured, describeAppleError, subscriptionStatusFor } from "@/lib/appleStore";
 import { accountTokenFor } from "@/lib/storeAccountToken";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     result = await subscriptionStatusFor(originalTransactionId);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = describeAppleError(err);
     console.error("[apple] could not read subscription status", { userId, message });
     return NextResponse.json({ error: `Could not reach the App Store: ${message}` }, { status: 502 });
   }

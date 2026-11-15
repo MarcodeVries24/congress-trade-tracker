@@ -1,8 +1,11 @@
 import {
+  APIError,
   APIException,
   AppStoreServerAPIClient,
   Environment,
   SignedDataVerifier,
+  VerificationException,
+  VerificationStatus,
   type JWSTransactionDecodedPayload,
   type ResponseBodyV2DecodedPayload,
 } from "@apple/app-store-server-library";
@@ -23,6 +26,14 @@ import {
  * them.
  */
 const BUNDLE_ID = "com.congtrade.app";
+
+/**
+ * The app's Apple ID, the number in its App Store Connect address. Apple's
+ * library will not verify a production transaction without it (it is part of
+ * what is checked), so without it every real purchase would fail to verify
+ * while TestFlight and App Review, both sandbox, went through.
+ */
+const APP_APPLE_ID = 6817481190;
 
 /**
  * The environments to try, in order.
@@ -83,22 +94,47 @@ function signedDataVerifier(environment: Environment): SignedDataVerifier {
   // Sandbox and production are signed by the same chain but carry their
   // environment inside; the library checks it against this one, which is why
   // there is one verifier per environment.
-  const verifier = new SignedDataVerifier(certs, true, environment, BUNDLE_ID);
+  const verifier = new SignedDataVerifier(
+    certs,
+    true,
+    environment,
+    BUNDLE_ID,
+    environment === Environment.PRODUCTION ? APP_APPLE_ID : undefined
+  );
   verifiers.set(environment, verifier);
   return verifier;
 }
 
-/** The first environment's answer that verifies; the first failure if none does. */
+/**
+ * What went wrong, in words. Apple's library throws errors whose message is
+ * empty and puts the cause in fields of its own (an HTTP status and Apple's
+ * error code, or a verification status), so the plain message says nothing.
+ */
+export function describeAppleError(err: unknown): string {
+  if (err instanceof APIException) {
+    const code = typeof err.apiError === "number" ? (APIError[err.apiError] ?? err.apiError) : null;
+    return [`App Store API ${err.httpStatusCode}`, code, err.errorMessage].filter(Boolean).join(", ");
+  }
+  if (err instanceof VerificationException) {
+    const cause = err.cause instanceof Error && err.cause.message ? ` (${err.cause.message})` : "";
+    return `verification failed: ${VerificationStatus[err.status] ?? err.status}${cause}`;
+  }
+  if (err instanceof Error) return err.message || err.name;
+  return String(err);
+}
+
+/** The first environment's answer that verifies; every environment's failure if none does. */
 async function inAnyEnvironment<T>(verify: (v: SignedDataVerifier) => Promise<T>): Promise<T> {
-  let firstError: unknown = null;
+  const failures: string[] = [];
   for (const environment of ENVIRONMENTS) {
     try {
       return await verify(signedDataVerifier(environment));
     } catch (err) {
-      firstError ??= err;
+      // Environment's values are its names ("Production", "Sandbox").
+      failures.push(`${environment}: ${describeAppleError(err)}`);
     }
   }
-  throw firstError;
+  throw new Error(failures.join("; "));
 }
 
 /** The decoded notification, or a throw if it is not genuinely from Apple. */

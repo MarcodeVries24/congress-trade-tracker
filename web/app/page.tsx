@@ -52,6 +52,14 @@ function partyColor(party: string): string {
   return "bg-line-strong";
 }
 
+/** "Nov 4" this year, "Dec 30, 2025" otherwise: the day a Latest Trades row was disclosed. */
+function disclosedOn(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
 export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -163,7 +171,15 @@ export default function Home() {
                       >
                         <MemberPhoto name={trade.member_name} photoUrl={trade.photo_url} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm text-ink">{memberDisplayName(trade)}</div>
+                          <div className="truncate text-sm text-ink">
+                            {memberDisplayName(trade)}
+                            {trade.filing_date ? (
+                              <span className="text-xs text-ink-faint" title="Date disclosed">
+                                {" "}
+                                · {disclosedOn(trade.filing_date)}
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="truncate text-xs text-ink-faint">
                             {trade.ticker ? `${trade.ticker} · ` : ""}
                             {displayAssetName(trade)}

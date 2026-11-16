@@ -43,7 +43,7 @@ const SOURCES = [
 
 export async function getGeneralNews(limit = 8): Promise<NewsSection[]> {
   const results = await Promise.allSettled(
-    SOURCES.map((s) => fetchFeed(s.url, s.publisher, { limit, revalidate: 1800 }))
+    SOURCES.map((s) => fetchFeed(s.url, s.publisher, { limit }))
   );
 
   const sections = SOURCES.map((source, i) => {

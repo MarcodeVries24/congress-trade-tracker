@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 /**
  * A small RSS/Atom reader.
  *
@@ -131,25 +133,36 @@ export function parseFeed(xml: string, source: string): FeedItem[] {
  * One feed's items, newest first.
  *
  * Never throws: a timeout, a 500 or a page of HTML all come back as an empty
- * list. `revalidate` hands caching to Next's data cache, so a page render
- * doesn't mean a round trip to a government web server.
+ * list, and that empty list is not cached, so the next render tries again.
+ *
+ * Cached for half an hour as the few items kept, not as the feed itself: on
+ * Vercel every cache write counts as ISR writes in 8 KB units, and a whole
+ * RSS document (tens of KB, every item's full text) rewritten every half hour
+ * for each feed cost many times what its handful of headlines does.
  */
-export async function fetchFeed(
-  url: string,
-  source: string,
-  { limit = 10, revalidate = 1800 }: { limit?: number; revalidate?: number } = {}
-): Promise<FeedItem[]> {
+export async function fetchFeed(url: string, source: string, { limit = 10 }: { limit?: number } = {}): Promise<FeedItem[]> {
   try {
-    const res = await fetch(url, {
-      headers: { "user-agent": USER_AGENT, accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      next: { revalidate },
-    });
-    if (!res.ok) return [];
-    const items = parseFeed(await res.text(), source);
-    items.sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
-    return items.slice(0, limit);
+    return await cachedFeed(url, source, limit);
   } catch {
     return [];
   }
 }
+
+const cachedFeed = unstable_cache(
+  async (url: string, source: string, limit: number): Promise<FeedItem[]> => {
+    // Not cached by fetch itself (Next 15 does not by default): only the
+    // items returned here are.
+    const res = await fetch(url, {
+      headers: { "user-agent": USER_AGENT, accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    const items = parseFeed(await res.text(), source);
+    // A page of HTML served with a 200 parses to nothing; not worth keeping.
+    if (!items.length) throw new Error(`${url} had no items`);
+    items.sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
+    return items.slice(0, limit);
+  },
+  ["feed-items-v2"],
+  { revalidate: 1800 }
+);

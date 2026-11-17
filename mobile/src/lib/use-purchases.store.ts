@@ -117,9 +117,9 @@ export function usePurchases(onEntitled: () => void): Purchases {
       });
       const data = (await res.json().catch(() => ({}))) as { entitled?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? `Could not confirm the purchase (${res.status}).`);
-      if (data.entitled) onEntitled();
+      return data.entitled === true;
     },
-    [getToken, onEntitled]
+    [getToken]
   );
 
   const iap = useIAP({
@@ -127,11 +127,17 @@ export function usePurchases(onEntitled: () => void): Purchases {
       const payload = reportFor(purchase);
       void (async () => {
         try {
-          if (payload) await report(payload);
+          const entitled = payload ? await report(payload) : false;
           // Only after the server has accepted it. Finishing first would tell
           // the store we are done with a purchase we might have failed to
           // record, and the store would never mention it again.
           await iap.finishTransaction({ purchase, isConsumable: false });
+          // And Pro only after that: it closes the plans screen, which ends
+          // the billing connection, and on Android finishing is what
+          // acknowledges the purchase. Acknowledged after the screen had gone
+          // it never was, and Play refunds a purchase nobody acknowledges.
+          // (The server acknowledges too; this is the quicker of the two.)
+          if (entitled) onEntitled();
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Could not confirm the purchase.');
         } finally {
@@ -294,11 +300,13 @@ export function usePurchases(onEntitled: () => void): Purchases {
       }
       // One at a time: the first the server accepts is enough, and the rest
       // are the same subscription's other transactions.
-      for (const payload of payloads) await report(payload);
+      let entitled = false;
+      for (const payload of payloads) if (await report(payload)) entitled = true;
+      if (entitled) onEntitled();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not restore purchases.');
     }
-  }, [restorePurchases, report]);
+  }, [restorePurchases, report, onEntitled]);
 
   return { available: true, ready: connected, products, busy, error, accountReady, buy, restore };
 }

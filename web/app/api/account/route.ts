@@ -24,7 +24,10 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
 
-  const [pro, rows] = await Promise.all([hasProServer(), getSubscriptions(userId)]);
+  // One after the other: reading the rows first lets a lapsed store row be
+  // checked with the store once, before the Pro answer is worked out from it.
+  const rows = await getSubscriptions(userId);
+  const pro = await hasProServer();
   return NextResponse.json({ pro, renewing: renewingProviders(rows), endedAt: pro ? null : lastEnded(rows) });
 }
 

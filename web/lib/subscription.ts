@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { withLapsedStoreRowsRefreshed } from "@/lib/storeRefresh";
 import { anyGrantsAccess, rowForProvider, type SubscriptionProvider, type SubscriptionRow } from "@/lib/subscriptionAccess";
 
 export { grantsAccess, anyGrantsAccess, rowForProvider } from "@/lib/subscriptionAccess";
@@ -23,12 +24,17 @@ export type { SubscriptionRow } from "@/lib/subscriptionAccess";
  * live App Store one.
  */
 export async function getSubscriptions(clerkUserId: string): Promise<SubscriptionRow[]> {
-  return (await sql.query(
-    `SELECT clerk_user_id, provider, provider_account_id, provider_subscription_id,
-            status, product_id, current_period_end, cancel_at_period_end
-     FROM subscriptions WHERE clerk_user_id = $1`,
-    [clerkUserId]
-  )) as SubscriptionRow[];
+  const read = async () =>
+    (await sql.query(
+      `SELECT clerk_user_id, provider, provider_account_id, provider_subscription_id,
+              status, product_id, current_period_end, cancel_at_period_end
+       FROM subscriptions WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    )) as SubscriptionRow[];
+  // A store row whose paid period has run out is checked with the store
+  // before it is believed, in case the notification that ended or renewed it
+  // was lost (see lib/storeRefresh).
+  return withLapsedStoreRowsRefreshed(await read(), read);
 }
 
 /** The subscription from one provider, for the Stripe portal and the stores. */

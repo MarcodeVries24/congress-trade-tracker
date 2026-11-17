@@ -1,6 +1,6 @@
 import { sql } from "@/lib/db";
 import { appleApiConfigured, describeAppleError, subscriptionStatusFor } from "@/lib/appleStore";
-import { fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
+import { acknowledgeIfPending, fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
 import { PAYING_STATUSES, type SubscriptionRow } from "@/lib/subscriptionAccess";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -66,6 +66,7 @@ async function refreshGoogle(row: SubscriptionRow): Promise<void> {
     currentPeriodEnd: state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null,
     cancelAtPeriodEnd: state.cancelAtPeriodEnd,
   });
+  await acknowledgeIfPending(row.provider_account_id!, state);
 }
 
 async function refreshApple(row: SubscriptionRow): Promise<void> {

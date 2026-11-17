@@ -56,6 +56,8 @@ export type GoogleSubscriptionState = {
   /** The Clerk user id the app attached when it started the purchase. */
   clerkUserId: string | null;
   linkedPurchaseToken: string | null;
+  /** Play still waiting for the purchase to be acknowledged (see acknowledgeIfPending). */
+  acknowledgementPending: boolean;
 };
 
 /**
@@ -112,5 +114,36 @@ export async function fetchSubscriptionState(purchaseToken: string): Promise<Goo
     // the same job appAccountToken does on Apple.
     clerkUserId: d.externalAccountIdentifiers?.obfuscatedExternalAccountId ?? null,
     linkedPurchaseToken: d.linkedPurchaseToken ?? null,
+    acknowledgementPending: d.acknowledgementState === "ACKNOWLEDGEMENT_STATE_PENDING",
   };
+}
+
+/**
+ * Acknowledges a purchase Play is still waiting on.
+ *
+ * Play cancels and refunds a purchase nobody acknowledges: within three days
+ * for a real one, within minutes for a test purchase. The app acknowledges
+ * when it finishes the transaction, but an app closed straight after paying,
+ * or that loses its billing connection first, never gets there. So the
+ * server acknowledges too, as Google recommends, wherever it records a
+ * purchase: the app's report, Play's notifications and the lapsed-row check.
+ * Acknowledging twice is harmless; a failure is logged and the app's own
+ * acknowledgement remains as the other route.
+ */
+export async function acknowledgeIfPending(purchaseToken: string, state: GoogleSubscriptionState): Promise<void> {
+  if (!state.acknowledgementPending) return;
+  try {
+    await androidPublisher().purchases.subscriptions.acknowledge({
+      packageName: PACKAGE_NAME,
+      // Not required since May 2025, but the client's type still names it.
+      subscriptionId: state.productId ?? undefined,
+      token: purchaseToken,
+      requestBody: {},
+    });
+    console.info("[google] acknowledged a purchase Play was still waiting on");
+  } catch (err) {
+    console.error("[google] could not acknowledge a purchase", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

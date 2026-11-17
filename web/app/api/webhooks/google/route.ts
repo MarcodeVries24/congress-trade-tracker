@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchSubscriptionState, googleNotificationsConfigured } from "@/lib/googleStore";
+import { acknowledgeIfPending, fetchSubscriptionState, googleNotificationsConfigured } from "@/lib/googleStore";
 import { userForAccountToken } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
     currentPeriodEnd: state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null,
     cancelAtPeriodEnd: state.cancelAtPeriodEnd,
   });
+
+  await acknowledgeIfPending(purchaseToken, state);
 
   return NextResponse.json({ received: true });
 }

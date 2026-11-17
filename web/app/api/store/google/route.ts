@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
+import { acknowledgeIfPending, fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
 import { accountTokenFor } from "@/lib/storeAccountToken";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
     currentPeriodEnd: state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null,
     cancelAtPeriodEnd: state.cancelAtPeriodEnd,
   });
+
+  await acknowledgeIfPending(purchaseToken, state);
 
   return NextResponse.json({
     entitled: state.status === "active" || state.status === "past_due",

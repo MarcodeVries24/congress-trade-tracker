@@ -9,6 +9,7 @@ import { useFollows } from '@/lib/follows';
 import { haptic } from '@/lib/haptics';
 import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { LINKS, SITE, openPage } from '@/lib/links';
+import { manageStoreSubscription } from '@/lib/manage-store-subscription';
 import { usePush } from '@/lib/push';
 import { useTheme } from '@/theme';
 import { ListRow } from '@/ui/list-row';
@@ -71,7 +72,7 @@ export default function SettingsScreen() {
           onPress={() =>
             renewing.includes('stripe')
               ? openPage(`${SITE}/account`)
-              : openPage(store === 'google' ? LINKS.manageGoogle : LINKS.manageApple)
+              : manageStoreSubscription(store === 'google' ? 'google' : 'apple')
           }
           last={!isSignedIn}
         />

@@ -7,7 +7,8 @@ import { useAccess } from '@/lib/access';
 import { API_BASE } from '@/lib/api';
 import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { haptic } from '@/lib/haptics';
-import { LINKS, openPage } from '@/lib/links';
+import { openPage } from '@/lib/links';
+import { manageStoreSubscription } from '@/lib/manage-store-subscription';
 import { usePush } from '@/lib/push';
 import { ProfileEditor } from '@/components/profile-editor';
 import { radius, useTheme } from '@/theme';
@@ -55,7 +56,7 @@ export function AccountPanel({ showDelete = false }: { showDelete?: boolean } = 
   const openBilling = async (flow: 'manage' | 'cancel') => {
     setError(null);
     if (!renewing.includes('stripe')) {
-      openPage(storeRenewing[0] === 'google' ? LINKS.manageGoogle : LINKS.manageApple);
+      manageStoreSubscription(storeRenewing[0] === 'google' ? 'google' : 'apple');
       return;
     }
     try {
@@ -188,7 +189,7 @@ export function AccountPanel({ showDelete = false }: { showDelete?: boolean } = 
                     Your {store === 'apple' ? 'App Store' : 'Google Play'} subscription will keep renewing. Deleting
                     your account does not cancel it. Cancel it first.
                   </Text>
-                  <Tap onPress={() => openPage(store === 'apple' ? LINKS.manageApple : LINKS.manageGoogle)}>
+                  <Tap onPress={() => manageStoreSubscription(store)}>
                     <Text variant="caption" style={[styles.bold, styles.underline]}>
                       Manage subscriptions
                     </Text>

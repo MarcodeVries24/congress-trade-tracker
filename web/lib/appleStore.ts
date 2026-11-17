@@ -263,8 +263,19 @@ export async function subscriptionStatusFor(originalTransactionId: string): Prom
       const transaction = await verifyTransaction(item.signedTransactionInfo);
       // Apple's numeric status: 1 active, 2 expired, 3 in billing retry,
       // 4 in billing grace period, 5 revoked.
-      const status =
+      let status =
         item.status === 1 ? "active" : item.status === 3 || item.status === 4 ? "past_due" : "canceled";
+      // Still active but with auto-renew switched off is someone who has
+      // cancelled: Pro to the end of the period, then nothing. Stored as
+      // "canceled", which is what the webhook's AUTO_RENEW_DISABLED stores,
+      // so a restore or a re-check does not quietly turn it back into a
+      // subscription that renews.
+      if (status === "active" && item.signedRenewalInfo) {
+        const renewal = await inAnyEnvironment((v) => v.verifyAndDecodeRenewalInfo(item.signedRenewalInfo!)).catch(
+          () => null
+        );
+        if (renewal?.autoRenewStatus === 0) status = "canceled";
+      }
       return { status, transaction };
     }
   }

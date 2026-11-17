@@ -3,7 +3,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getSubscriptions } from "@/lib/subscription";
-import { PAYING_STATUSES, type SubscriptionProvider, type SubscriptionRow } from "@/lib/subscriptionAccess";
+import { grantsAccess, PAYING_STATUSES, type SubscriptionProvider, type SubscriptionRow } from "@/lib/subscriptionAccess";
 
 /**
  * The signed-in account, as the app needs to see it.
@@ -19,6 +19,9 @@ import { PAYING_STATUSES, type SubscriptionProvider, type SubscriptionRow } from
  * `endedAt` is set for someone without Pro who had it before: when the last
  * of their subscriptions ran out, so the app can tell them why it is asking
  * them to subscribe again.
+ *
+ * `endsAt` is set for someone with Pro whose subscription will not renew
+ * (cancelled, still inside the period paid for): when their Pro ends.
  */
 export async function GET() {
   const { userId } = await auth();
@@ -28,7 +31,13 @@ export async function GET() {
   // checked with the store once, before the Pro answer is worked out from it.
   const rows = await getSubscriptions(userId);
   const pro = await hasProServer();
-  return NextResponse.json({ pro, renewing: renewingProviders(rows), endedAt: pro ? null : lastEnded(rows) });
+  const renewing = renewingProviders(rows);
+  return NextResponse.json({
+    pro,
+    renewing,
+    endedAt: pro ? null : lastEnded(rows),
+    endsAt: pro && renewing.length === 0 ? paidUntil(rows) : null,
+  });
 }
 
 /**
@@ -90,6 +99,19 @@ function lastEnded(rows: readonly SubscriptionRow[]): string | null {
   if (!rows.length) return null;
   const ends = rows.map((row) => (row.current_period_end ? new Date(row.current_period_end).getTime() : 0));
   return new Date(Math.min(Math.max(...ends) || Date.now(), Date.now())).toISOString();
+}
+
+/**
+ * For someone with Pro and nothing that will renew: the end of the last
+ * period paid for. The app says "Pro until …, won't renew", so a person who
+ * cancelled can see it worked and how long they keep Pro. Null for a comped
+ * account, whose Pro comes with no subscription at all.
+ */
+function paidUntil(rows: readonly SubscriptionRow[]): string | null {
+  const ends = rows
+    .filter((row) => grantsAccess(row) && row.current_period_end)
+    .map((row) => new Date(row.current_period_end!).getTime());
+  return ends.length ? new Date(Math.max(...ends)).toISOString() : null;
 }
 
 /** Providers that will charge again: paying, and not set to end at the period's close. */

@@ -28,6 +28,11 @@ type Access = {
    * welcome screen says so, rather than greeting them as if they were new.
    */
   endedAt: string | null;
+  /**
+   * For someone with Pro whose subscription will not renew (cancelled, still
+   * inside the period paid for): when it ends (ISO).
+   */
+  endsAt: string | null;
   /** Whether the paywall must be shown: a definite no from the server. */
   locked: boolean;
   /** Asks again, after a purchase or a restore. */
@@ -51,6 +56,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     status: AccessStatus;
     renewing: RenewingProvider[];
     endedAt: string | null;
+    endsAt: string | null;
   } | null>(null);
   const [devSkipped, setDevSkipped] = useState(false);
   const getTokenRef = useRef(getToken);
@@ -63,16 +69,30 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const forUser = userIdRef.current;
     if (!forUser) return;
-    const settle = (status: AccessStatus, renewing: RenewingProvider[] = [], endedAt: string | null = null) =>
-      setAnswer({ userId: forUser, status, renewing, endedAt });
+    const settle = (
+      status: AccessStatus,
+      renewing: RenewingProvider[] = [],
+      endedAt: string | null = null,
+      endsAt: string | null = null
+    ) => setAnswer({ userId: forUser, status, renewing, endedAt, endsAt });
     try {
       const token = await getTokenRef.current();
       if (!token) return settle('signed-out');
       const res = await fetch(`${API_BASE}/api/account`, { headers: { authorization: `Bearer ${token}` } });
       if (res.status === 401) return settle('signed-out');
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as { pro?: boolean; renewing?: RenewingProvider[]; endedAt?: string | null };
-      settle(data.pro ? 'pro' : 'free', data.renewing ?? [], data.pro ? null : (data.endedAt ?? null));
+      const data = (await res.json()) as {
+        pro?: boolean;
+        renewing?: RenewingProvider[];
+        endedAt?: string | null;
+        endsAt?: string | null;
+      };
+      settle(
+        data.pro ? 'pro' : 'free',
+        data.renewing ?? [],
+        data.pro ? null : (data.endedAt ?? null),
+        data.pro ? (data.endsAt ?? null) : null
+      );
     } catch {
       settle('unknown');
     }
@@ -104,6 +124,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const status: AccessStatus = !isLoaded ? 'loading' : !isSignedIn ? 'signed-out' : (current?.status ?? 'loading');
   const renewing = useMemo(() => current?.renewing ?? [], [current]);
   const endedAt = current?.endedAt ?? null;
+  const endsAt = current?.endsAt ?? null;
 
   const locked = !devSkipped && (status === 'signed-out' || status === 'free');
   const skipForDevelopment = useCallback(() => setDevSkipped(true), []);
@@ -112,11 +133,12 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       status,
       renewing,
       endedAt,
+      endsAt,
       locked,
       refresh,
       skipForDevelopment: __DEV__ ? skipForDevelopment : undefined,
     }),
-    [status, renewing, endedAt, locked, refresh, skipForDevelopment]
+    [status, renewing, endedAt, endsAt, locked, refresh, skipForDevelopment]
   );
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;
 }

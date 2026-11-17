@@ -39,13 +39,26 @@ export function AccountPanel({ showDelete = false }: { showDelete?: boolean } = 
   const router = useRouter();
   const { signOut, getToken } = useAuth();
   const push = usePush();
-  const { status, renewing } = useAccess();
+  const { status, renewing, endsAt } = useAccess();
 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const storeRenewing = renewing.filter((p): p is 'apple' | 'google' => p === 'apple' || p === 'google');
+
+  // Under the plan, how it carries on. Renewing says only that: the date is
+  // one tap away in the store, and a countdown to a charge reads like a
+  // warning. Cancelled says how long Pro lasts, which only reassures: it
+  // worked, and nothing is lost before then. In the phone's own time zone.
+  const planDetail =
+    status !== 'pro'
+      ? undefined
+      : renewing.length
+        ? 'Renews automatically'
+        : endsAt
+          ? `Pro until ${new Date(endsAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}, won't renew`
+          : undefined;
 
   /**
    * Where a subscription is managed or cancelled is wherever it was bought.
@@ -107,6 +120,7 @@ export function AccountPanel({ showDelete = false }: { showDelete?: boolean } = 
         <ListRow
           icon="sparkles-outline"
           label="Plan"
+          detail={planDetail}
           right={
             status === 'pro' ? (
               <Pill label="CongTrade Pro" tone="accent" />

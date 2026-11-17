@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/clerk-expo';
-import { isEligibleForIntroOfferIOS, useIAP } from 'expo-iap';
+import { getAvailablePurchases as ownedPurchases, isEligibleForIntroOfferIOS, useIAP } from 'expo-iap';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
@@ -21,6 +21,19 @@ import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct, t
  */
 
 type Subscription = ReturnType<typeof useIAP>['subscriptions'][number];
+type StorePurchase = Parameters<NonNullable<Parameters<typeof useIAP>[0]>['onPurchaseSuccess'] & {}>[0];
+
+/**
+ * What the server is told about a purchase: iOS ties every renewal to the
+ * original transaction; Play identifies a subscription by its purchase
+ * token. Purchase is a union, so each is narrowed rather than reached for.
+ */
+function reportFor(purchase: StorePurchase): { originalTransactionId: string } | { purchaseToken: string } | null {
+  if ('originalTransactionIdentifierIOS' in purchase) {
+    return { originalTransactionId: purchase.originalTransactionIdentifierIOS ?? purchase.transactionId };
+  }
+  return purchase.purchaseToken ? { purchaseToken: purchase.purchaseToken } : null;
+}
 
 // "14 days", "1 month": a trial's length as the paywall says it. Weeks are
 // counted in days, the way trials are usually advertised.
@@ -111,15 +124,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
 
   const iap = useIAP({
     onPurchaseSuccess: (purchase) => {
-      // iOS ties every renewal to the original transaction; Play identifies a
-      // subscription by its purchase token. Purchase is a union, so each is
-      // narrowed rather than reached for.
-      const payload =
-        'originalTransactionIdentifierIOS' in purchase
-          ? { originalTransactionId: purchase.originalTransactionIdentifierIOS ?? purchase.transactionId }
-          : purchase.purchaseToken
-            ? { purchaseToken: purchase.purchaseToken }
-            : null;
+      const payload = reportFor(purchase);
       void (async () => {
         try {
           if (payload) await report(payload);
@@ -143,7 +148,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
     onError: (err) => setError(err.message),
   });
 
-  const { connected, subscriptions, fetchProducts, requestPurchase, restorePurchases, getAvailablePurchases } = iap;
+  const { connected, subscriptions, fetchProducts, requestPurchase, restorePurchases } = iap;
 
   useEffect(() => {
     if (!connected) return;
@@ -261,16 +266,39 @@ export function usePurchases(onEntitled: () => void): Purchases {
     [products, requestPurchase, subscriptions]
   );
 
-  /** Required by Apple: someone reinstalling must get back what they paid for. */
+  /**
+   * Required by Apple: someone reinstalling must get back what they paid for.
+   *
+   * What this Apple Account or Google account already owns is read first,
+   * which needs no sign-in and is what nearly everyone restoring has. Only
+   * when that finds nothing is the App Store asked to sync (it can ask for
+   * the Apple Account password, and fails with "Unable to Complete Request"
+   * often enough in TestFlight and the sandbox), and the owned purchases read
+   * again. Each one found is reported to the server, which decides, exactly
+   * as for a purchase made here: Pro, a subscription moving off a deleted
+   * account, or a clear refusal.
+   */
   const restore = useCallback(async () => {
     setError(null);
+    const ours = (all: StorePurchase[]) => all.filter((p) => periodForProduct(p.productId) !== null);
     try {
-      await restorePurchases();
-      await getAvailablePurchases();
+      let owned = ours(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+      if (owned.length === 0) {
+        await restorePurchases().catch(() => {});
+        owned = ours(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+      }
+      const payloads = owned.map(reportFor).filter((p): p is NonNullable<typeof p> => p !== null);
+      if (payloads.length === 0) {
+        setError(`No subscription found for this ${Platform.OS === 'android' ? 'Google account' : 'Apple Account'}.`);
+        return;
+      }
+      // One at a time: the first the server accepts is enough, and the rest
+      // are the same subscription's other transactions.
+      for (const payload of payloads) await report(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not restore purchases.');
     }
-  }, [restorePurchases, getAvailablePurchases]);
+  }, [restorePurchases, report]);
 
   return { available: true, ready: connected, products, busy, error, accountReady, buy, restore };
 }

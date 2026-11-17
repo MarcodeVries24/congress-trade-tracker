@@ -100,20 +100,25 @@ export default function PaywallScreen() {
   );
 
   // The plan picked before being sent to sign in, bought once they are back
-  // signed in. Never for an account that turns out to have Pro already (the
-  // effect above takes it away instead), and dropped if they come back
-  // without signing in.
-  const [pending, setPending] = useState<BillingPeriod | null>(null);
-  const { accountReady, buy } = purchases;
+  // signed in, or a restore asked for signed out (a purchase can only be tied
+  // to an account), run then. Never for an account that turns out to have Pro
+  // already (the effect above takes it away instead), and dropped if they
+  // come back without signing in.
+  const [pending, setPending] = useState<BillingPeriod | 'restore' | null>(null);
+  const { accountReady, buy, restore } = purchases;
+  const restoreNow = useCallback(async () => {
+    await restore();
+    await refresh();
+  }, [restore, refresh]);
   useFocusEffect(
     useCallback(() => {
       if (!pending) return;
       if (access.status === 'signed-out' || access.status === 'unknown') setPending(null);
       else if (access.status === 'free' && accountReady) {
         setPending(null);
-        void buy(pending);
+        void (pending === 'restore' ? restoreNow() : buy(pending));
       }
-    }, [pending, access.status, accountReady, buy])
+    }, [pending, access.status, accountReady, buy, restoreNow])
   );
 
   const subscribe = () => {
@@ -383,9 +388,12 @@ export default function PaywallScreen() {
           {purchases.available ? (
             <FinePrintLink
               label="Restore purchases"
-              onPress={async () => {
-                await purchases.restore();
-                await refresh();
+              onPress={() => {
+                if (access.status === 'signed-out') {
+                  // Restoring means they bought before, so most likely with an account.
+                  setPending('restore');
+                  router.push('/sign-in');
+                } else void restoreNow();
               }}
             />
           ) : null}

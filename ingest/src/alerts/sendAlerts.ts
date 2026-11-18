@@ -152,8 +152,14 @@ async function findNewMatches(alert: DueAlert): Promise<MatchRow[]> {
   // rather than assuming nothing has touched it since.
   const filters = normalizeAlertFilters(alert.filters);
   const conditions = buildAlertConditions(filters, addParam);
-  conditions.push(`f.ingested_at > ${addParam(alert.created_at)}::timestamptz`);
-  conditions.push(`f.ingested_at > NOW() - INTERVAL '${MAX_INGEST_AGE_DAYS} days'`);
+  // New to subscribers when it was published, which is the later of being
+  // fetched and being approved in /admin: a filing can wait in the approval
+  // queue for hours, and an alert created in that time would otherwise never
+  // hear of it. Re-approving a filing cannot send it twice: alert_matches
+  // below remembers what each alert was already told.
+  const publishedAt = `GREATEST(f.ingested_at, f.approved_at)`;
+  conditions.push(`${publishedAt} > ${addParam(alert.created_at)}::timestamptz`);
+  conditions.push(`${publishedAt} > NOW() - INTERVAL '${MAX_INGEST_AGE_DAYS} days'`);
   conditions.push(`NULLIF(f.filing_date, '')::date >= CURRENT_DATE - ${MAX_FILING_AGE_DAYS}`);
 
   const alertParam = addParam(alert.id);

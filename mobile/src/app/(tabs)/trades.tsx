@@ -202,11 +202,11 @@ export default function TradesScreen() {
     {
       key: 'recent',
       label: 'Traded past 30 days',
-      on: windowFor(filters.tradedFrom) === '30',
+      on: windowFor(filters.tradedFrom, filters.tradedTo) === '30',
       toggle: () =>
         setFilters((f) => {
           const next = { ...f, tradedTo: undefined };
-          next.tradedFrom = windowFor(f.tradedFrom) === '30' ? undefined : daysAgo(30);
+          next.tradedFrom = windowFor(f.tradedFrom, f.tradedTo) === '30' ? undefined : daysAgo(30);
           return next;
         }),
     },
@@ -241,7 +241,7 @@ export default function TradesScreen() {
     (chip) =>
       !quickKeys.has(chip.key) &&
       !(chip.key === 'minAmount' && filters.minAmount === 50001) &&
-      !(chip.key === 'tradedFrom' && windowFor(filters.tradedFrom) === '30') &&
+      !(chip.key === 'tradedFrom' && windowFor(filters.tradedFrom, filters.tradedTo) === '30') &&
       !(chip.key === 'filedStatus' && filters.filedStatus === 'late')
   );
   const active = countActive(filters);

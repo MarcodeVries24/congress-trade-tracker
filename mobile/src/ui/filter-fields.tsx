@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { memberDisplayNameFromFiledName } from '@/lib/format';
+import { memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import {
   AMOUNT_RANGES,
   ASSET_TYPES,
   CHAMBERS,
+  EARLIEST_FILED,
+  EARLIEST_TRADED,
   FILED,
   MARKET_CAPS,
   MIN_AMOUNTS,
@@ -20,6 +22,7 @@ import {
   type TradeFilters,
 } from '@/lib/trade-filters';
 import { radius, useTheme } from '@/theme';
+import { DayPicker, todayIso } from '@/ui/day-picker';
 import { Icon } from '@/ui/icon';
 import { MemberPicker } from '@/ui/member-picker';
 import { TickerPicker } from '@/ui/ticker-picker';
@@ -100,8 +103,6 @@ export function FilterFields({
   const list = (values: string[]) => (values.length ? values : undefined);
   const input = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
   const sort = SORTS.find((s) => s.key === draft.sort) ?? SORTS[0];
-  const window = windowFor(draft.dateFrom);
-  const tradedWindow = windowFor(draft.tradedFrom);
 
   return (
     <>
@@ -132,29 +133,23 @@ export function FilterFields({
       )}
 
       {mode === 'search' ? (
-        <FilterSection title="Traded" hint="By the date the trade was made">
-          <ToggleChips
-            single
-            options={WINDOWS.filter((w) => w.key !== 'any')}
-            selected={tradedWindow === 'any' ? [] : [tradedWindow]}
-            onChange={([v]) => {
-              const w = WINDOWS.find((x) => x.key === v);
-              set({ tradedFrom: w && w.days ? daysAgo(w.days) : undefined, tradedTo: undefined });
-            }}
+        <FilterSection title="Traded" hint="By the date the trade was made, past days or exact dates">
+          <DateWindow
+            from={draft.tradedFrom}
+            to={draft.tradedTo}
+            earliest={EARLIEST_TRADED}
+            onChange={(tradedFrom, tradedTo) => set({ tradedFrom, tradedTo })}
           />
         </FilterSection>
       ) : null}
 
       {mode === 'search' ? (
-        <FilterSection title="Filed" hint="By the date the disclosure was published">
-          <ToggleChips
-            single
-            options={WINDOWS.filter((w) => w.key !== 'any')}
-            selected={window === 'any' ? [] : [window]}
-            onChange={([v]) => {
-              const w = WINDOWS.find((x) => x.key === v);
-              set({ dateFrom: w && w.days ? daysAgo(w.days) : undefined, dateTo: undefined });
-            }}
+        <FilterSection title="Filed" hint="By the date the disclosure was published, past days or exact dates">
+          <DateWindow
+            from={draft.dateFrom}
+            to={draft.dateTo}
+            earliest={EARLIEST_FILED}
+            onChange={(dateFrom, dateTo) => set({ dateFrom, dateTo })}
           />
         </FilterSection>
       ) : null}
@@ -236,11 +231,114 @@ export function FilterFields({
   );
 }
 
+/**
+ * A date filter: the past-N-days presets, and under them exact From and To
+ * days for any other range. A preset sets From and clears To; picking a day
+ * makes it exact dates, and the presets let go.
+ */
+function DateWindow({
+  from,
+  to,
+  earliest,
+  onChange,
+}: {
+  from: string | undefined;
+  to: string | undefined;
+  earliest: string;
+  onChange: (from: string | undefined, to: string | undefined) => void;
+}) {
+  const { c } = useTheme();
+  const [editing, setEditing] = useState<'from' | 'to' | null>(null);
+  const preset = windowFor(from, to);
+  const today = todayIso();
+
+  const field = (which: 'from' | 'to') => {
+    const value = which === 'from' ? from : to;
+    const on = editing === which;
+    return (
+      <Tap
+        scaleTo={0.98}
+        onPress={() => setEditing(on ? null : which)}
+        accessibilityRole="button"
+        accessibilityLabel={`${which === 'from' ? 'From' : 'To'} date, ${value ? shortDate(value) : which === 'from' ? 'any' : 'today'}`}
+        style={[
+          styles.dateField,
+          { backgroundColor: c.surface, borderColor: on ? c.accent : c.border },
+        ]}>
+        <View style={styles.flex}>
+          <Text variant="footnote" tone="muted">
+            {which === 'from' ? 'From' : 'To'}
+          </Text>
+          <Text variant="bodyStrong" tone={value ? 'default' : 'faint'}>
+            {value ? shortDate(value) : which === 'from' ? 'Any date' : 'Today'}
+          </Text>
+        </View>
+        {value ? (
+          <Tap
+            hitSlop={10}
+            accessibilityLabel={`Clear the ${which} date`}
+            onPress={() => {
+              setEditing(null);
+              onChange(which === 'from' ? undefined : from, which === 'to' ? undefined : to);
+            }}>
+            <Icon name="close-circle" size={18} color={c.textFaint} />
+          </Tap>
+        ) : (
+          <Icon name="calendar-outline" size={18} color={c.textFaint} />
+        )}
+      </Tap>
+    );
+  };
+
+  return (
+    <>
+      <ToggleChips
+        single
+        options={WINDOWS.filter((w) => w.key !== 'any')}
+        selected={preset === 'any' ? [] : [preset]}
+        onChange={([v]) => {
+          const w = WINDOWS.find((x) => x.key === v);
+          setEditing(null);
+          onChange(w && w.days ? daysAgo(w.days) : undefined, undefined);
+        }}
+      />
+      <View style={styles.dateRow}>
+        {field('from')}
+        <Text variant="callout" tone="faint">
+          –
+        </Text>
+        {field('to')}
+      </View>
+      {editing ? (
+        <DayPicker
+          key={editing}
+          value={editing === 'from' ? from : to}
+          min={editing === 'from' ? earliest : (from ?? earliest)}
+          max={editing === 'from' ? (to ?? today) : today}
+          onPick={(day) => (editing === 'from' ? onChange(day, to) : onChange(from, day))}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   section: { paddingVertical: 20, borderBottomWidth: StyleSheet.hairlineWidth, gap: 14 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sectionBody: { gap: 10 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   input: {
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,

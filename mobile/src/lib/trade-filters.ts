@@ -1,5 +1,5 @@
 import type { AlertFilters, TradeQuery } from '@/lib/api';
-import { memberDisplayNameFromFiledName } from '@/lib/format';
+import { memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 
 /**
  * Every filter the trades page offers, as one object.
@@ -104,7 +104,10 @@ export const FILED = [
   { key: 'onTime', label: 'On time' },
 ] as const;
 
-/** Date windows, for both filing and trade dates. Presets rather than a calendar: they are what people pick. */
+/**
+ * Date windows, for both filing and trade dates: what people usually pick.
+ * Exact from and to dates are offered under them, for everything else.
+ */
 export const WINDOWS = [
   { key: 'any', label: 'Any time', days: 0 },
   { key: '7', label: 'Past week', days: 7 },
@@ -178,11 +181,36 @@ export function daysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Which window preset a dateFrom (or tradedFrom) corresponds to, if any. */
-export function windowFor(dateFrom: string | undefined): string {
-  if (!dateFrom) return 'any';
+/** The earliest day each date filter offers: the website's for filings, the STOCK Act's year for trades. */
+export const EARLIEST_FILED = '2022-01-01';
+export const EARLIEST_TRADED = '2012-01-01';
+
+/**
+ * Which window preset a from date (dateFrom or tradedFrom) corresponds to, if
+ * any. A range with an end date is never a preset: it is exact dates.
+ */
+export function windowFor(dateFrom: string | undefined, dateTo?: string): string {
+  if (!dateFrom || dateTo) return 'any';
   const days = Math.round((Date.now() - new Date(`${dateFrom}T00:00:00Z`).getTime()) / 86_400_000);
   return WINDOWS.find((w) => w.days && Math.abs(w.days - days) <= 1)?.key ?? 'any';
+}
+
+function dayAndMonth(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/** A date range in words, for its chip: "past 30 days", "1 Mar 2026 – 15 Apr 2026", "since 1 Mar 2026". */
+export function rangeLabel(from: string | undefined, to: string | undefined): string {
+  const preset = windowFor(from, to);
+  if (preset !== 'any') return labelOf(WINDOWS, preset).toLowerCase();
+  if (from && to) {
+    if (from === to) return `on ${shortDate(from)}`;
+    // One year is said once: "Nov 3 – Nov 10, 2026".
+    const start = from.slice(0, 4) === to.slice(0, 4) ? dayAndMonth(from) : shortDate(from);
+    return `${start} – ${shortDate(to)}`;
+  }
+  if (from) return `since ${shortDate(from)}`;
+  return `until ${shortDate(to ?? null)}`;
 }
 
 const LIST_KEYS = [
@@ -270,10 +298,10 @@ export function activeChips(f: TradeFilters): ActiveChip[] {
   }
   if (f.filedStatus)
     chips.push({ key: 'filedStatus', label: labelOf(FILED, f.filedStatus), clear: drop('filedStatus') });
-  if (f.dateFrom) {
+  if (f.dateFrom || f.dateTo) {
     chips.push({
       key: 'dateFrom',
-      label: `Filed ${labelOf(WINDOWS, windowFor(f.dateFrom)).toLowerCase()}`,
+      label: `Filed ${rangeLabel(f.dateFrom, f.dateTo)}`,
       clear: (x) => {
         const next = { ...x };
         delete next.dateFrom;
@@ -282,10 +310,10 @@ export function activeChips(f: TradeFilters): ActiveChip[] {
       },
     });
   }
-  if (f.tradedFrom) {
+  if (f.tradedFrom || f.tradedTo) {
     chips.push({
       key: 'tradedFrom',
-      label: `Traded ${labelOf(WINDOWS, windowFor(f.tradedFrom)).toLowerCase()}`,
+      label: `Traded ${rangeLabel(f.tradedFrom, f.tradedTo)}`,
       clear: (x) => {
         const next = { ...x };
         delete next.tradedFrom;

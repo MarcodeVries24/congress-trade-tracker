@@ -52,19 +52,24 @@ import { SITE_URL } from "../lib/siteUrl.js";
 const ALERT_FROM = process.env.ALERT_FROM_EMAIL;
 
 /**
- * Per-alert ceiling for one email. Anything beyond this stays unsent and is
- * picked up by the next run, which both keeps a single email readable and
- * stops any one alert turning a bulk re-ingest into a thousand-row message.
+ * How many matches one email lists. The renderer fits 120 comfortably in
+ * its dense mode (75KB against Gmail's ~92KB clipping budget).
  *
- * Set to what one email can actually show, and no higher. recordSent() marks
- * every match it is handed as sent, so a match fetched here but dropped by the
- * renderer is never emailed at all — it just quietly becomes a row the
- * subscriber has to find on the site. At 200 that was happening to everything
- * past the fortieth. The renderer fits 120 comfortably in its dense mode
- * (75KB against a 92KB budget), so 120 it is; the rest waits four hours for
- * the next run, which is what this comment always claimed.
+ * Every new match is still counted and recorded as sent, not only the ones
+ * listed: the email and the push say how many there were ("and 140 more"),
+ * with a link to the site, and the rest are not sent again in the next
+ * email. They used to wait for the next run, which with GitHub's schedule
+ * was 4 to 12 hours later, under an email that never said more were coming.
  */
-const MAX_MATCHES_PER_RUN = 120;
+const MAX_MATCHES_SHOWN = 120;
+
+/**
+ * A safety ceiling on what one run fetches for one alert, far above anything
+ * a real batch reaches (the ingest-age and filing-age floors below already
+ * stop a bulk re-ingest counting as new). Beyond it, the rest are found by
+ * the next run.
+ */
+const MAX_MATCHES_FETCHED = 2000;
 
 /**
  * Two independent brakes on what counts as "new", because `ingested_at`
@@ -179,7 +184,7 @@ async function findNewMatches(alert: DueAlert): Promise<MatchRow[]> {
        WHERE am.alert_id = ${alertParam}::bigint AND am.match_key = c.content_key || ':' || c.occurrence
      )
      ORDER BY c.filing_date DESC NULLS LAST, c.id
-     LIMIT ${MAX_MATCHES_PER_RUN}`,
+     LIMIT ${MAX_MATCHES_FETCHED}`,
     params
   )) as MatchRow[];
 }
@@ -288,7 +293,7 @@ async function main() {
       const input = {
         alertName: alert.name,
         filters: normalizeAlertFilters(alert.filters),
-        trades: matches,
+        trades: matches.slice(0, MAX_MATCHES_SHOWN),
         totalMatched: matches.length,
         siteUrl: SITE_URL,
         unsubscribeUrl,

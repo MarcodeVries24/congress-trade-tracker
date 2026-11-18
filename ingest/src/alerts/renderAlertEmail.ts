@@ -28,16 +28,16 @@ export interface AlertEmailInput {
 }
 
 /**
- * Every match goes in the email. The only ceiling is Gmail's: it clips a
- * message over roughly 102KB behind a "View entire message" link, and what
- * gets hidden is the end — which is where the unsubscribe link lives. An
+ * Every match handed in goes in the email. The only ceiling is Gmail's: it
+ * clips a message over roughly 102KB behind a "View entire message" link, and
+ * what gets hidden is the end — which is where the unsubscribe link lives. An
  * email that buries its own unsubscribe is worse than one that says a few
  * rows are missing.
  *
  * So the cards are laid in until the document approaches that limit rather
- * than until some round number of rows is reached. The sender already caps a
- * run at 200 matches, and at this budget a run of that size is the only one
- * that ever spills.
+ * than until some round number of rows is reached. The sender hands in at
+ * most 120 (MAX_MATCHES_SHOWN), which fits; anything beyond what is listed,
+ * there or here, is counted in the "and N more" line with a link to the site.
  */
 const MAX_HTML_BYTES = 92_000;
 
@@ -134,7 +134,7 @@ export function alertEmailHtml(input: AlertEmailInput): string {
   const missing = totalMatched - rendered.length;
   const more =
     missing > 0
-      ? `<tr><td style="padding:2px 0 14px 0;font-size:13px;color:#5b6773;">and ${missing} more in this batch &mdash; <a href="${siteUrl}/trades" style="color:#0369a1;font-weight:600;text-decoration:none;">see them on CongTrade</a>.</td></tr>`
+      ? `<tr><td style="padding:2px 0 14px 0;font-size:13px;color:#5b6773;">and ${missing} more &mdash; <a href="${siteUrl}/trades" style="color:#0369a1;font-weight:600;text-decoration:none;">see them all on CongTrade</a>.</td></tr>`
       : "";
 
   return document({ alertName, totalMatched, chips, cards: body, more, siteUrl, unsubscribeUrl });

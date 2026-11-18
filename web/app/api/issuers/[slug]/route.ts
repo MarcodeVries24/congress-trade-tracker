@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PUBLISHED_DATA_TAG } from "@/lib/cache";
 import { getIssuerBySlug } from "@/lib/issuers";
 
 /**
@@ -13,6 +14,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const found = await getIssuerBySlug(slug);
   if (!found) return NextResponse.json({ error: "Issuer not found" }, { status: 404 });
   return NextResponse.json(found, {
-    headers: { "cache-control": "public, s-maxage=300, stale-while-revalidate=3600" },
+    headers: { "cache-control": "public, s-maxage=300, stale-while-revalidate=3600", "Vercel-Cache-Tag": PUBLISHED_DATA_TAG },
   });
 }

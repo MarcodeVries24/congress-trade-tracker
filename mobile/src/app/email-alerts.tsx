@@ -208,6 +208,18 @@ export default function EmailAlertsScreen() {
             ? `${item.sent_count} sent, last ${shortDate(item.last_sent_at?.slice(0, 10) ?? null)}`
             : 'nothing sent yet'}
         </Text>
+        {item.matched_count ? (
+          <Tap
+            hitSlop={8}
+            onPress={() => router.push({ pathname: '/alert-trades/[id]', params: { id: item.id } })}
+            accessibilityRole="link"
+            style={styles.sentLink}>
+            <Text variant="footnote" tone="accent">
+              See the {item.matched_count.toLocaleString()} {item.matched_count === 1 ? 'trade' : 'trades'} it sent
+            </Text>
+            <Icon name="chevron-forward" size={13} color={c.accent} />
+          </Tap>
+        ) : null}
         {!item.active && item.paused_reason === 'subscription-ended' ? (
           <Text variant="footnote" tone="loss">
             Paused because the subscription ended.
@@ -270,4 +282,5 @@ const styles = StyleSheet.create({
   },
   rowIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, gap: 3 },
+  sentLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingTop: 2 },
 });

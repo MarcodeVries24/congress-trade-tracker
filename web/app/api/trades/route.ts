@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, LOGO_SQL } from "@/lib/db";
+import { sql } from "@/lib/db";
 import { ALERT_FROM_SQL, buildAlertConditions } from "@/lib/alertFilters";
-import { getMemberSlugsByName } from "@/lib/members";
-import { PRICE_COLUMNS_SQL, PRICE_JOINS_SQL } from "@/lib/prices";
+import { TRADE_ROW_COLUMNS_SQL, TRADE_ROW_FROM_SQL, withMemberSlugs } from "@/lib/tradeRows";
 import { hasFeatureServer } from "@/lib/access";
 import { PUBLIC_DAILY_HEADERS } from "@/lib/cache";
 import { usesGatedTradeParams } from "@congtrade/shared/tradeFilters";
@@ -140,15 +139,8 @@ export async function GET(req: NextRequest) {
   // so paging by offset showed some trades twice and skipped others entirely.
   const [dataRows, countRows] = await Promise.all([
     sql.query(
-      `SELECT t.*, f.bioguide_id, f.filing_date, f.pdf_url, f.chamber, f.parse_status,
-              COALESCE(mh.photo_url, mr.photo_url) AS photo_url,
-              COALESCE(mh.party, mr.party) AS party,
-              COALESCE(mh.state, mr.state) AS member_state,
-              cmc.market_cap, cmc.company_name, ${LOGO_SQL} AS logo_url,
-              (NULLIF(f.filing_date, '')::date - NULLIF(t.transaction_date, '')::date) AS days_to_file,
-              ${PRICE_COLUMNS_SQL}
-       ${ALERT_FROM_SQL}
-       ${PRICE_JOINS_SQL}
+      `SELECT ${TRADE_ROW_COLUMNS_SQL}
+       ${TRADE_ROW_FROM_SQL}
        ${where}
        ORDER BY ${sortExpr} ${order} NULLS LAST, t.id ${order}
        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
@@ -159,17 +151,8 @@ export async function GET(req: NextRequest) {
 
   const total = (countRows as { count: number }[])[0]?.count ?? 0;
 
-  // The page each member's name links to. Resolved here rather than derived
-  // in the browser because a slug belongs to a *person*, and a person is the
-  // several spellings they file under — which only the grouped directory
-  // knows. Deriving it from the one spelling on a row would 404 for anyone
-  // whose canonical name comes from a different variant. Cached, so this
-  // costs one query per instance per five minutes, not one per request.
-  const slugsByName = await getMemberSlugsByName();
-  const data = (dataRows as Record<string, unknown>[]).map((row) => ({
-    ...row,
-    member_slug: slugsByName.get(String(row.member_name)) ?? null,
-  }));
+  // The page each member's name links to; see withMemberSlugs.
+  const data = await withMemberSlugs(dataRows as Record<string, unknown>[]);
 
   // Cached at the CDN only when no Pro filter was asked for: the answer is
   // then the same for everyone, signed in or not. With one, it depends on

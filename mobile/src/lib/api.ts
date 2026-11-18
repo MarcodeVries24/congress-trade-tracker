@@ -524,6 +524,22 @@ export function fetchAlerts(options: RequestOptions = {}): Promise<AlertList> {
   return get<AlertList>("/api/alerts", undefined, options);
 }
 
+/** A trade an alert sent, and when: trades sent together share a sent_at, one notification's worth. */
+export type SentTrade = Trade & { sent_at: string };
+
+export interface AlertTrades {
+  alert: { id: string; name: string; filters: AlertFilters; summary: string };
+  /** The most recent sends, newest first; at most 100. */
+  trades: SentTrade[];
+  /** Every trade this alert has ever sent, for "the latest 100 of 868". */
+  totalSent: number;
+}
+
+/** The trades one alert has sent, what its notifications were about. Owner only. */
+export function fetchAlertTrades(id: string, options: RequestOptions = {}): Promise<AlertTrades> {
+  return get<AlertTrades>(`/api/alerts/${encodeURIComponent(id)}/trades`, undefined, options);
+}
+
 export async function createAlert(
   input: { name: string; frequency: AlertFrequency; filters: AlertFilters; email: boolean; push: boolean },
   options: RequestOptions = {}

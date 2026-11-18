@@ -7,9 +7,8 @@ import { useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 
-import { fetchAlerts, registerPushDevice, unregisterPushDevice } from '@/lib/api';
+import { registerPushDevice, unregisterPushDevice } from '@/lib/api';
 import { noteAlertTapped } from '@/lib/review-prompt';
-import { fromAlertFilters } from '@/lib/trade-filters';
 import { useAuthedRequest } from '@/lib/use-api';
 
 /**
@@ -226,10 +225,11 @@ export function PushProvider({ children }: { children: ReactNode }) {
     await clerkSignOut();
   }, [stored, authed, save, clerkSignOut]);
 
-  // A tapped alert opens its trades: the Trades tab, filtered the way the
-  // alert is. The alert is looked up rather than carried in the payload,
-  // which has a 4KB ceiling an alert with many members would pass. Covers a
-  // tap that launched the app (the last response) and one while it runs.
+  // A tapped alert opens the trades it sent, grouped by notification, so the
+  // ones just announced are at the top (the alert's filtered search is a
+  // button there). Only the alert's id travels in the payload, which has a
+  // 4KB ceiling; the screen asks the server for the rest. Covers a tap that
+  // launched the app (the last response) and one while it runs.
   const handled = useRef<string | null>(null);
   useEffect(() => {
     if (unsupported) return;
@@ -241,26 +241,14 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const data = response.notification.request.content.data as { type?: string; alertId?: string } | undefined;
       if (data?.type !== 'alert' || !data.alertId) return;
       noteAlertTapped();
-      void (async () => {
-        try {
-          const list = await fetchAlerts(await authed());
-          const alert = list.alerts.find((a) => a.id === data.alertId);
-          if (alert) {
-            router.push({ pathname: '/trades', params: { filters: JSON.stringify(fromAlertFilters(alert.filters)) } });
-            return;
-          }
-        } catch {
-          // Fall through to the list.
-        }
-        router.push('/email-alerts');
-      })();
+      router.push({ pathname: '/alert-trades/[id]', params: { id: data.alertId } });
     };
     void Notifications.getLastNotificationResponseAsync()
       .then((r) => r && open(r))
       .catch(() => {});
     const sub = Notifications.addNotificationResponseReceivedListener(open);
     return () => sub.remove();
-  }, [unsupported, authed, router]);
+  }, [unsupported, router]);
 
   const value = useMemo<PushState>(
     () => ({

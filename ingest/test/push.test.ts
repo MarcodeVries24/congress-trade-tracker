@@ -1,5 +1,5 @@
-// The wording of an alert's push notification: one trade named outright,
-// several counted with the first few spelled out.
+// The wording of an alert's push notification: "New Trade(s)" over a count
+// of the new trades and the alert's name.
 //
 //   npx tsx ingest/test/push.test.ts
 //
@@ -46,17 +46,13 @@ function trade(over: Partial<AlertTradeRow>): AlertTradeRow {
 const alert = { id: "7", name: "Big buys" };
 
 const one = pushMessageFor(alert, [trade({})]);
-check("one trade: title names who did what", one.title, "Nancy Pelosi bought NVDA");
-check("one trade: body has amount, company and alert", one.body, "$1M–$5M · NVIDIA Corp · Big buys");
+check("one trade: title", one.title, "New Trade");
+check("one trade: body counts it for the alert", one.body, "1 new trade for alert “Big buys”");
 check("tap opens the alert", one.data, { type: "alert", alertId: "7" });
 
-const sold = pushMessageFor(alert, [trade({ transaction_type: "S (partial)", ticker: null, amount_low: 15001, amount_high: 50000 })]);
-check("a sale without a ticker uses the asset name", sold.title, "Nancy Pelosi sold NVIDIA Corporation - Common Stock");
-check("thousands are compact", sold.body.startsWith("$15K–$50K"), true);
-
 const many = pushMessageFor(alert, [1, 2, 3, 4, 5].map((id) => trade({ id })));
-check("several: title counts", many.title, "Big buys: 5 new trades");
-check("several: body lists three and the rest", many.body.endsWith(", and 2 more"), true);
+check("several: title", many.title, "New Trades");
+check("several: body counts them for the alert", many.body, "5 new trades for alert “Big buys”");
 
 if (failures) {
   console.error(`\n${failures} failed`);

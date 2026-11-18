@@ -1,4 +1,3 @@
-import { memberDisplayName } from "@congtrade/shared/memberDisplay";
 import type { AlertTradeRow } from "../../../web/lib/alertFilters";
 
 /**
@@ -13,52 +12,18 @@ export interface PushMessage {
   data: { type: "alert"; alertId: string };
 }
 
-function verb(type: string): string {
-  const t = type.toUpperCase();
-  return t.startsWith("P") ? "bought" : t.startsWith("S") ? "sold" : "exchanged";
-}
-
-function asset(row: AlertTradeRow): string {
-  if (row.ticker?.trim()) return row.ticker.trim();
-  return row.asset_name.length > 40 ? `${row.asset_name.slice(0, 37)}…` : row.asset_name;
-}
-
-function money(n: number): string {
-  if (n >= 1_000_000) return `$${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-  return `$${n}`;
-}
-
-function amount(row: AlertTradeRow): string | null {
-  if (row.amount_low && row.amount_high) return `${money(row.amount_low)}–${money(row.amount_high)}`;
-  if (row.amount_low) return `${money(row.amount_low)}+`;
-  return row.amount_range;
-}
-
 /**
- * One notification for one alert's new matches. A single trade is named
- * outright, as the email subject does; several are counted, with the first
- * few spelled out underneath.
+ * One notification for one alert's new matches, the same shape however many
+ * there are: "New Trades" over "3 new trades for alert “Big buys”". It names
+ * no trade: tapping it opens the alert's sent trades in the app, grouped by
+ * notification (mobile/src/app/alert-trades/[id].tsx), where this batch is at
+ * the top. The count is every new match, the ones an email only counts too.
  */
 export function pushMessageFor(alert: { id: string; name: string }, matches: AlertTradeRow[]): PushMessage {
-  const data = { type: "alert" as const, alertId: alert.id };
-  if (matches.length === 1) {
-    const row = matches[0];
-    return {
-      title: `${memberDisplayName(row)} ${verb(row.transaction_type)} ${asset(row)}`,
-      body: [amount(row), row.company_name && row.ticker ? row.company_name : null, alert.name]
-        .filter(Boolean)
-        .join(" · "),
-      data,
-    };
-  }
-  const lines = matches
-    .slice(0, 3)
-    .map((row) => `${memberDisplayName(row)} ${verb(row.transaction_type)} ${asset(row)}`);
-  const more = matches.length - lines.length;
+  const n = matches.length;
   return {
-    title: `${alert.name}: ${matches.length} new trades`,
-    body: lines.join(", ") + (more > 0 ? `, and ${more} more` : ""),
-    data,
+    title: n === 1 ? "New Trade" : "New Trades",
+    body: `${n} new ${n === 1 ? "trade" : "trades"} for alert “${alert.name}”`,
+    data: { type: "alert", alertId: alert.id },
   };
 }

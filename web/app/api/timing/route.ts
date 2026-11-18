@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PUBLISHED_DATA_TAG } from "@/lib/cache";
 import { getTimingOverviewCached, parseTimingWindow } from "@/lib/timing";
 
 /**
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
       // an old ranking after it changed); the CDN keeps it for an hour.
       "cache-control": "public, max-age=0, must-revalidate",
       "CDN-Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      "Vercel-Cache-Tag": PUBLISHED_DATA_TAG,
     },
   });
 }

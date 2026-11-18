@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { adminUserId } from "@/lib/admin";
+import { refreshPublishedData } from "@/lib/cache";
 import { issuerSlug } from "@/lib/issuerSlug";
 import { getMemberSlugsByName } from "@/lib/members";
 
@@ -72,4 +73,6 @@ async function refreshPagesFor(docIds: string[]) {
     if (ticker) paths.add(`/issuers/${issuerSlug(ticker)}`);
   }
   for (const path of paths) revalidatePath(path);
+  // The API answers the app and the website's lists read, cached at the CDN.
+  await refreshPublishedData();
 }

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { SignedIn } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 import { useProMirror } from "@/lib/useProMirror";
+import { GET_THE_APP_HREF } from "@/lib/appLinks";
 
 const LINKS = [
   { href: "/trades", label: "All Trades" },
@@ -147,6 +148,20 @@ export function MobileNav() {
               );
             })}
           </ul>
+          {/* The app, for the visitor most likely to want it: one already on a
+              phone. Closed by hand, since on the home page the link only moves
+              to #get-the-app and the path the menu watches does not change. */}
+          <div className="border-t border-line px-4 pb-2">
+            <Link
+              href={GET_THE_APP_HREF}
+              tabIndex={open ? undefined : -1}
+              onClick={() => setOpen(false)}
+              className="mt-2 flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold text-accent transition-colors hover:bg-panel-muted"
+            >
+              Get the app
+              <span className="text-xs font-medium text-ink-faint">iPhone · Android</span>
+            </Link>
+          </div>
           {/* Unlike the account link below, this one shows signed-out too:
               /upgrade is the pricing page, not a page that only tells you to
               sign in, and someone who has not signed up yet is exactly who it

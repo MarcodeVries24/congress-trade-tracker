@@ -6,6 +6,7 @@ import { AccountMenu } from "./AccountMenu";
 import { ThemeToggle } from "./ThemeToggle";
 import { MobileNav } from "./MobileNav";
 import { Logo } from "./Logo";
+import { GET_THE_APP_HREF } from "@/lib/appLinks";
 
 export function Header() {
   return (
@@ -68,6 +69,16 @@ export function Header() {
             className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
           >
             News
+          </Link>
+          {/* For everyone, signed in or not: the app is where alerts arrive as
+              they are sent, so a subscriber wants it as much as a visitor. */}
+          <Link
+            href={GET_THE_APP_HREF}
+            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
+          >
+            {/* One word while the row is tight; the full phrase once it is not. */}
+            <span className="lg:hidden">App</span>
+            <span className="hidden lg:inline">Get the app</span>
           </Link>
           {/* Signed-out only. A signed-in free account reaches the same page
               from the avatar menu, and someone already paying does not need

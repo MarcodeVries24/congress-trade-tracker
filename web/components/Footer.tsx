@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { StoreBadges } from "./StoreBadges";
 
 const YEAR = new Date().getFullYear();
 
@@ -75,6 +76,10 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
+            </div>
+            <div>
+              <div className="font-semibold uppercase tracking-wider text-ink-faint">Get the app</div>
+              <StoreBadges size="sm" className="mt-2 flex-col !items-start !gap-2" />
             </div>
             <div>
               <div className="font-semibold uppercase tracking-wider text-ink-faint">Legal</div>

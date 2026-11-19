@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkThemeProvider } from "@/components/ClerkThemeProvider";
 import { SITE_URL } from "@/lib/site";
+import { APP_STORE_ID } from "@/lib/appLinks";
 import "./globals.css";
 
 // The AdSense account script (no ad slot, just the client ID) needs to be
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "CongTrade | Congress Trade Tracker",
   description: "Searchable U.S. Congress (House & Senate) asset trade disclosures (Periodic Transaction Reports)",
+  // Safari on an iPhone shows its own banner across the top of every page,
+  // with "Open" for someone who has the app and "View" in the App Store for
+  // someone who does not. It appears once the app is live in the store.
+  itunes: { appId: APP_STORE_ID },
   // No `alternates.canonical` here on purpose: metadata is inherited, so a
   // canonical set in the root layout would make every page declare the
   // homepage as its canonical — telling Google that /trades is a duplicate

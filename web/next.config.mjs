@@ -24,6 +24,7 @@ const nextConfig = {
     const longCache = [{ key: "Cache-Control", value: "public, max-age=2592000, stale-while-revalidate=86400" }];
     const assets = [
       { source: "/cong/:file*", headers: longCache },
+      { source: "/app-screens/:file*", headers: longCache },
       { source: "/:file(american\\.png|stock-portrait\\.jpg|favicon\\.ico|icon\\.svg|apple-icon\\.png)", headers: longCache },
     ];
     if (process.env.NODE_ENV === "production") return assets;

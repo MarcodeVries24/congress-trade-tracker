@@ -17,6 +17,8 @@ import { issuerSlug } from "@/lib/issuerSlug";
 import { memberDisplayName } from "@/lib/memberDisplay";
 import { BannerFlag } from "@/components/BannerFlag";
 import { AboutCongTrade } from "@/components/AboutCongTrade";
+import { AppPromo } from "@/components/AppPromo";
+import { StoreBadges } from "@/components/StoreBadges";
 import { SentimentRiver } from "@/components/SentimentRiver";
 import { PolicyStrip } from "@/components/PolicyStrip";
 import { NewsRow } from "@/components/NewsRow";
@@ -100,6 +102,13 @@ export default function Home() {
               Built directly from Periodic Transaction Reports filed with the House Clerk and Senate eFD. Every filing
               since {archiveStart}, updated daily.
             </p>
+            {/* The app, from the first screen: alerts arrive there as they are sent. */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-5">
+              <StoreBadges size="sm" />
+              <Link href="#get-the-app" className="text-xs text-ink-muted underline decoration-line-strong hover:text-ink">
+                Alerts on your phone, as they happen
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -278,6 +287,8 @@ export default function Home() {
             </Card>
           </div>
         </div>
+
+        <AppPromo />
 
         {/* The best recent trades, the ranking /best-trades has in full,
             straight after the trading panels and above the markets news. */}

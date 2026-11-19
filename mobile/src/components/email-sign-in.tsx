@@ -8,7 +8,8 @@ import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 // 'new-password' and 'new-code' create an account for an address Clerk does not know.
-type Step = 'email' | 'password' | 'code' | 'new-password' | 'new-code';
+// 'reset' is a forgotten password: a code sent to the address, and a new password.
+type Step = 'email' | 'password' | 'code' | 'new-password' | 'new-code' | 'reset';
 
 // The Clerk instances' minimum (Dashboard > User & authentication > Password,
 // set to 8 on production and development). Clerk checks it again, and also
@@ -151,6 +152,27 @@ export function EmailSignIn() {
     }
   };
 
+  /**
+   * Device Trust: the first password sign-in on a device is confirmed with a
+   * code sent to the account's email, so a leaked password alone is not
+   * enough. Every phone is a new device the first time, and a password that
+   * was just reset is a password sign-in too.
+   */
+  const askSecondFactor = async (result: NonNullable<typeof signIn>) => {
+    const factor = result.supportedSecondFactors?.find((f) => f.strategy === 'email_code');
+    if (!factor) {
+      setError('This account needs a second step this app does not support yet.');
+      return;
+    }
+    await result.prepareSecondFactor({
+      strategy: 'email_code',
+      ...('emailAddressId' in factor ? { emailAddressId: factor.emailAddressId } : {}),
+    });
+    setCode('');
+    setCodeIsSecondFactor(true);
+    setStep('code');
+  };
+
   const submitPassword = async () => {
     if (!signIn) return;
     setError(null);
@@ -161,20 +183,7 @@ export function EmailSignIn() {
         password,
       });
       if (result.status === 'needs_second_factor') {
-        // Device Trust: the first password sign-in on a device is confirmed
-        // with a code sent to the account's email, so a leaked password alone
-        // is not enough. Every phone is a new device the first time.
-        const factor = result.supportedSecondFactors?.find((f) => f.strategy === 'email_code');
-        if (!factor) {
-          setError('This account needs a second step this app does not support yet.');
-          return;
-        }
-        await result.prepareSecondFactor({
-          strategy: 'email_code',
-          ...('emailAddressId' in factor ? { emailAddressId: factor.emailAddressId } : {}),
-        });
-        setCodeIsSecondFactor(true);
-        setStep('code');
+        await askSecondFactor(result);
         return;
       }
       await finish(result.status === 'complete' ? result.createdSessionId : null);
@@ -197,6 +206,51 @@ export function EmailSignIn() {
       await finish(result.status === 'complete' ? result.createdSessionId : null);
     } catch (err) {
       setError(messageFrom(err, 'That code did not work.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * A forgotten password. Clerk emails a code to the address, and the code
+   * with a new password signs the person in. Their other sessions stay signed
+   * in, as on the website.
+   */
+  const startReset = async () => {
+    if (!signIn) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await signIn.create({ strategy: 'reset_password_email_code', identifier: email.trim() });
+      setPassword('');
+      setCode('');
+      setStep('reset');
+    } catch (err) {
+      setError(messageFrom(err, 'Could not send a reset code.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReset = async () => {
+    if (!signIn) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'reset_password_email_code',
+        code: code.trim(),
+        password,
+      });
+      if (result.status === 'needs_second_factor') {
+        await askSecondFactor(result);
+        return;
+      }
+      await finish(result.status === 'complete' ? result.createdSessionId : null);
+    } catch (err) {
+      // A wrong code, or a new password Clerk turns down (too short, or known
+      // from a breach): its own sentence says which.
+      setError(messageFrom(err, 'Could not set the new password.'));
     } finally {
       setBusy(false);
     }
@@ -231,7 +285,13 @@ export function EmailSignIn() {
           ? { label: 'Create account', onPress: createAccount, disabled: password.length < MIN_PASSWORD }
           : step === 'new-code'
             ? { label: 'Verify code', onPress: verifyNewAccount, disabled: code.trim().length < 6 }
-            : { label: 'Verify code', onPress: submitCode, disabled: code.trim().length < 6 };
+            : step === 'reset'
+              ? {
+                  label: 'Set new password',
+                  onPress: submitReset,
+                  disabled: code.trim().length < 6 || password.length < MIN_PASSWORD,
+                }
+              : { label: 'Verify code', onPress: submitCode, disabled: code.trim().length < 6 };
 
   return (
     <View style={styles.wrap}>
@@ -329,14 +389,61 @@ export function EmailSignIn() {
         </>
       ) : null}
 
+      {step === 'reset' ? (
+        <>
+          <Text variant="caption" tone="muted">
+            We sent a six-digit code to that address. Enter it with a new password.
+          </Text>
+          <TextInput
+            key="reset-code"
+            value={code}
+            onChangeText={setCode}
+            placeholder="6-digit code"
+            placeholderTextColor={c.textFaint}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            maxLength={6}
+            returnKeyType="next"
+            {...field('reset-code')}
+            style={[field('reset-code').style, styles.code]}
+          />
+          <TextInput
+            key="reset-password"
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              setError(null);
+            }}
+            placeholder={`New password (at least ${MIN_PASSWORD} characters)`}
+            placeholderTextColor={c.textFaint}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="go"
+            onSubmitEditing={() => !action.disabled && action.onPress()}
+            {...field('reset-password')}
+          />
+        </>
+      ) : null}
+
       <Button label={action.label} onPress={action.onPress} loading={busy} disabled={action.disabled} />
 
-      {step === 'password' && codeAvailable ? (
-        <Tap onPress={switchToCode} disabled={busy} style={styles.link}>
-          <Text variant="callout" tone="muted" style={styles.underline}>
-            Email me a code instead
-          </Text>
-        </Tap>
+      {step === 'password' ? (
+        <View style={styles.links}>
+          <Tap onPress={startReset} disabled={busy} style={styles.link}>
+            <Text variant="callout" tone="muted" style={styles.underline}>
+              Forgot password?
+            </Text>
+          </Tap>
+          {codeAvailable ? (
+            <Tap onPress={switchToCode} disabled={busy} style={styles.link}>
+              <Text variant="callout" tone="muted" style={styles.underline}>
+                Email me a code instead
+              </Text>
+            </Tap>
+          ) : null}
+        </View>
       ) : null}
 
       {error ? (
@@ -375,6 +482,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.lg,
   },
+  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', columnGap: 20 },
   link: { alignItems: 'center', paddingVertical: 6 },
   underline: { textDecorationLine: 'underline' },
 });

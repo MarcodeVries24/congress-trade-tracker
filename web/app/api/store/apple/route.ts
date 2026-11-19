@@ -7,7 +7,9 @@ import {
   releaseAppleSubscription,
   userForAccountToken,
 } from "@/lib/storeAccountToken";
+import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
+import { appleSubscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
 
 /**
  * The app reporting a purchase, or asking to restore one.
@@ -65,12 +67,22 @@ export async function POST(req: NextRequest) {
     const holder = await userForAccountToken(transaction.appAccountToken);
     if (holder && holder !== userId && (await accountStillExists(holder))) {
       console.error("[apple] transaction belongs to another account", { userId, originalTransactionId });
+      // When that account's Pro ends, and whether it renews, so the person
+      // knows when they could subscribe here instead. The app writes the date
+      // in the phone's time zone from `until`; the sentence here, in UTC, is
+      // for builds that only show `error`.
+      const until = transaction.expiresDate ? new Date(transaction.expiresDate) : null;
+      const renews = status !== "canceled";
+      const untilText = until
+        ? until.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+        : null;
       return NextResponse.json(
         {
           entitled: false,
           reason: "other-account",
-          error:
-            "This App Store subscription belongs to a different CongTrade account. Sign in with the account you subscribed with.",
+          until: until?.toISOString() ?? null,
+          renews,
+          error: appleSubscriptionElsewhereMessage(untilText, renews),
         },
         { status: 409 }
       );
@@ -79,6 +91,7 @@ export async function POST(req: NextRequest) {
     await releaseAppleSubscription(subscriptionId, userId);
   }
 
+  const currentPeriodEnd = transaction.expiresDate ? new Date(transaction.expiresDate) : null;
   await upsertSubscription({
     clerkUserId: userId,
     provider: "apple",
@@ -86,9 +99,23 @@ export async function POST(req: NextRequest) {
     providerSubscriptionId: transaction.transactionId ?? null,
     status,
     productId: transaction.productId ?? null,
-    currentPeriodEnd: transaction.expiresDate ? new Date(transaction.expiresDate) : null,
+    currentPeriodEnd,
     cancelAtPeriodEnd: status === "canceled",
   });
 
-  return NextResponse.json({ entitled: status === "active" || status === "past_due", status });
+  // The same rule as everywhere else access is decided: a cancelled
+  // subscription keeps Pro to the end of the period paid for. Answering
+  // "active or past_due" alone told someone restoring a cancelled one, still
+  // paid up, that they had nothing.
+  const entitled = grantsAccess({
+    clerk_user_id: userId,
+    provider: "apple",
+    provider_account_id: subscriptionId,
+    provider_subscription_id: transaction.transactionId ?? null,
+    status,
+    product_id: transaction.productId ?? null,
+    current_period_end: currentPeriodEnd?.toISOString() ?? null,
+    cancel_at_period_end: status === "canceled",
+  });
+  return NextResponse.json({ entitled, status });
 }

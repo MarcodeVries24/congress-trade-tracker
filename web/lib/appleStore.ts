@@ -7,6 +7,7 @@ import {
   SignedDataVerifier,
   VerificationException,
   VerificationStatus,
+  type JWSRenewalInfoDecodedPayload,
   type JWSTransactionDecodedPayload,
   type ResponseBodyV2DecodedPayload,
 } from "@apple/app-store-server-library";
@@ -197,12 +198,29 @@ export const APPLE_STATUS: Record<string, string> = {
   REVOKE: "canceled",
 };
 
-export function statusForNotification(type: string, subtype: string | undefined): string | null {
+export function statusForNotification(
+  type: string,
+  subtype: string | undefined,
+  autoRenewStatus?: number | null
+): string | null {
   // A renewal status change says so in its subtype: AUTO_RENEW_DISABLED is
   // someone cancelling, which keeps access to the end of the paid period and
   // is exactly what the "canceled" status already means here.
   if (type === "DID_CHANGE_RENEWAL_STATUS" && subtype === "AUTO_RENEW_DISABLED") return "canceled";
-  return APPLE_STATUS[type] ?? null;
+  const status = APPLE_STATUS[type] ?? null;
+  // The type alone does not say whether the subscription will renew. A plan
+  // change (DID_CHANGE_RENEWAL_PREF) arrives whether renewal is on or off, and
+  // used to be stored as "active", turning a cancelled subscription back into
+  // one that renews. The renewal info that comes with the notification does
+  // say, so it decides: paid for but not renewing is "canceled", as the
+  // AUTO_RENEW_DISABLED branch above and subscriptionStatusFor store it.
+  if (status === "active" && autoRenewStatus === 0) return "canceled";
+  return status;
+}
+
+/** The renewal info inside a notification or a status answer, verified like the transaction. */
+export async function verifyRenewalInfo(signedRenewalInfo: string): Promise<JWSRenewalInfoDecodedPayload> {
+  return inAnyEnvironment((v) => v.verifyAndDecodeRenewalInfo(signedRenewalInfo));
 }
 
 const apiClients = new Map<Environment, AppStoreServerAPIClient>();
@@ -271,9 +289,7 @@ export async function subscriptionStatusFor(originalTransactionId: string): Prom
       // so a restore or a re-check does not quietly turn it back into a
       // subscription that renews.
       if (status === "active" && item.signedRenewalInfo) {
-        const renewal = await inAnyEnvironment((v) => v.verifyAndDecodeRenewalInfo(item.signedRenewalInfo!)).catch(
-          () => null
-        );
+        const renewal = await verifyRenewalInfo(item.signedRenewalInfo).catch(() => null);
         if (renewal?.autoRenewStatus === 0) status = "canceled";
       }
       return { status, transaction };

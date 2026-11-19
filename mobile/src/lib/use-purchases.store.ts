@@ -1,3 +1,4 @@
+import { appleSubscriptionElsewhereMessage } from '@congtrade/shared/storeProducts';
 import { useAuth } from '@clerk/clerk-expo';
 import { getAvailablePurchases as ownedPurchases, isEligibleForIntroOfferIOS, useIAP } from 'expo-iap';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +21,18 @@ import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct, t
  * reported to it and the answer comes back from Apple, never from this device.
  */
 
+/**
+ * The server turning a store subscription down because it belongs to another
+ * CongTrade account. Its own class so a purchase can be stopped before Apple's
+ * sheet opens when this is the answer, rather than after the person has paid.
+ */
+class OtherAccountError extends Error {}
+
+/** "20 Nov 2026", in the phone's own time zone, as the Account screen writes "Pro until". */
+function dayOf(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 type Subscription = ReturnType<typeof useIAP>['subscriptions'][number];
 type StorePurchase = Parameters<NonNullable<Parameters<typeof useIAP>[0]>['onPurchaseSuccess'] & {}>[0];
 
@@ -33,6 +46,11 @@ function reportFor(purchase: StorePurchase): { originalTransactionId: string } |
     return { originalTransactionId: purchase.originalTransactionIdentifierIOS ?? purchase.transactionId };
   }
   return purchase.purchaseToken ? { purchaseToken: purchase.purchaseToken } : null;
+}
+
+/** The purchases that are CongTrade Pro, out of everything this store account owns. */
+function ourPurchases(all: StorePurchase[]): StorePurchase[] {
+  return all.filter((p) => periodForProduct(p.productId) !== null);
 }
 
 // "14 days", "1 month": a trial's length as the paywall says it. Weeks are
@@ -115,7 +133,22 @@ export function usePurchases(onEntitled: () => void): Purchases {
         },
         body: JSON.stringify(body),
       });
-      const data = (await res.json().catch(() => ({}))) as { entitled?: boolean; error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        entitled?: boolean;
+        error?: string;
+        reason?: string;
+        until?: string | null;
+        renews?: boolean;
+      };
+      if (data.reason === 'other-account') {
+        // Worded here when the date came along, so it is the phone's date
+        // rather than the server's UTC one.
+        throw new OtherAccountError(
+          data.until
+            ? appleSubscriptionElsewhereMessage(dayOf(data.until), data.renews !== false)
+            : (data.error ?? appleSubscriptionElsewhereMessage(null, true))
+        );
+      }
       if (!res.ok) throw new Error(data.error ?? `Could not confirm the purchase (${res.status}).`);
       return data.entitled === true;
     },
@@ -240,6 +273,33 @@ export function usePurchases(onEntitled: () => void): Purchases {
         return;
       }
       setBusy(period);
+      // Apple keeps one subscription per group per Apple Account. While that
+      // Apple Account has one, buying another plan only switches it, and it
+      // stays with the CongTrade account it was bought on: the person would
+      // pay and get nothing on this one. So what it already owns is asked
+      // about first, before Apple's sheet opens. Theirs is simply Pro again;
+      // another account's is said plainly, with until when it runs.
+      if (Platform.OS === 'ios') {
+        try {
+          const owned = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+          for (const payload of owned.map(reportFor)) {
+            if (payload && (await report(payload))) {
+              setBusy(null);
+              onEntitled();
+              return;
+            }
+          }
+        } catch (err) {
+          if (err instanceof OtherAccountError) {
+            setError(err.message);
+            setBusy(null);
+            return;
+          }
+          // Anything else (offline, the store slow to answer) is no reason to
+          // refuse a purchase: one that goes through is reported and checked
+          // again as it completes.
+        }
+      }
       try {
         // Play requires exactly one offer token, and the offer it names is
         // what is bought: the free-trial offer when there is one, otherwise the
@@ -269,7 +329,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
         setBusy(null);
       }
     },
-    [products, requestPurchase, subscriptions]
+    [products, requestPurchase, subscriptions, report, onEntitled]
   );
 
   /**
@@ -286,12 +346,11 @@ export function usePurchases(onEntitled: () => void): Purchases {
    */
   const restore = useCallback(async () => {
     setError(null);
-    const ours = (all: StorePurchase[]) => all.filter((p) => periodForProduct(p.productId) !== null);
     try {
-      let owned = ours(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+      let owned = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
       if (owned.length === 0) {
         await restorePurchases().catch(() => {});
-        owned = ours(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+        owned = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
       }
       const payloads = owned.map(reportFor).filter((p): p is NonNullable<typeof p> => p !== null);
       if (payloads.length === 0) {

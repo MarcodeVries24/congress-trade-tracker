@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appleNotificationsConfigured, statusForNotification, verifyNotification, verifyTransaction } from "@/lib/appleStore";
+import {
+  appleNotificationsConfigured,
+  statusForNotification,
+  verifyNotification,
+  verifyRenewalInfo,
+  verifyTransaction,
+} from "@/lib/appleStore";
 import { appleSubscriptionHolder, userForAccountToken } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
@@ -46,7 +52,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
-  const status = statusForNotification(notificationType ?? "", subtype);
+  // Whether the subscription will renew, which the type alone does not say (a
+  // plan change arrives either way). Verified like everything else from
+  // Apple; if it does not verify, the type decides as it always has.
+  const renewal = data?.signedRenewalInfo ? await verifyRenewalInfo(data.signedRenewalInfo).catch(() => null) : null;
+  const status = statusForNotification(notificationType ?? "", subtype, renewal?.autoRenewStatus);
   if (!status || !data?.signedTransactionInfo) {
     // Nothing we act on. Still a 200: Apple has delivered it, and asking to be
     // told again about something we deliberately ignore helps nobody.

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { sql } from "@/lib/db";
 import { getSubscriptions } from "@/lib/subscription";
 import { grantsAccess, PAYING_STATUSES, type SubscriptionProvider, type SubscriptionRow } from "@/lib/subscriptionAccess";
+import { healProMirror } from "@/lib/subscriptionWrite";
 
 /**
  * The signed-in account, as the app needs to see it.
@@ -32,6 +33,8 @@ export async function GET() {
   const rows = await getSubscriptions(userId);
   const pro = await hasProServer();
   const renewing = renewingProviders(rows);
+  const user = await currentUser().catch(() => null);
+  if (user) await healProMirror(userId, rows, user.publicMetadata);
   return NextResponse.json({
     pro,
     renewing,

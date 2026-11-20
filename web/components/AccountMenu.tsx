@@ -46,7 +46,7 @@ function SparkleIcon() {
  *
  * Upgrade sits above it, and only for someone who isn't already paying. It is
  * gated on `loaded` as well as `isPro` so a subscriber never sees a flash of
- * "Upgrade to Pro" while Clerk is still resolving who they are. Clerk skips
+ * "Get Pro" while Clerk is still resolving who they are. Clerk skips
  * falsy children here without complaint, so the conditional is safe.
  */
 export function AccountMenu() {
@@ -59,7 +59,7 @@ export function AccountMenu() {
     <UserButton appearance={{ elements: { userButtonAvatarBox: "h-8 w-8" } }}>
       <UserButton.MenuItems>
         {loaded && !isPro && (
-          <UserButton.Action label="Upgrade to Pro" labelIcon={<SparkleIcon />} onClick={() => router.push("/upgrade")} />
+          <UserButton.Action label="Get Pro" labelIcon={<SparkleIcon />} onClick={() => router.push("/upgrade")} />
         )}
         {/* "Account" rather than "Email alerts": the page also holds the plan,
             and naming it after only half its contents is why the way to

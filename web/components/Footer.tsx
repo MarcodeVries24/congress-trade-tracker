@@ -6,8 +6,8 @@ const YEAR = new Date().getFullYear();
 const COMPANY_LINKS = [
   { label: "About", href: "/about" },
   // Shown to everyone, subscribers included: a footer is where people look
-  // for a price, and /upgrade tells a subscriber they are already on Pro.
-  { label: "Pricing", href: "/upgrade" },
+  // for what Pro is, and /upgrade tells a subscriber they already have it.
+  { label: "CongTrade Pro", href: "/upgrade" },
   { label: "Contact", href: "/about#contact" },
   { label: "Feedback", href: "/feedback" },
 ];

@@ -8,6 +8,25 @@ import { Footer } from "@/components/Footer";
 import { AlertsManager } from "@/components/AlertsManager";
 import { ManagePlanButton } from "@/components/ManagePlanButton";
 import { hasProServer } from "@/lib/access";
+import { getSubscriptions, grantsAccess, type SubscriptionRow } from "@/lib/subscription";
+import { healProMirror } from "@/lib/subscriptionWrite";
+
+/**
+ * Where a subscription is managed: the one that bills it. Pro bought in the
+ * app is the App Store's or Google Play's to change or cancel, and only a
+ * website subscription has Stripe's portal behind it. Null for Pro with no
+ * subscription behind it (a comped account), which has nothing to manage.
+ */
+function manageLinkFor(row: SubscriptionRow | undefined): { href: string; label: string } | "stripe" | null {
+  if (!row) return null;
+  if (row.provider === "stripe") return "stripe";
+  if (row.provider === "apple") return { href: "https://apps.apple.com/account/subscriptions", label: "Manage in the App Store" };
+  const sku = row.product_id ? `sku=${encodeURIComponent(row.product_id)}&` : "";
+  return {
+    href: `https://play.google.com/store/account/subscriptions?${sku}package=com.congtrade.app`,
+    label: "Manage in Google Play",
+  };
+}
 
 export const metadata: Metadata = {
   title: "Your account | CongTrade",
@@ -20,7 +39,12 @@ export default async function AccountPage() {
   // page renders the signed-out shell in that case, and layout.tsx already
   // forces dynamic rendering, so there's no prerender to worry about.
   const user = await currentUser();
+  const rows = user ? await getSubscriptions(user.id) : [];
   const isPro = await hasProServer();
+  // Someone who bought Pro in the app before every purchase updated the
+  // website's mirror is put right here, so their filters open (see healProMirror).
+  if (user) await healProMirror(user.id, rows, user.publicMetadata);
+  const manage = manageLinkFor(rows.find((row) => grantsAccess(row)));
 
   return (
     <>
@@ -63,16 +87,27 @@ export default async function AccountPage() {
                   </p>
                 )}
               </div>
-              {/* A subscriber goes to Stripe's portal; everyone else to the
-                  pricing page. */}
+              {/* A subscriber manages it where it bills; everyone else is
+                  shown how to get Pro, which is sold in the app. */}
               {isPro ? (
-                <ManagePlanButton className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink" />
+                manage === "stripe" ? (
+                  <ManagePlanButton className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink" />
+                ) : manage ? (
+                  <a
+                    href={manage.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+                  >
+                    {manage.label}
+                  </a>
+                ) : null
               ) : (
                 <Link
                   href="/upgrade"
                   className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
                 >
-                  Upgrade to Pro
+                  Get Pro in the app
                 </Link>
               )}
             </div>

@@ -7,18 +7,17 @@ import { AlertFilters, describeAlert } from "@/lib/alertFilters";
 import { alertDraftHref, readAlertDraft } from "@/lib/alertsClient";
 
 /**
- * Keeps a half-built alert alive across checkout.
+ * Keeps a half-built alert alive while its owner gets Pro.
  *
  * Someone who hit the upgrade wall from the trades page arrives here with
  * their filters in the URL. This shows them what they were part-way through,
- * and sends them back to finish it the moment they hold Pro — so paying
- * completes the thing they were doing rather than dumping them on a pricing
- * page with nothing to show for it.
+ * and sends them back to finish it the moment they hold Pro, so getting Pro
+ * in the app completes the thing they were doing here.
  *
  * Belt and braces on purpose: the redirect fires when Clerk reports the plan,
- * but the button is always there. Clerk refreshes session claims after a
- * checkout on its own schedule, and a funnel step that only works if that
- * lands promptly is a funnel step that sometimes doesn't work.
+ * but the button is always there. The plan reaches the browser on Clerk's own
+ * schedule, and a step that only works if that lands promptly is a step that
+ * sometimes doesn't work.
  */
 export function UpgradeDraftHandoff() {
   const router = useRouter();
@@ -45,7 +44,8 @@ export function UpgradeDraftHandoff() {
         <span className="font-medium">{describeAlert(draft).join(" · ")}</span>.
       </p>
       <p className="mt-1 text-xs text-ink-muted">
-        It&apos;s saved in this link, so finish upgrading and we&apos;ll take you straight back to it.
+        It&apos;s saved in this link. Get Pro in the app, keep this page open, and we&apos;ll take you straight back
+        to it.
       </p>
       <button
         type="button"

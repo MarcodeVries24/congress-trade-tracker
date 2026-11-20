@@ -1,5 +1,6 @@
+import { clerkClient } from "@clerk/nextjs/server";
 import { sql } from "@/lib/db";
-import type { SubscriptionProvider } from "@/lib/subscriptionAccess";
+import { anyGrantsAccess, type SubscriptionProvider, type SubscriptionRow } from "@/lib/subscriptionAccess";
 
 /**
  * The write half of the subscriptions table, used by each provider's webhook.
@@ -59,6 +60,38 @@ export async function upsertSubscription(input: SubscriptionUpsert): Promise<voi
       input.cancelAtPeriodEnd,
     ]
   );
+  await mirrorProOntoClerk(input.clerkUserId);
+}
+
+/**
+ * Copies whether someone holds Pro onto their Clerk user, for the website.
+ *
+ * The browser decides whether to draw the filters as locked from this mirror
+ * (lib/useProMirror), not from the table, so it has to follow every change to
+ * any subscription. It used to be written by the Stripe webhook alone, which
+ * left everyone who bought Pro in the app looking at locked filters on the
+ * website while the server would have let them through. Worked out from all
+ * of the person's rows, so a cancelled subscription from one place cannot hide
+ * a live one from another.
+ *
+ * Best effort: the table is the enforcement boundary and is already written.
+ * A Clerk outage, or a user deleted since, must not fail the webhook that
+ * called this and make the store or Stripe retry it.
+ */
+export async function mirrorProOntoClerk(clerkUserId: string): Promise<void> {
+  try {
+    const rows = (await sql.query(
+      `SELECT clerk_user_id, provider, provider_account_id, provider_subscription_id,
+              status, product_id, current_period_end, cancel_at_period_end
+       FROM subscriptions WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    )) as SubscriptionRow[];
+    const client = await clerkClient();
+    // Merged into the existing metadata by Clerk, so the admin flag stays.
+    await client.users.updateUserMetadata(clerkUserId, { publicMetadata: { pro: anyGrantsAccess(rows) } });
+  } catch (err) {
+    console.error(`could not mirror the plan onto ${clerkUserId}: ${(err as Error).message}`);
+  }
 }
 
 /** The Clerk user behind a Stripe customer, for events that carry only the customer. */
@@ -83,4 +116,23 @@ export async function claimEvent(id: string, type: string): Promise<boolean> {
     [id, type]
   )) as { id: string }[];
   return rows.length > 0;
+}
+
+/**
+ * Puts the website's Pro mirror right if it disagrees with the subscriptions.
+ *
+ * Every change to a subscription writes the mirror now, but for a while only
+ * Stripe's did: anyone who bought Pro in the app before that saw locked
+ * filters on the website. Called where a signed-in person's subscriptions are
+ * read anyway (the app's account check on every launch, the website's account
+ * page), so those accounts are put right the next time either is opened. Only
+ * written when it differs, which after the first time is never.
+ */
+export async function healProMirror(
+  clerkUserId: string,
+  rows: SubscriptionRow[],
+  publicMetadata: unknown
+): Promise<void> {
+  const mirrored = (publicMetadata as { pro?: boolean } | undefined)?.pro === true;
+  if (mirrored !== anyGrantsAccess(rows)) await mirrorProOntoClerk(clerkUserId);
 }

@@ -74,7 +74,9 @@ export default function TermsPage() {
           <p>
             Every disclosed trade on the website is free to read, without an account. Some features, namely filters,
             alerts and an ad-free view, require a free account and a paid CongTrade Pro subscription. In the
-            CongTrade apps for iPhone and Android, using the app requires CongTrade Pro. Accounts are handled by our
+            CongTrade apps for iPhone and Android, using the app requires CongTrade Pro. CongTrade Pro is sold in the
+            apps, and a subscription bought there also gives you Pro on the website when you sign in with the same
+            account. Accounts are handled by our
             authentication provider, Clerk; you can sign up with an email address, a Google account, or an Apple
             account. The same account works on the website and in the apps.
           </p>
@@ -91,21 +93,15 @@ export default function TermsPage() {
 
         <LegalSection title="5. Paying, renewal and cancelling">
           <p>
-            <strong>On the website,</strong> subscriptions are billed by Stripe, which handles the payment and your
-            card details directly; we never see or store them. The price shown on the pricing page is the total you
-            pay, and nothing is added at checkout. Prices are quoted in euros or in US dollars depending on the
-            country you are visiting from. You can cancel at any time from your account, which takes you to
-            Stripe&rsquo;s billing page.
-          </p>
-          <p>
-            <strong>In the apps,</strong> subscriptions are sold and billed by Apple through the App Store, or by
-            Google through Google Play, at the price the store shows you, under the store&rsquo;s own terms. You
+            CongTrade Pro is sold in the CongTrade apps only; the website does not take payment. Subscriptions are
+            sold and billed by Apple through the App Store, or by Google through Google Play, at the price the store
+            shows you, under the store&rsquo;s own terms. You
             cancel them in your App Store or Google Play subscription settings (the app&rsquo;s account screen links
             there), at least 24 hours before the renewal date to avoid the next charge. Refunds for store purchases
             are handled by Apple or Google under their own policies; we cannot issue them ourselves.
           </p>
           <p>
-            Wherever you subscribed, a subscription renews automatically for the same period until you cancel it.
+            A subscription renews automatically for the same period until you cancel it.
             Cancelling takes effect at the end of the current billing period, and you keep access until then. Beyond
             the withdrawal right in section 6 and anything else the law requires, fees already paid are not refunded.
           </p>
@@ -117,27 +113,10 @@ export default function TermsPage() {
             withdraw from it, without giving a reason.
           </p>
           <p>
-            <strong>For a subscription bought on the website,</strong> tell us within that period at <a href="mailto:contact@congtrade.com" className="underline decoration-line-strong hover:text-ink hover:decoration-ink-muted">contact@congtrade.com</a>, in any
-            clear statement, or by using the model form below. When you subscribe you expressly ask us to start
-            straight away, by ticking the box for it before checkout. If you then withdraw within those 14 days, you
-            owe a proportionate amount for the part of the period you already had access to, and we refund the rest
-            within 14 days of being told, using the same payment method you paid with.
-          </p>
-          <p>
-            <strong>For a subscription bought in an app,</strong> the contract of sale is with Apple or Google, so
-            you withdraw through them: Apple via reportaproblem.apple.com, Google via your Google Play order
+            Because CongTrade Pro is bought in an app, the contract of sale is with Apple or Google, so you
+            withdraw through them: Apple via reportaproblem.apple.com, Google via your Google Play order
             history. We will help if you contact us.
           </p>
-          <p>Model withdrawal form, to be copied and sent to us:</p>
-          <ul>
-            <li>To CongTrade, contact@congtrade.com</li>
-            <li>I hereby give notice that I withdraw from my contract for the supply of the following service: CongTrade Pro</li>
-            <li>Ordered on: [date]</li>
-            <li>Name of consumer: [your name]</li>
-            <li>Address of consumer: [your address]</li>
-            <li>Account email: [the address on your CongTrade account]</li>
-            <li>Date: [today&rsquo;s date]</li>
-          </ul>
         </LegalSection>
 
         <LegalSection title="7. Not financial, legal, or investment advice">
@@ -223,7 +202,7 @@ export default function TermsPage() {
             The Site links to third-party sites that we don&rsquo;t control, including the House Clerk, the Senate
             eFD system, and individual source filings. We&rsquo;re not responsible for the content, accuracy, or
             practices of those sites. The Site also relies on third-party services to operate: Clerk (accounts),
-            Stripe (payments on the website), Apple and Google (app stores, and push notification delivery), Expo
+            Apple and Google (app stores, and push notification delivery), Expo
             (push notifications), Resend (alert email delivery), Vercel (hosting) and Neon (database). Each is
             governed by its own terms and privacy policy.
           </p>

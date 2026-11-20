@@ -16,6 +16,13 @@ import { TERMS_VERSION } from "@/lib/legal";
  * the whole reason for going direct to Stripe.
  */
 export async function POST(req: NextRequest) {
+  // Pro is sold in the app now (see app/upgrade/page.tsx), and nothing on the
+  // website starts a checkout any more. Refused rather than deleted, so that
+  // selling on the website again is a setting plus the plan cards from git
+  // history: WEB_CHECKOUT=true on Vercel.
+  if (process.env.WEB_CHECKOUT !== "true") {
+    return NextResponse.json({ error: "CongTrade Pro is sold in the CongTrade app." }, { status: 410 });
+  }
   if (!billingConfigured()) {
     return NextResponse.json({ error: "Billing is not configured" }, { status: 503 });
   }

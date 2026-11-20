@@ -154,19 +154,20 @@ export function AlertsManager() {
 
       {!state.isPro && (
         <div className="mt-4 rounded-lg border border-line bg-panel p-5">
-          <h3 className="text-sm font-semibold text-ink">Email alerts are a CongTrade Pro feature</h3>
+          <h3 className="text-sm font-semibold text-ink">Alerts are a CongTrade Pro feature</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-muted">
             Build a filter as specific as you like (a chamber, a party, a member, a ticker, a minimum trade size) and
-            get an email when a new disclosure matches it.
+            get an email when a new disclosure matches it. Pro is sold in the CongTrade app: get it there with this
+            same account, and alerts open here too.
           </p>
-          {/* Carries a draft they arrived with through checkout, which hands
-              it back to this page afterwards — the same handover the trades
-              page uses, so upgrading finishes the alert they started. */}
+          {/* Carries a draft they arrived with to the Pro page, which hands it
+              back to this page once Pro arrives — the same handover the trades
+              page uses, so getting Pro finishes the alert they started. */}
           <Link
             href={draft ? alertUpgradeHref(draft) : "/upgrade"}
             className="mt-4 inline-block rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
-            Upgrade to Pro
+            Get Pro in the app
           </Link>
         </div>
       )}

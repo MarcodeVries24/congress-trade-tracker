@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { clerkClient } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { sendPurchaseConfirmation } from "@/lib/purchaseEmail";
 import { claimEvent, upsertSubscription, userIdForCustomer } from "@/lib/subscriptionWrite";
@@ -133,18 +132,8 @@ async function record(subscription: Stripe.Subscription, fallbackUserId: string 
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
   });
-
-  // A mirror for the browser. The table stays the enforcement boundary; this
-  // only exists so the trades page can grey out a filter without waiting on a
-  // round trip, and so it can't be trusted for anything that matters.
-  try {
-    const client = await clerkClient();
-    await client.users.updateUserMetadata(clerkUserId, {
-      publicMetadata: { pro: ["active", "trialing", "past_due"].includes(subscription.status) },
-    });
-  } catch (err) {
-    console.error(`stripe webhook: could not mirror plan onto ${clerkUserId} — ${(err as Error).message}`);
-  }
+  // upsertSubscription also mirrors the plan onto the Clerk user, for the
+  // browser (see mirrorProOntoClerk).
 }
 
 /**

@@ -62,7 +62,9 @@ export function AppPromo() {
             ))}
           </ul>
           <StoreBadges className="mt-5" />
-          <p className="mt-2 text-xs text-ink-faint">Free to download.</p>
+          <p className="mt-2 text-xs text-ink-faint">
+            The app runs on CongTrade Pro, and one subscription opens Pro on this website too.
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-2.5 sm:gap-4">

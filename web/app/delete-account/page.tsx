@@ -86,7 +86,7 @@ export default function DeleteAccountPage() {
             Deleting the app removes them.
           </p>
           <p>
-            Payment card details are never stored by us at all. Stripe, Apple and Google hold those under their own
+            Payment card details are never stored by us at all. Apple and Google hold those under their own
             policies.
           </p>
         </LegalSection>

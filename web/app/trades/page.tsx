@@ -125,7 +125,7 @@ function Home() {
   // local state after that, same as before this param existed.
   const searchParams = useSearchParams();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
-  const { openSignUp, openSignIn } = useClerk();
+  const { openSignIn } = useClerk();
   // Reads the plan mirrored onto the Clerk user by the Stripe webhook, and
   // the same {"admin": true} comp flag as before. UI only: the enforcement
   // is server-side in /api/trades, which never trusts the client's view.
@@ -137,10 +137,10 @@ function Home() {
   // client's plan state.
   const filtersLocked = authLoaded && !isPro;
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  // Which wall they hit. A locked *filter* should just take them to pricing;
-  // only the alert offer carries the half-built alert through checkout, so
-  // that upgrading from a filter click doesn't drop them into an alert editor
-  // they never asked for.
+  // Which wall they hit, which decides what the pop-up names and where its
+  // "What's in Pro" goes: only the alert offer carries the half-built alert
+  // on, so that a filter click never lands someone in an alert editor they
+  // never asked for.
   const [upgradeIntent, setUpgradeIntent] = useState<"filters" | "alert">("filters");
   function promptUpgrade() {
     setUpgradeIntent("filters");
@@ -150,29 +150,20 @@ function Home() {
     setUpgradeIntent("alert");
     setUpgradeModalOpen(true);
   }
-  // Where to land someone who signs in rather than signs up. Both routes go
-  // to the thing they were doing, never to a pricing page: an existing account
-  // may already be paying, and /account decides what a half-built alert gets —
-  // the editor for a member, the upsell (carrying the draft on to checkout)
-  // for everyone else. Signing *up* is the other case, and still goes straight
-  // to pricing, because a brand-new account has nothing to check.
+  // Where to land someone who signs in from the wall: back to the thing they
+  // were doing, since the account may well hold Pro from the app already, and
+  // /account decides what a half-built alert gets (the editor for a member,
+  // the way to Pro for everyone else). Someone who signs *up* instead has
+  // nothing to check, and goes to the Pro page.
   function signInTarget() {
     if (upgradeIntent === "alert") return alertDraftHref(alertFilters);
     const url = new URL(window.location.href);
     url.searchParams.set(RESUME_PARAM, "filters");
     return url.pathname + url.search;
   }
-  function continueUpgrade() {
-    setUpgradeModalOpen(false);
-    const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
-    if (isSignedIn) router.push(target);
-    // `redirectUrl` is deprecated in this Clerk version and gets silently
-    // ignored — forceRedirectUrl is what actually lands them on /upgrade
-    // after sign-up. Someone who clicks "Already have an account? Sign in"
-    // inside that same modal is a different person entirely: they may well be
-    // paying already, so signInForceRedirectUrl sends them back here instead.
-    else openSignUp({ forceRedirectUrl: target, signInForceRedirectUrl: signInTarget() });
-  }
+  // Stable, because the pop-up closes itself from an effect the moment Pro
+  // arrives and lists this among its dependencies.
+  const closeUpgradeModal = useCallback(() => setUpgradeModalOpen(false), []);
   function continueSignIn() {
     setUpgradeModalOpen(false);
     const target = upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade";
@@ -452,10 +443,10 @@ function Home() {
   ]);
 
   // Someone who signed in from the upgrade wall lands back here, because an
-  // existing account may already be a paying one — showing a member the
-  // pricing table for something they already bought is the worst moment to
-  // get wrong. Only once Clerk has reported the plan, and only if it really
-  // is missing, do they go on to /upgrade. Declared after the sync effect so
+  // existing account may already hold Pro from the app, and telling them how
+  // to get what they have is the worst moment to get wrong. Only once Clerk
+  // has reported the plan, and only if it really is missing, is the wall
+  // shown again, saying where Pro is sold. Declared after the sync effect so
   // its replace() is the one that sticks; the marker itself never survives,
   // since the sync rebuilds the query from the filters alone.
   const resumedFromSignIn = initial.get(RESUME_PARAM) === "filters";
@@ -467,9 +458,12 @@ function Home() {
     // cleared. A free visitor waits about a second to reach pricing; a member
     // is never shown a price for what they already pay for. That asymmetry is
     // the whole point of the wait.
-    const timer = setTimeout(() => router.replace("/upgrade"), 1200);
+    const timer = setTimeout(() => {
+      setUpgradeIntent("filters");
+      setUpgradeModalOpen(true);
+    }, 1200);
     return () => clearTimeout(timer);
-  }, [resumedFromSignIn, authLoaded, filtersLocked, router]);
+  }, [resumedFromSignIn, authLoaded, filtersLocked]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1145,7 +1139,13 @@ function Home() {
         )}
       </main>
       <Footer />
-      <UpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} onContinue={continueUpgrade} onSignIn={continueSignIn} />
+      <UpgradeModal
+        open={upgradeModalOpen}
+        intent={upgradeIntent}
+        onClose={closeUpgradeModal}
+        onSignIn={continueSignIn}
+        moreHref={upgradeIntent === "alert" ? alertUpgradeHref(alertFilters) : "/upgrade"}
+      />
     </>
   );
 }

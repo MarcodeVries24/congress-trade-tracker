@@ -106,16 +106,23 @@ export function readAlertDraft(search: string): AlertFilters | undefined {
 }
 
 /**
- * The same handover, routed via the pricing page for someone who can't save an
+ * The same handover, routed via the Pro page for someone who can't save an
  * alert yet.
  *
  * Without this, the funnel loses people at its most expensive moment: they
- * build a filter, hit the upgrade wall, pay — and land back with the draft
+ * build a filter, hit the upgrade wall, get Pro — and land back with the draft
  * gone, having to rebuild from memory the thing they just told us they wanted.
- * /upgrade carries it through checkout and hands it to /account afterwards.
+ * /upgrade holds it while they get Pro and hands it to /account afterwards.
+ *
+ * A draft with nothing in it (every key unset, as the trades page's filters
+ * are before anyone touches them) is no draft: carried along, it had the Pro
+ * page announce "You were setting up an alert for ." with nothing named.
  */
 export function alertUpgradeHref(filters: AlertFilters): string {
-  const keys = Object.keys(filters);
+  const keys = Object.keys(filters).filter((key) => {
+    const value = (filters as Record<string, unknown>)[key];
+    return value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && value.length === 0);
+  });
   if (keys.length === 0) return "/upgrade";
   return `/upgrade?${ALERT_DRAFT_PARAM}=${encodeURIComponent(JSON.stringify(filters))}`;
 }

@@ -163,7 +163,7 @@ export function MobileNav() {
             </Link>
           </div>
           {/* Unlike the account link below, this one shows signed-out too:
-              /upgrade is the pricing page, not a page that only tells you to
+              /upgrade is the Pro page, not a page that only tells you to
               sign in, and someone who has not signed up yet is exactly who it
               is for. Hidden once they are paying. */}
           {!isPro && (
@@ -176,7 +176,7 @@ export function MobileNav() {
                   pathname === "/upgrade" ? "bg-panel-muted text-accent" : "text-accent hover:bg-panel-muted"
                 }`}
               >
-                Upgrade to Pro
+                Get Pro
                 {pathname === "/upgrade" && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />}
               </Link>
             </div>

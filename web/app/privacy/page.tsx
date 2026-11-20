@@ -41,7 +41,7 @@ export default function PrivacyPage() {
             All of the trading data shown in CongTrade is public government filing data, not personal data about
             you. Browsing the website doesn&rsquo;t require an account. If you create an account, we collect the
             minimum needed to run that account and subscription, mostly handled by our providers (Clerk for
-            accounts; Stripe, Apple or Google for payment) rather than stored by us directly. The one
+            accounts; Apple or Google for payment) rather than stored by us directly. The one
             exception is email alerts, which need your address and your saved criteria in our own database in order
             to send anything, push notifications, which need your device&rsquo;s push token if you turn them on, and
             feedback, which we keep when you choose to send it. The apps collect nothing beyond that: no location, no contacts, no analytics and no advertising
@@ -90,8 +90,7 @@ export default function PrivacyPage() {
             Every alert email includes a one-click unsubscribe link that switches that alert off without signing in.
             Deleting an alert deletes its criteria and its sent-history with it. Alerts, and replying to feedback you
             send, are the only things we use your email address for. We don&rsquo;t send marketing, and we don&rsquo;t share the address with
-            anyone beyond our email delivery provider, Resend, which transmits the message, and Stripe, if you
-            subscribe on the website.
+            anyone beyond our email delivery provider, Resend, which transmits the message.
           </p>
         </LegalSection>
 
@@ -108,17 +107,12 @@ export default function PrivacyPage() {
 
         <LegalSection title="6. Payments">
           <p>
-            Subscription payments are processed by Stripe. We never see or store your card details; Stripe handles
-            those directly. In our own database we keep a record of your subscription, namely your Clerk account ID,
-            the Stripe customer and subscription identifiers, its status, the plan, and when the paid period ends.
-            That record is what grants access to paid features, and we are required to keep billing and tax records
-            for seven years.
-          </p>
-          <p>
-            In the apps, subscriptions are sold and charged by Apple through the App Store, or by Google through
-            Google Play, under their own terms and privacy policies. We never see your payment details there either.
-            What we receive from them is the same kind of record: the product, the transaction identifiers, the
-            status and the renewal date. To connect a store purchase to your CongTrade account, we give your account
+            CongTrade Pro is sold in the CongTrade apps: subscriptions are sold and charged by Apple through the App
+            Store, or by Google through Google Play, under their own terms and privacy policies. The website does not
+            take payment. We never see your payment details. What we receive from the store is a record of your
+            subscription: the product, the transaction identifiers, the status and the renewal date. In our own
+            database we keep that record with your Clerk account ID. It is what grants access to paid features, in
+            the apps and on the website, and we are required to keep billing and tax records for seven years. To connect a store purchase to your CongTrade account, we give your account
             a random identifier that the store carries with the purchase; it contains nothing about you and is used
             for nothing else.
           </p>
@@ -195,7 +189,7 @@ export default function PrivacyPage() {
             The Site links out to third-party sites, such as the House Clerk&rsquo;s disclosure portal, the Senate
             eFD system, and individual source filings, to let you verify data at the source. To operate, it relies on
             these providers, which process personal data on our behalf or, for the app stores, as sellers in their
-            own right: Clerk (accounts), Stripe (payments on the website), Apple (the App Store and iPhone
+            own right: Clerk (accounts), Apple (the App Store and iPhone
             notifications), Google (Google Play and Android notifications), Expo (push notification delivery),
             Resend (alert emails), Vercel (hosting) and Neon (database). Each has its own privacy practices. We do not
             sell your personal data or share it for advertising.

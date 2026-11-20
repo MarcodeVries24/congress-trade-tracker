@@ -20,8 +20,16 @@ const FAQS: { q: string; a: string }[] = [
     a: "Because that's all members disclose. A filing says a trade was worth $15,001–$50,000, never $31,240. Where CongTrade shows a total, it adds up the midpoint of each range: a reasonable estimate, and clearly not a precise number.",
   },
   {
+    q: "Why do I subscribe in the app, not on the website?",
+    a: "CongTrade Pro is sold through the App Store and Google Play only, so they take care of the payment, the receipts, VAT and refunds. Pro belongs to your CongTrade account, not your phone: sign in on this website with the same account and the filters, alerts and ad-free pages open here as well.",
+  },
+  {
+    q: "I have Pro in the app. How do I use it here?",
+    a: "Sign in on the website with the same account you use in the app: the same Apple, Google or email sign-in. Pro is there straight away. If the filters still look locked, check that both are signed in with the same account.",
+  },
+  {
     q: "What can I do without paying?",
-    a: "Search and browse everything: every trade, every member, every issuer, all the way back through the archive. Pro adds the filters, the email alerts and an ad-free view. The underlying data isn't held back from anyone.",
+    a: "On the website, search and browse everything: every trade, every member, every issuer, all the way back through the archive. Pro adds the filters, the alerts and an ad-free view. The underlying data isn't held back from anyone.",
   },
   {
     q: "What exactly do the filters add?",
@@ -29,7 +37,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Can I cancel?",
-    a: "Any time, from your account page. No email, no cancellation flow to sit through.",
+    a: "Any time, in your App Store or Google Play subscription settings (the app and your account page here link straight there). You keep Pro until the end of the period you paid for.",
   },
   {
     q: "Is this investment advice?",

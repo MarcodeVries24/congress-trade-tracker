@@ -399,11 +399,14 @@ async function syncMembersHistoryAndTerms(allLegislators: Legislator[]): Promise
 // (comparing a few thousand filings against ~1000 candidates is trivial),
 // and it's what lets a bad resolution from an earlier, less careful version
 // of this logic self-correct instead of staying wrong forever.
-async function resolveFilingBioguideIds(allLegislators: Legislator[]): Promise<void> {
+async function resolveFilingBioguideIds(allLegislators: Legislator[], unresolvedOnly = false): Promise<void> {
   const recentLegislators = allLegislators.filter((l) => l.terms.some((t) => t.start && (!t.end || t.end >= EARLIEST_RELEVANT_TERM_END)));
 
+  // Every filing on the daily full run, so a wrong match self-corrects;
+  // only those with no member yet (new ones) after each ingest.
   const filings = await sql.query(
-    `SELECT doc_id, member_name, state_district, filing_date, bioguide_id FROM filings WHERE member_name IS NOT NULL AND member_name != ''`
+    `SELECT doc_id, member_name, state_district, filing_date, bioguide_id FROM filings
+     WHERE member_name IS NOT NULL AND member_name != ''${unresolvedOnly ? " AND bioguide_id IS NULL" : ""}`
   );
 
   let changed = 0;
@@ -436,7 +439,17 @@ async function resolveFilingBioguideIds(allLegislators: Legislator[]): Promise<v
   console.log(`Resolved/corrected bioguide_id for ${changed} filing(s) (name match, district+date as tie-break only).`);
 }
 
+/**
+ * `--new-only` (after each ingest): match the filings that have no member yet,
+ * and add members for any district nobody has a photo for, from the same
+ * legislator lists. Leaves photos, current members, histories and terms, and
+ * re-checking every filing's match, to the daily full run (daily-sync.yml):
+ * those change with a new Congress or a resignation, not every four hours,
+ * and the full run reads every filing, which after every ingest added up to
+ * a large part of the database's monthly network transfer.
+ */
 async function main() {
+  const newOnly = process.argv.includes("--new-only");
   await ensureSchema();
 
   console.log("Fetching current members of Congress...");
@@ -444,6 +457,12 @@ async function main() {
   console.log("Fetching historical members of Congress...");
   const historicalLegislators = await fetchLegislators(MEMBERS_REFERENCE.legislatorsHistoricalYamlUrl);
   const allLegislators = [...currentLegislators, ...historicalLegislators];
+
+  if (newOnly) {
+    await backfillFormerMembers(currentLegislators, historicalLegislators);
+    await resolveFilingBioguideIds(allLegislators, true);
+    return;
+  }
 
   // Only members whose terms matter here: everyone current, and former
   // members who served recently enough to have filed (see syncMembersHistoryAndTerms).

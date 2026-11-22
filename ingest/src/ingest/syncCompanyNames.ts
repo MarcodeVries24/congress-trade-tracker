@@ -14,6 +14,13 @@ import { COMPANY_NAME_OVERRIDES, companyNameFrom, secTicker } from "./companyNam
  *
  * `--dry-run` prints what would change and writes nothing.
  *
+ * `--new-only` (after each ingest) names only tickers that have no row in
+ * company_market_caps yet, i.e. new ones. The full pass, which also catches a
+ * company renamed at the SEC, runs daily (daily-sync.yml): run after every
+ * ingest, its read of every ticker and every filed name each time was a
+ * large part of the database's monthly network transfer, for a list that
+ * barely changes.
+ *
  * Writes only the name: a row it creates for a ticker the market-cap sync has
  * not reached yet is still looked up there (it checks logo_checked_at).
  */
@@ -37,16 +44,36 @@ async function secTitles(): Promise<Map<string, string>> {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
+  const newOnly = process.argv.includes("--new-only");
   await ensureSchema();
+
+  const allTickers = `SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker <> ''
+                      UNION SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL`;
+  const tickerRows = (await sql.query(
+    newOnly
+      ? `SELECT ticker FROM (${allTickers}) x
+         WHERE NOT EXISTS (SELECT 1 FROM company_market_caps cmc WHERE cmc.ticker = x.ticker)`
+      : allTickers
+  )) as { ticker: string }[];
+  if (newOnly && tickerRows.length === 0) {
+    console.log("No new tickers to name.");
+    return;
+  }
+  // Only the tickers being named: all of them, or the new ones.
+  const scope = newOnly ? tickerRows.map((r) => r.ticker) : null;
   const titles = await secTitles();
 
-  const [tickerRows, filedRows, currentRows] = (await Promise.all([
-    sql.query(`SELECT DISTINCT ticker FROM transactions WHERE ticker IS NOT NULL AND ticker <> ''
-               UNION SELECT DISTINCT ticker FROM asset_name_tickers WHERE ticker IS NOT NULL`),
-    sql.query(`SELECT ticker, asset_name, COUNT(*)::int AS n FROM transactions
-               WHERE ticker IS NOT NULL AND ticker <> '' GROUP BY 1, 2`),
-    sql.query(`SELECT ticker, company_name FROM company_market_caps`),
-  ])) as [{ ticker: string }[], { ticker: string; asset_name: string; n: number }[], { ticker: string; company_name: string | null }[]];
+  const [filedRows, currentRows] = (await Promise.all([
+    sql.query(
+      `SELECT ticker, asset_name, COUNT(*)::int AS n FROM transactions
+       WHERE ticker IS NOT NULL AND ticker <> ''${scope ? " AND ticker = ANY($1)" : ""} GROUP BY 1, 2`,
+      scope ? [scope] : []
+    ),
+    sql.query(
+      `SELECT ticker, company_name FROM company_market_caps${scope ? " WHERE ticker = ANY($1)" : ""}`,
+      scope ? [scope] : []
+    ),
+  ])) as [{ ticker: string; asset_name: string; n: number }[], { ticker: string; company_name: string | null }[]];
 
   const filed = new Map<string, [string, number][]>();
   for (const r of filedRows) {

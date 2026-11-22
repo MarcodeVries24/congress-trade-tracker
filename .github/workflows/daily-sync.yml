@@ -1,0 +1,36 @@
+name: Daily members and company names
+
+# The full versions of two steps that ingest.yml runs in a light form
+# (--new-only) after every ingest: members (photos, current members,
+# histories and terms, and re-checking which member every filing belongs
+# to) and company names (every ticker against the SEC's list, so a renamed
+# company is picked up). Both change with a new Congress, a resignation or a
+# rename, not every four hours, and both read whole tables, which run after
+# every ingest was a large part of the database's monthly network transfer.
+on:
+  schedule:
+    - cron: "41 3 * * *" # 03:41 UTC daily, clear of ingest.yml's runs
+  workflow_dispatch: {}
+
+jobs:
+  daily-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run sync-members --workspace ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Its own step, so a failed members sync does not hold back the names.
+      - run: npm run sync-company-names --workspace ingest
+        if: ${{ !cancelled() }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

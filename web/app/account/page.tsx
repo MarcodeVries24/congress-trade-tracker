@@ -11,21 +11,50 @@ import { hasProServer } from "@/lib/access";
 import { getSubscriptions, grantsAccess, type SubscriptionRow } from "@/lib/subscription";
 import { healProMirror } from "@/lib/subscriptionWrite";
 
+type Manage =
+  | { kind: "stripe"; boughtIn: string }
+  | { kind: "store"; boughtIn: string; href: string; label: string; how: string };
+
 /**
- * Where a subscription is managed: the one that bills it. Pro bought in the
- * app is the App Store's or Google Play's to change or cancel, and only a
- * website subscription has Stripe's portal behind it. Null for Pro with no
- * subscription behind it (a comped account), which has nothing to manage.
+ * Where a subscription is cancelled or changed: wherever it was bought, since
+ * that is who bills it. We cannot cancel a store subscription ourselves, so a
+ * website visitor who wants out is sent straight to the right store's
+ * subscription page, with the way there on the phone for anyone the link does
+ * not open for. Null for Pro with no subscription behind it (a comped
+ * account), which has nothing to cancel.
  */
-function manageLinkFor(row: SubscriptionRow | undefined): { href: string; label: string } | "stripe" | null {
+function manageFor(row: SubscriptionRow | undefined): Manage | null {
   if (!row) return null;
-  if (row.provider === "stripe") return "stripe";
-  if (row.provider === "apple") return { href: "https://apps.apple.com/account/subscriptions", label: "Manage in the App Store" };
+  if (row.provider === "stripe") return { kind: "stripe", boughtIn: "Bought on this website." };
+  if (row.provider === "apple") {
+    return {
+      kind: "store",
+      boughtIn: "Bought in the iPhone app, through the App Store.",
+      href: "https://apps.apple.com/account/subscriptions",
+      label: "Cancel or change in the App Store",
+      how: "On your iPhone: Settings, then your name, then Subscriptions.",
+    };
+  }
   const sku = row.product_id ? `sku=${encodeURIComponent(row.product_id)}&` : "";
   return {
+    kind: "store",
+    boughtIn: "Bought in the Android app, through Google Play.",
     href: `https://play.google.com/store/account/subscriptions?${sku}package=com.congtrade.app`,
-    label: "Manage in Google Play",
+    label: "Cancel or change in Google Play",
+    how: "On your phone: the Play Store, then your profile picture, then Payments & subscriptions.",
   };
+}
+
+/** "Renews Dec 4, 2026" or "Cancelled: Pro until Dec 4, 2026", from the row that grants Pro. */
+function renewalLine(row: SubscriptionRow | undefined): string | null {
+  if (!row?.current_period_end) return null;
+  const day = new Date(row.current_period_end).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return row.status === "canceled" || row.cancel_at_period_end ? `Cancelled: Pro until ${day}.` : `Renews ${day}.`;
 }
 
 export const metadata: Metadata = {
@@ -44,7 +73,9 @@ export default async function AccountPage() {
   // Someone who bought Pro in the app before every purchase updated the
   // website's mirror is put right here, so their filters open (see healProMirror).
   if (user) await healProMirror(user.id, rows, user.publicMetadata);
-  const manage = manageLinkFor(rows.find((row) => grantsAccess(row)));
+  const granting = rows.find((row) => grantsAccess(row));
+  const manage = manageFor(granting);
+  const renewal = renewalLine(granting);
 
   return (
     <>
@@ -78,6 +109,17 @@ export default async function AccountPage() {
                     <>Free: search and browse. Filters, email alerts and an ad-free view are Pro.</>
                   )}
                 </p>
+                {isPro && manage && (
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {manage.boughtIn}
+                    {renewal ? ` ${renewal}` : ""}
+                    {manage.kind === "store" && (
+                      <span className="block text-ink-faint">
+                        Cancelling happens there, not here. {manage.how}
+                      </span>
+                    )}
+                  </p>
+                )}
                 {user?.primaryEmailAddress?.emailAddress && (
                   <p className="mt-1 text-xs text-ink-faint">
                     Signed in as {user.primaryEmailAddress.emailAddress} ·{" "}
@@ -87,10 +129,11 @@ export default async function AccountPage() {
                   </p>
                 )}
               </div>
-              {/* A subscriber manages it where it bills; everyone else is
-                  shown how to get Pro, which is sold in the app. */}
+              {/* A subscriber cancels or changes it where it was bought;
+                  everyone else is shown how to get Pro, which is sold in the
+                  app. */}
               {isPro ? (
-                manage === "stripe" ? (
+                manage?.kind === "stripe" ? (
                   <ManagePlanButton className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink" />
                 ) : manage ? (
                   <a

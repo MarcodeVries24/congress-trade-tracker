@@ -5,9 +5,9 @@ on:
   # of that day's runs into one email. Reports on *yesterday's* filings
   # (filing_date, not when our pipeline happened to touch the row — see
   # sendDailyReport.ts), so this runs early — just after the first ingest
-  # run of the new day (17 */4 * * * → 00:17 UTC) — rather than late in the
-  # *same* day, since by then all six of yesterday's runs already had their
-  # chance to see anything filed yesterday.
+  # run of the new day (cron-job.org's 00:23 Amsterdam run, see ingest.yml)
+  # — rather than late in the *same* day, since by then all of yesterday's
+  # runs already had their chance to see anything filed yesterday.
   schedule:
     - cron: "0 1 * * *" # 01:00 UTC daily
   workflow_dispatch: {}

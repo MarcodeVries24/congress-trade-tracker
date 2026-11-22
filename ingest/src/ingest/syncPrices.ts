@@ -95,6 +95,28 @@ async function writeLatest(
   );
 }
 
+/**
+ * The dates one ticker wants a close for, earliest first; with `unpricedOnly`,
+ * only those with no close stored yet. Asked per ticker, for the tickers a
+ * run actually fetches, rather than for all of them up front.
+ */
+async function wantedDays(ticker: string, unpricedOnly: boolean): Promise<string[]> {
+  const rows = (await sql.query(
+    `SELECT day FROM (
+       SELECT t.transaction_date AS day FROM transactions t
+       WHERE t.ticker = $1 AND t.transaction_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+       UNION
+       SELECT f.filing_date AS day FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
+       WHERE t.ticker = $1 AND f.filing_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+     ) x
+     WHERE day <= $2
+       ${unpricedOnly ? "AND NOT EXISTS (SELECT 1 FROM price_points pp WHERE pp.ticker = $1 AND pp.day = x.day)" : ""}
+     ORDER BY day`,
+    [ticker, today]
+  )) as { day: string }[];
+  return rows.map((r) => r.day);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const full = args.includes("--full");
@@ -104,36 +126,59 @@ async function main() {
 
   await ensureSchema();
 
-  // Every date a close is wanted for, per ticker: when it was traded and when
-  // it was disclosed.
-  const needed = (await sql.query(
-    `SELECT ticker, array_agg(DISTINCT day ORDER BY day) AS days FROM (
+  // One row per ticker, worked out in the database: how many dates want a
+  // close (when it was traded and when it was disclosed), how many of those
+  // have none stored yet that the source could answer, and how its last sync
+  // went. This used to fetch every one of those dates and every stored close
+  // (the whole price_points table) to compare them here, a few MB per run, to
+  // conclude on most runs that nothing was missing; on Neon that read was a
+  // large share of the month's network transfer. With --new-only, only the
+  // tickers that need fetching come back at all.
+  const params: unknown[] = [today];
+  if (only) params.push(only);
+  const rows = (await sql.query(
+    `WITH wanted AS (
        SELECT t.ticker, t.transaction_date AS day FROM transactions t
        WHERE t.ticker IS NOT NULL AND t.ticker <> '' AND t.transaction_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
        UNION
        SELECT t.ticker, f.filing_date AS day FROM transactions t JOIN filings f ON f.doc_id = t.doc_id
        WHERE t.ticker IS NOT NULL AND t.ticker <> '' AND f.filing_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-     ) x
-     WHERE day <= $1 ${only ? "AND ticker = $2" : ""}
-     GROUP BY ticker
+     ),
+     per_ticker AS (
+       SELECT w.ticker, MIN(w.day) AS first_wanted, COUNT(*)::int AS wanted,
+              COUNT(*) FILTER (
+                WHERE pp.ticker IS NULL
+                  AND (pl.close_day IS NULL OR w.day <= pl.close_day)
+                  AND (pl.first_day IS NULL OR w.day >= pl.first_day)
+              )::int AS missing
+       FROM wanted w
+       LEFT JOIN price_points pp ON pp.ticker = w.ticker AND pp.day = w.day
+       LEFT JOIN price_latest pl ON pl.ticker = w.ticker
+       WHERE w.day <= $1 ${only ? "AND w.ticker = $2" : ""}
+       GROUP BY w.ticker
+     )
+     SELECT p.ticker, p.first_wanted, p.missing,
+            pl.status, pl.close_day, pl.first_day, pl.synced_at::text AS synced_at
+     FROM per_ticker p
+     LEFT JOIN price_latest pl ON pl.ticker = p.ticker
+     ${
+       // What --new-only would skip anyway: priced, nothing missing.
+       newOnly && !full ? "WHERE pl.ticker IS NULL OR pl.status <> 'ok' OR p.missing > 0" : ""
+     }
      -- Most-traded first, so a run cut short has done the tickers people see.
-     ORDER BY COUNT(*) DESC, ticker`,
-    only ? [today, only] : [today]
-  )) as { ticker: string; days: string[] }[];
+     ORDER BY p.wanted DESC, p.ticker`,
+    params
+  )) as {
+    ticker: string;
+    first_wanted: string;
+    missing: number;
+    status: string | null;
+    close_day: string | null;
+    first_day: string | null;
+    synced_at: string | null;
+  }[];
 
-  const stored = new Map<string, Set<string>>();
-  for (const r of (await sql.query(`SELECT ticker, day FROM price_points`)) as { ticker: string; day: string }[]) {
-    if (!stored.has(r.ticker)) stored.set(r.ticker, new Set());
-    stored.get(r.ticker)!.add(r.day);
-  }
-  const latest = new Map<string, Latest>();
-  for (const r of (await sql.query(
-    `SELECT ticker, status, close_day, first_day, synced_at::text FROM price_latest`
-  )) as Latest[]) {
-    latest.set(r.ticker, r);
-  }
-
-  console.log(`Syncing closes for ${needed.length} ticker(s) from ${SOURCE.name}${full ? " (full refetch)" : ""}...`);
+  console.log(`Syncing closes for ${rows.length} ticker(s) from ${SOURCE.name}${full ? " (full refetch)" : ""}...`);
   let fetched = 0;
   let refreshed = 0;
   let notFound = 0;
@@ -142,8 +187,11 @@ async function main() {
   let consecutiveFailures = 0;
   let points = 0;
 
-  for (const [i, { ticker, days }] of needed.slice(0, limit).entries()) {
-    const known = latest.get(ticker);
+  for (const [i, row] of rows.slice(0, limit).entries()) {
+    const { ticker, first_wanted: firstWanted } = row;
+    const known: Latest | undefined = row.status
+      ? { ticker, status: row.status, close_day: row.close_day, first_day: row.first_day, synced_at: row.synced_at! }
+      : undefined;
     if (
       !full &&
       known?.status === "not_found" &&
@@ -153,18 +201,15 @@ async function main() {
       continue;
     }
 
-    const have = stored.get(ticker) ?? new Set<string>();
-    // A day after the latest stored close cannot be answered yet (it is
-    // early, not missing), and one before the series starts never can be.
-    const answerable = (d: string) =>
-      (!known?.close_day || d <= known.close_day) && (!known?.first_day || d >= known.first_day);
-    const missing = days.filter((d) => !have.has(d) && answerable(d));
-    const whole = full || !known || known.status !== "ok" || missing.length > 0;
+    // `missing` counts only days the source could answer: one after the
+    // latest stored close is early, not missing, and one before the series
+    // starts never can be (see the query above).
+    const whole = full || !known || known.status !== "ok" || row.missing > 0;
     if (!whole && (newOnly || Date.now() - new Date(known!.synced_at).getTime() < FRESH_HOURS * 3_600_000)) {
       skipped++;
       continue;
     }
-    const fromDay = whole ? daysBefore(days[0], 10) : daysBefore(known!.close_day ?? today, RECENT_DAYS);
+    const fromDay = whole ? daysBefore(firstWanted, 10) : daysBefore(known!.close_day ?? today, RECENT_DAYS);
 
     try {
       let series = await fetchWithRetry(ticker, fromDay);
@@ -181,12 +226,14 @@ async function main() {
       let rewrite = whole;
       if (!whole && known?.close_day && series.splits.some((d) => d > known.close_day!)) {
         await sleep(DELAY_MS);
-        series = await fetchWithRetry(ticker, daysBefore(days[0], 10));
+        series = await fetchWithRetry(ticker, daysBefore(firstWanted, 10));
         rewrite = true;
         if (!series || !series.closes.length) throw new Error("split refetch returned nothing");
       }
 
       if (rewrite) {
+        // Every date this ticker wants, all rewritten from this one fetch.
+        const days = await wantedDays(ticker, false);
         const rows = days
           .map((day) => {
             const c = closeOn(series!.closes, day);
@@ -199,8 +246,7 @@ async function main() {
       } else {
         // Recent window only: fill any day it now answers (a filing from the
         // weekend, say) without touching the rest.
-        const rows = days
-          .filter((d) => !have.has(d))
+        const rows = (await wantedDays(ticker, true))
           .map((day) => {
             const c = closeOn(series!.closes, day);
             return c ? { day, close: c.close, close_day: c.day } : null;
@@ -225,7 +271,7 @@ async function main() {
         break;
       }
     }
-    if ((i + 1) % 200 === 0) console.log(`  ...${i + 1}/${Math.min(needed.length, limit)}`);
+    if ((i + 1) % 200 === 0) console.log(`  ...${i + 1}/${Math.min(rows.length, limit)}`);
     await sleep(DELAY_MS);
   }
 

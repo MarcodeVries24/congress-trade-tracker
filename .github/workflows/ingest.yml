@@ -5,7 +5,16 @@ on:
   # jobs together, which can delay a run by 1-2+ hours during busy periods.
   schedule:
     - cron: "17 */4 * * *"
+  # Also started from outside (cron-job.org calls the workflow_dispatch API
+  # every four hours), because GitHub skips or delays many scheduled runs.
   workflow_dispatch: {}
+
+# One ingest at a time. A run started while another is going waits for it
+# instead of running alongside: two at once would fetch the same filings,
+# write the same rows and could send the same alerts twice.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
 
 jobs:
   ingest:

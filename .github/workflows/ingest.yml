@@ -20,11 +20,17 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run sync-members --workspace ingest
+      - run: npm run ingest --workspace ingest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - run: npm run ingest --workspace ingest
+      # Matches this run's new filings to their member, after the ingest so
+      # they are matched in the same run. --new-only: the full members sync
+      # (photos, histories, re-checking every filing) runs daily in
+      # daily-sync.yml; it read every filing, which after every ingest was a
+      # large part of the database's monthly network transfer.
+      - run: npm run sync-members --workspace ingest -- --new-only
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -55,9 +61,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       # Company names from the SEC's public ticker list, so a ticker that
-      # arrived in this run is named straight away. Only names that differ are
-      # written. An enrichment like the one above: never fails the ingest.
-      - run: npm run sync-company-names --workspace ingest
+      # arrived in this run is named straight away. --new-only: just tickers
+      # with no row yet; the full pass (renamed companies) runs daily in
+      # daily-sync.yml. An enrichment like the one above: never fails the
+      # ingest.
+      - run: npm run sync-company-names --workspace ingest -- --new-only
         if: ${{ !cancelled() }}
         continue-on-error: true
         env:

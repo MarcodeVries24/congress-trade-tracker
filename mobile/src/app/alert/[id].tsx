@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,6 +9,9 @@ import {
   Switch,
   TextInput,
   View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 
 import { createAlert, deleteAlert, previewAlert, updateAlert, type AlertFilters, type AlertFrequency } from '@/lib/api';
@@ -26,6 +29,7 @@ import { EmptyState } from '@/ui/empty-state';
 import { FilterFields } from '@/ui/filter-fields';
 import { Icon, type IconName } from '@/ui/icon';
 import { PushPrimer } from '@/ui/push-primer';
+import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 const FREQUENCIES = [
@@ -158,6 +162,34 @@ export default function AlertEditorScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether the Save button at the bottom is on screen. While it is not (the
+  // filters make this a long screen), a Save button shows in the header, so
+  // saving never needs a scroll to the end. Measured from the scroll position,
+  // the visible height (which shrinks while the keyboard is up) and where the
+  // button sits in the content.
+  const [saveInView, setSaveInView] = useState(true);
+  const view = useRef({ offset: 0, height: 0, saveBottom: 0 });
+  const recheck = () => {
+    const { offset, height, saveBottom } = view.current;
+    if (!height || !saveBottom) return;
+    const visible = offset + height >= saveBottom;
+    setSaveInView((was) => (was === visible ? was : visible));
+  };
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    view.current.offset = e.nativeEvent.contentOffset.y;
+    view.current.height = e.nativeEvent.layoutMeasurement.height;
+    recheck();
+  };
+  const onViewport = (e: LayoutChangeEvent) => {
+    view.current.height = e.nativeEvent.layout.height;
+    recheck();
+  };
+  const onSaveLayout = (e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    view.current.saveBottom = y + height;
+    recheck();
+  };
+
   const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
   const filters = useMemo<AlertFilters>(() => toAlertFilters(draft), [draft]);
   const criteria = countActive(draft) + (draft.q ? 1 : 0);
@@ -259,11 +291,52 @@ export default function AlertEditorScreen() {
       ? 'Notifications are off on this phone, so this goes to your other phones only.'
       : 'A notification on this phone, and any other phone you have them on for.';
 
+  const headerSave = (
+    <Tap
+      onPress={save}
+      disabled={busy !== null}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={existing ? 'Save changes' : 'Save alert'}
+      style={[styles.headerSave, { backgroundColor: c.primary }]}>
+      {busy === 'save' ? (
+        <ActivityIndicator size="small" color={c.primaryText} />
+      ) : (
+        <Text variant="subhead" color={c.primaryText}>
+          Save
+        </Text>
+      )}
+    </Tap>
+  );
+
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <Stack.Screen options={{ title: existing ? 'Edit alert' : 'New alert' }} />
+      <Stack.Screen
+        options={{
+          title: existing ? 'Edit alert' : 'New alert',
+          // A small version of the Save button below: the same dark fill,
+          // with rounded corners rather than iOS 26's round glass, which the
+          // header would otherwise put around anything placed in it. On iOS
+          // that takes a custom header item with the shared background
+          // hidden; Android draws no background of its own.
+          ...(saveInView
+            ? { headerRight: undefined, unstable_headerRightItems: undefined }
+            : Platform.OS === 'ios'
+              ? {
+                  unstable_headerRightItems: () => [
+                    { type: 'custom' as const, element: headerSave, hidesSharedBackground: true },
+                  ],
+                }
+              : { headerRight: () => headerSave }),
+        }}
+      />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+          onLayout={onViewport}>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -337,12 +410,14 @@ export default function AlertEditorScreen() {
             </Text>
           ) : null}
 
-          <Button
-            label={existing ? 'Save changes' : 'Save alert'}
-            loading={busy === 'save'}
-            disabled={busy !== null}
-            onPress={save}
-          />
+          <View onLayout={onSaveLayout}>
+            <Button
+              label={existing ? 'Save changes' : 'Save alert'}
+              loading={busy === 'save'}
+              disabled={busy !== null}
+              onPress={save}
+            />
+          </View>
           {existing ? (
             <Button
               label={confirmDelete ? 'Tap again to delete' : 'Delete alert'}
@@ -361,6 +436,14 @@ export default function AlertEditorScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerSave: {
+    minWidth: 64,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   screen: { flex: 1 },
   content: { padding: 16, gap: 14, paddingBottom: 56 },
   flex: { flex: 1, gap: 2 },

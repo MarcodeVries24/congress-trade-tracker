@@ -79,9 +79,9 @@ export function PolicyStrip() {
                 </span>
               </a>
             ) : (
-              <div className="flex items-center gap-4 px-4 py-3 sm:px-5" aria-hidden>
-                <span className="h-3 w-28 animate-pulse rounded bg-line" />
-                <span className="h-3 flex-1 animate-pulse rounded bg-line" />
+              <div className="shimmer flex items-center gap-4 px-4 py-3 sm:px-5" aria-hidden>
+                <span className="h-3 w-28 rounded bg-panel-muted" />
+                <span className="h-3 flex-1 rounded bg-panel-muted" />
               </div>
             )}
           </li>

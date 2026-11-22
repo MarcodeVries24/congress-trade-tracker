@@ -66,7 +66,7 @@ export function NewsRow({
         {section
           ? section.items.slice(0, 4).map((item) => <NewsCard key={item.url} item={item} />)
           : Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="h-48 animate-pulse rounded-lg border border-line bg-panel" aria-hidden />
+              <div key={i} className="shimmer h-48 rounded-lg border border-line bg-panel" aria-hidden />
             ))}
       </div>
     </section>

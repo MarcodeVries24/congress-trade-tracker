@@ -27,7 +27,7 @@ export function TradeChartRange({
   const series = usePriceSeries(ticker);
   if (series === undefined) {
     // Holds the chart's place while it loads, so nothing below it jumps.
-    return <div aria-hidden className="h-[270px] animate-pulse rounded-lg bg-panel-muted" />;
+    return <div aria-hidden className="shimmer h-[270px] rounded-lg bg-panel-muted" />;
   }
   const points = series?.filter((p) => p.d >= fromDay) ?? [];
   if (points.length <= 4) return null;

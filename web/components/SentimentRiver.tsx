@@ -202,7 +202,7 @@ export function SentimentRiver() {
   }, [data, mode]);
 
   if (!data || !reading) {
-    return <div className="mb-4 h-[360px] animate-pulse rounded-xl border border-line bg-panel sm:mb-6" />;
+    return <div className="shimmer mb-4 h-[360px] rounded-xl border border-line bg-panel sm:mb-6" />;
   }
 
   const fmt = (n: number) => (mode === "value" ? compactUSD.format(n) : compactCount.format(Math.round(n)));

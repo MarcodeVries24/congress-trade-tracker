@@ -121,6 +121,43 @@ export function TimedTradeList({ trades, start = 1 }: { trades: TimedTrade[]; st
   );
 }
 
+/**
+ * TimedTradeList in outline, while the ranking loads: the same rows (rank,
+ * logo, two lines, the move on the right) at the same sizes, so the card does
+ * not change shape when the trades arrive.
+ */
+export function TimedTradeListSkeleton({ rows, start = 1 }: { rows: number; start?: number }) {
+  const bar = "inline-block rounded bg-panel-muted align-middle text-transparent select-none";
+  const widths = ["w-44", "w-36", "w-40"];
+  const subWidths = ["w-36", "w-44", "w-32"];
+  return (
+    <ol aria-hidden className="divide-y divide-line/60">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li key={i} className="flex items-center gap-3 px-4 py-3">
+          <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-faint opacity-50">{start + i}</span>
+          <span className="h-[30px] w-[30px] shrink-0 rounded-md bg-panel-muted" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm">
+              <span className={`${bar} h-3.5 ${widths[i % widths.length]}`}>&nbsp;</span>
+            </div>
+            <div className="text-xs">
+              <span className={`${bar} h-3 ${subWidths[i % subWidths.length]}`}>&nbsp;</span>
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-sm font-semibold">
+              <span className={`${bar} h-3.5 w-14`}>&nbsp;</span>
+            </div>
+            <div className="text-[10px]">
+              <span className={`${bar} h-2.5 w-12`}>&nbsp;</span>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function TimingLeaderList({ leaders }: { leaders: TimingLeader[] }) {
   return (
     <ol className="divide-y divide-line/60">

@@ -17,8 +17,18 @@ const SIZES = {
   md: { apple: "h-11", google: "h-[64px] -my-[10.5px] -mx-[10px]" },
 } as const;
 
-export function StoreBadges({ size = "md", className = "" }: { size?: keyof typeof SIZES; className?: string }) {
+export function StoreBadges({
+  size = "md",
+  className = "",
+  eager = false,
+}: {
+  size?: keyof typeof SIZES;
+  className?: string;
+  /** For badges on the first screen, which lazy loading would show a beat after the rest. */
+  eager?: boolean;
+}) {
   const s = SIZES[size];
+  const loading = eager ? "eager" : "lazy";
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
       <a href={APP_STORE_URL} target="_blank" rel="noreferrer" className="shrink-0 transition-opacity hover:opacity-85">
@@ -26,8 +36,11 @@ export function StoreBadges({ size = "md", className = "" }: { size?: keyof type
         <img
           src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us"
           alt="Download on the App Store"
+          // The badge's own proportions, so its space is kept before it loads.
+          width={120}
+          height={40}
           className={`${s.apple} w-auto`}
-          loading="lazy"
+          loading={loading}
         />
       </a>
       <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" className="shrink-0 transition-opacity hover:opacity-85">
@@ -35,8 +48,10 @@ export function StoreBadges({ size = "md", className = "" }: { size?: keyof type
         <img
           src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
           alt="Get it on Google Play"
+          width={646}
+          height={250}
           className={`${s.google} w-auto max-w-none`}
-          loading="lazy"
+          loading={loading}
         />
       </a>
     </div>

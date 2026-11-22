@@ -2,7 +2,7 @@
 
 import Link from "@/components/Link";
 import { useEffect, useState } from "react";
-import { NOT_ADVICE, TimedTradeList } from "@/components/TimingFeature";
+import { NOT_ADVICE, TimedTradeList, TimedTradeListSkeleton } from "@/components/TimingFeature";
 import type { TimingOverview } from "@/lib/timing";
 
 const WINDOWS = [30, 90, 365] as const;
@@ -72,14 +72,16 @@ export function HomeTiming() {
       </div>
 
       {!shown ? (
-        <div className="animate-pulse space-y-3 px-5 py-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-8 rounded bg-panel-muted" />
-          ))}
+        // The ranking's own two columns of three, in outline.
+        <div className="shimmer grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-line/60">
+          <TimedTradeListSkeleton rows={3} start={1} />
+          <div className="border-t border-line/60 lg:border-t-0">
+            <TimedTradeListSkeleton rows={3} start={4} />
+          </div>
         </div>
       ) : trades.length ? (
         // Two columns of three on a wide screen, one list on a phone.
-        <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-line/60">
+        <div className="fade-in grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-line/60">
           <TimedTradeList trades={trades.slice(0, half)} start={1} />
           <div className="border-t border-line/60 lg:border-t-0">
             <TimedTradeList trades={trades.slice(half)} start={half + 1} />

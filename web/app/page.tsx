@@ -104,7 +104,7 @@ export default function Home() {
             </p>
             {/* The app, from the first screen: alerts arrive there as they are sent. */}
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-5">
-              <StoreBadges size="sm" />
+              <StoreBadges size="sm" eager />
               <Link href="#get-the-app" className="text-xs text-ink-muted underline decoration-line-strong hover:text-ink">
                 Alerts on your phone, as they happen
               </Link>
@@ -174,10 +174,10 @@ export default function Home() {
               </div>
             }
           >
-            {!dashboard && <CardSkeleton rows={7} />}
+            {!dashboard && <CardSkeleton rows={15} kind="trade" />}
             {dashboard && latestTrades.length === 0 && <EmptyRow />}
             {dashboard && (
-              <ul className="divide-y divide-line/60">
+              <ul className="fade-in divide-y divide-line/60">
                 {latestTrades.map((trade) => {
                   const badge = typeBadge(trade.transaction_type);
                   return (
@@ -225,10 +225,10 @@ export default function Home() {
           {/* Sidebar: Most Active Politicians + Top by Trading Volume, stacked */}
           <div className="flex h-full flex-col gap-4 lg:gap-6">
             <Card title="Most Active Politicians" href="/politicians?sort=trade_count">
-              {!dashboard && <CardSkeleton rows={6} />}
+              {!dashboard && <CardSkeleton rows={8} kind="member" />}
               {dashboard && dashboard.topPoliticians.length === 0 && <EmptyRow />}
               {dashboard && (
-                <ul className="divide-y divide-line/60">
+                <ul className="fade-in divide-y divide-line/60">
                   {dashboard.topPoliticians.map((p, i) => {
                     const location = memberLocationFromDashboard(p);
                     return (
@@ -255,10 +255,10 @@ export default function Home() {
             </Card>
 
             <Card title="Top by Trading Volume" href="/politicians?sort=volume_sum" className="flex-1">
-              {!dashboard && <CardSkeleton rows={6} />}
+              {!dashboard && <CardSkeleton rows={8} kind="member" />}
               {dashboard && dashboard.topByVolume.length === 0 && <EmptyRow />}
               {dashboard && (
-                <ul className="divide-y divide-line/60">
+                <ul className="fade-in divide-y divide-line/60">
                   {dashboard.topByVolume.map((p, i) => {
                     const location = memberLocationFromDashboard(p);
                     return (
@@ -301,10 +301,10 @@ export default function Home() {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:mt-6 lg:grid-cols-3">
           {/* Most Traded Stocks */}
           <Card title="Most Traded Stocks" href="/issuers">
-            {!dashboard && <CardSkeleton rows={6} />}
+            {!dashboard && <CardSkeleton rows={8} kind="stock" />}
             {dashboard && dashboard.topStocks.length === 0 && <EmptyRow />}
             {dashboard && (
-              <ul className="divide-y divide-line/60">
+              <ul className="fade-in divide-y divide-line/60">
                 {dashboard.topStocks.map((s) => (
                   <li key={s.ticker}>
                     <Link href={`/issuers/${issuerSlug(s.ticker)}`} className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
@@ -324,10 +324,10 @@ export default function Home() {
 
           {/* Biggest Recent Trades */}
           <Card title="Biggest Recent Trades" href="/trades">
-            {!dashboard && <CardSkeleton rows={5} />}
+            {!dashboard && <CardSkeleton rows={5} kind="big-trade" />}
             {dashboard && dashboard.biggestTrades.length === 0 && <EmptyRow />}
             {dashboard && (
-              <ul className="divide-y divide-line/60">
+              <ul className="fade-in divide-y divide-line/60">
                 {dashboard.biggestTrades.map((trade) => (
                   <li key={trade.id}>
                     <Link href={`/trades/${trade.id}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-panel-muted sm:px-5">
@@ -348,9 +348,9 @@ export default function Home() {
 
           {/* Activity Breakdown */}
           <Card title="Activity Breakdown">
-            {!dashboard && <CardSkeleton rows={4} />}
+            {!dashboard && <BreakdownSkeleton />}
             {dashboard && (
-              <div className="space-y-5 px-4 py-4 sm:px-5">
+              <div className="fade-in space-y-5 px-4 py-4 sm:px-5">
                 <div>
                   <div className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-faint">By chamber</div>
                   <div className="space-y-1.5">
@@ -453,18 +453,111 @@ function Card({
   );
 }
 
-function CardSkeleton({ rows }: { rows: number }) {
+type SkeletonKind = "trade" | "member" | "stock" | "big-trade";
+
+/**
+ * What a card shows while the dashboard loads: its own rows, in outline.
+ *
+ * Each kind is built like the row it stands in for, with the same text sizes
+ * and the same pieces on the right, so the card is already the height and
+ * shape it will be and nothing jumps when the trades arrive. The bars hold
+ * invisible text rather than fixed heights for the same reason: a line is as
+ * tall as the real line would be.
+ */
+// `rows` is as many as the card will hold (api/dashboard: 15 latest trades,
+// 8 in each ranking, 5 biggest trades), so the page below does not move either.
+function CardSkeleton({ rows, kind }: { rows: number; kind: SkeletonKind }) {
+  // Varied widths, so the outline reads as names and companies rather than
+  // as a stack of identical bars.
+  const widths = ["w-32", "w-40", "w-28", "w-36", "w-24", "w-44", "w-32", "w-28"];
+  const subWidths = ["w-44", "w-28", "w-36", "w-24", "w-40", "w-32", "w-28", "w-36"];
+  const bar = "inline-block rounded bg-panel-muted align-middle text-transparent select-none";
   return (
-    <div className="animate-pulse divide-y divide-line/60">
+    <div aria-hidden className="shimmer divide-y divide-line/60">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-          <div className="h-8 w-8 shrink-0 rounded-full bg-panel-muted" />
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-3 w-2/3 rounded bg-panel-muted" />
-            <div className="h-2.5 w-1/3 rounded bg-panel-muted" />
-          </div>
+        <div
+          key={i}
+          className={`flex items-center gap-3 px-4 py-2.5 sm:px-5 ${kind === "stock" ? "justify-between" : ""}`}
+        >
+          {kind === "stock" ? (
+            <>
+              <span className="flex items-center gap-2.5 text-sm">
+                <span className="h-[26px] w-[26px] shrink-0 rounded-md bg-panel-muted" />
+                <span className={`${bar} ${widths[i % widths.length]} h-3.5`}>&nbsp;</span>
+              </span>
+              <span className={`${bar} h-3.5 w-16 text-sm`}>&nbsp;</span>
+            </>
+          ) : (
+            <>
+              <span className="h-8 w-8 shrink-0 rounded-full bg-panel-muted" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm">
+                  <span className={`${bar} ${widths[i % widths.length]} h-3.5`}>&nbsp;</span>
+                </div>
+                <div className="text-xs">
+                  <span className={`${bar} ${subWidths[i % subWidths.length]} h-3`}>&nbsp;</span>
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                {kind === "trade" && (
+                  <>
+                    <span className="inline-block rounded-full border border-transparent bg-panel-muted px-2 py-0.5 text-[10px] font-medium text-transparent">
+                      Purchase
+                    </span>
+                    <div className="mt-1 text-xs">
+                      <span className={`${bar} h-3 w-14`}>&nbsp;</span>
+                    </div>
+                  </>
+                )}
+                {kind === "member" && (
+                  <>
+                    <div className="text-sm font-semibold">
+                      <span className={`${bar} h-3.5 w-12`}>&nbsp;</span>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wide">
+                      <span className={`${bar} h-2.5 w-10`}>&nbsp;</span>
+                    </div>
+                  </>
+                )}
+                {kind === "big-trade" && (
+                  <div className="text-xs font-medium">
+                    <span className={`${bar} h-3 w-16`}>&nbsp;</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The Activity Breakdown card in outline: two groups of labelled bars, as it will be. */
+function BreakdownSkeleton() {
+  const bar = "inline-block rounded bg-panel-muted align-middle text-transparent select-none";
+  const group = (label: string, rows: number) => (
+    <div>
+      <div className="mb-2 text-xs font-medium uppercase tracking-wide">
+        <span className={`${bar} h-3 w-20`}>{label}</span>
+      </div>
+      <div className="space-y-1.5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i}>
+            <div className="mb-0.5 flex items-center justify-between text-xs">
+              <span className={`${bar} h-3 ${i % 2 ? "w-20" : "w-14"}`}>&nbsp;</span>
+              <span className={`${bar} h-3 w-8`}>&nbsp;</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-panel-muted" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <div aria-hidden className="shimmer space-y-5 px-4 py-4 sm:px-5">
+      {group("By chamber", 2)}
+      {group("By party", 3)}
     </div>
   );
 }

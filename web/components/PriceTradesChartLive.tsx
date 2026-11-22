@@ -20,7 +20,7 @@ export function PriceTradesChartLive({
   note?: string;
 }) {
   const series = usePriceSeries(ticker);
-  if (series === undefined) return <div aria-hidden className="mt-5 h-[300px] animate-pulse rounded-lg bg-panel-muted" />;
+  if (series === undefined) return <div aria-hidden className="shimmer mt-5 h-[300px] rounded-lg bg-panel-muted" />;
   const points = series?.filter((p) => p.d >= fromDay) ?? [];
   if (points.length < 10) return null;
   return (

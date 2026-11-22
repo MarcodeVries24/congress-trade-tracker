@@ -19,6 +19,8 @@
   --ink-muted: 71 85 105;
   --ink-faint: 148 163 184;
   --accent: 2 132 199;
+  /* The band that sweeps across a loading placeholder (.shimmer below). */
+  --shine: 15 23 42 / 0.045;
   color-scheme: light;
 }
 
@@ -32,12 +34,61 @@
   --ink-muted: 148 163 184;
   --ink-faint: 100 116 139;
   --accent: 56 189 248;
+  --shine: 255 255 255 / 0.04;
   color-scheme: dark;
 }
 
 body {
   background-color: rgb(var(--bg));
   color: rgb(var(--ink));
+}
+
+/*
+ * Loading placeholders. One soft band sweeps across the whole placeholder,
+ * left to right, rather than every grey bar blinking on and off at once,
+ * which read as flicker. Put .shimmer on the placeholder's outer element;
+ * the shapes inside keep their own muted fill. Still for anyone who has
+ * asked their system for less motion.
+ */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background-image: linear-gradient(90deg, transparent 0%, rgb(var(--shine)) 50%, transparent 100%);
+  animation: shimmer-sweep 1.6s ease-in-out infinite;
+}
+@keyframes shimmer-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* What a placeholder gives way to: the real rows ease in instead of popping. */
+.fade-in {
+  animation: fade-in 0.35s ease-out both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    display: none;
+  }
+  .fade-in {
+    animation: none;
+  }
 }
 
 /* Google's own documented fix for unfilled ad space — the adsbygoogle

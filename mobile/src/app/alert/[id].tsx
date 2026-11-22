@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,6 +9,9 @@ import {
   Switch,
   TextInput,
   View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 
 import { createAlert, deleteAlert, previewAlert, updateAlert, type AlertFilters, type AlertFrequency } from '@/lib/api';
@@ -26,6 +29,7 @@ import { EmptyState } from '@/ui/empty-state';
 import { FilterFields } from '@/ui/filter-fields';
 import { Icon, type IconName } from '@/ui/icon';
 import { PushPrimer } from '@/ui/push-primer';
+import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 
 const FREQUENCIES = [
@@ -158,6 +162,34 @@ export default function AlertEditorScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether the Save button at the bottom is on screen. While it is not (the
+  // filters make this a long screen), a Save button shows in the header, so
+  // saving never needs a scroll to the end. Measured from the scroll position,
+  // the visible height (which shrinks while the keyboard is up) and where the
+  // button sits in the content.
+  const [saveInView, setSaveInView] = useState(true);
+  const view = useRef({ offset: 0, height: 0, saveBottom: 0 });
+  const recheck = () => {
+    const { offset, height, saveBottom } = view.current;
+    if (!height || !saveBottom) return;
+    const visible = offset + height >= saveBottom;
+    setSaveInView((was) => (was === visible ? was : visible));
+  };
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    view.current.offset = e.nativeEvent.contentOffset.y;
+    view.current.height = e.nativeEvent.layoutMeasurement.height;
+    recheck();
+  };
+  const onViewport = (e: LayoutChangeEvent) => {
+    view.current.height = e.nativeEvent.layout.height;
+    recheck();
+  };
+  const onSaveLayout = (e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    view.current.saveBottom = y + height;
+    recheck();
+  };
+
   const set = (patch: Partial<TradeFilters>) => setDraft((d) => ({ ...d, ...patch }));
   const filters = useMemo<AlertFilters>(() => toAlertFilters(draft), [draft]);
   const criteria = countActive(draft) + (draft.q ? 1 : 0);
@@ -261,9 +293,35 @@ export default function AlertEditorScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      <Stack.Screen options={{ title: existing ? 'Edit alert' : 'New alert' }} />
+      <Stack.Screen
+        options={{
+          title: existing ? 'Edit alert' : 'New alert',
+          headerRight: saveInView
+            ? undefined
+            : () =>
+                busy === 'save' ? (
+                  <ActivityIndicator color={c.primary} />
+                ) : (
+                  <Tap
+                    onPress={save}
+                    disabled={busy !== null}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={existing ? 'Save changes' : 'Save alert'}>
+                    <Text variant="subhead" color={c.primary}>
+                      Save
+                    </Text>
+                  </Tap>
+                ),
+        }}
+      />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+          onLayout={onViewport}>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -337,12 +395,14 @@ export default function AlertEditorScreen() {
             </Text>
           ) : null}
 
-          <Button
-            label={existing ? 'Save changes' : 'Save alert'}
-            loading={busy === 'save'}
-            disabled={busy !== null}
-            onPress={save}
-          />
+          <View onLayout={onSaveLayout}>
+            <Button
+              label={existing ? 'Save changes' : 'Save alert'}
+              loading={busy === 'save'}
+              disabled={busy !== null}
+              onPress={save}
+            />
+          </View>
           {existing ? (
             <Button
               label={confirmDelete ? 'Tap again to delete' : 'Delete alert'}

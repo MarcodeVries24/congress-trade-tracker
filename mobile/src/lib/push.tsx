@@ -31,7 +31,7 @@ const STORE_KEY = 'push:v1';
 const CHANNEL = 'alerts';
 
 export type PushPermission = 'granted' | 'denied' | 'undetermined' | 'unsupported';
-export type EnableResult = 'on' | 'denied' | 'unsupported' | 'signed-out' | 'error';
+export type EnableResult = 'on' | 'later' | 'denied' | 'unsupported' | 'error';
 
 // Banners while the app is open, too: an alert is worth seeing either way.
 if (Platform.OS !== 'web') {
@@ -100,7 +100,11 @@ interface PushState {
   /** Set when this phone cannot get them at all; say this instead of offering the switch. */
   unsupported: string | null;
   busy: boolean;
-  /** Asks the system if it has not been asked, then registers this phone. Call after explaining why. */
+  /**
+   * Asks the system if it has not been asked, then registers this phone. Call
+   * after explaining why. Signed out, it asks all the same and answers
+   * 'later': the phone is registered as soon as someone signs in.
+   */
   enable: () => Promise<EnableResult>;
   disable: () => Promise<void>;
   /** For a permission the system will no longer ask about: only Settings can change it. */
@@ -182,7 +186,6 @@ export function PushProvider({ children }: { children: ReactNode }) {
 
   const enable = useCallback(async (): Promise<EnableResult> => {
     if (unsupported) return 'unsupported';
-    if (!isSignedIn) return 'signed-out';
     setBusy(true);
     try {
       await ensureChannel();
@@ -192,6 +195,13 @@ export function PushProvider({ children }: { children: ReactNode }) {
         setPermission(p);
       }
       if (p !== 'granted') return 'denied';
+      // Asked before there is an account (onboarding asks how to be told
+      // before the account step): the yes is kept, and the sync above
+      // registers this phone the moment someone signs in.
+      if (!isSignedIn) {
+        save({ enabled: true, token: null });
+        return 'later';
+      }
       const token = await pushToken();
       await registerPushDevice(token, Platform.OS === 'android' ? 'android' : 'ios', await authed());
       save({ enabled: true, token });

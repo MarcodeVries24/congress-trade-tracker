@@ -152,9 +152,20 @@ export default function AlertEditorScreen() {
   const [name, setName] = useState(existing?.name ?? params.name ?? '');
   const [draft, setDraft] = useState<TradeFilters>(initial);
   const [frequency, setFrequency] = useState<AlertFrequency>(existing?.frequency ?? 'instant');
-  const [byEmail, setByEmail] = useState(existing ? existing.email_enabled !== false : true);
-  // A new alert notifies this phone when the phone already has notifications on.
-  const [byPush, setByPush] = useState(existing ? Boolean(existing.push_enabled) : push.enabled);
+  // How the alert reaches its owner. A saved alert keeps what it had. A new
+  // one leans on push: on whenever this phone can take notifications, and
+  // email then off, since a push arrives the moment the alert is sent and an
+  // email can sit unread or in spam. Where push cannot carry it (not allowed,
+  // or not possible on this device) email takes over, so a new alert always
+  // reaches someone. Null means not chosen yet: the default follows the phone
+  // (whose notification state is read a moment after the screen opens) until
+  // a switch is touched.
+  const [pushChoice, setPushChoice] = useState<boolean | null>(existing ? Boolean(existing.push_enabled) : null);
+  const [emailChoice, setEmailChoice] = useState<boolean | null>(
+    existing ? existing.email_enabled !== false : null
+  );
+  const byPush = pushChoice ?? push.enabled;
+  const byEmail = emailChoice ?? !byPush;
   const [primer, setPrimer] = useState(false);
 
   const [preview, setPreview] = useState<{ total: number; recent: number } | 'failed' | null>(null);
@@ -211,17 +222,16 @@ export default function AlertEditorScreen() {
   }, [settled, authed]);
 
   const togglePush = (on: boolean) => {
+    setError(null);
     if (!on) {
-      if (!byEmail) {
-        setError('An alert needs a way to reach you. Keep email on, or pause the alert from the list.');
-        return;
-      }
-      setByPush(false);
+      // Never nowhere: switching push off with email off moves the alert to
+      // email rather than refusing.
+      if (!byEmail) setEmailChoice(true);
+      setPushChoice(false);
       return;
     }
-    setError(null);
     // The phone itself must be able to receive them first.
-    if (push.enabled) setByPush(true);
+    if (push.enabled) setPushChoice(true);
     else setPrimer(true);
   };
 
@@ -231,7 +241,7 @@ export default function AlertEditorScreen() {
       return;
     }
     setError(null);
-    setByEmail(on);
+    setEmailChoice(on);
   };
 
   const save = async () => {
@@ -286,10 +296,16 @@ export default function AlertEditorScreen() {
   }
 
   const pushDetail = push.unsupported
-    ? push.unsupported
+    ? `${push.unsupported} This alert comes by email.`
     : byPush && !push.enabled
       ? 'Notifications are off on this phone, so this goes to your other phones only.'
-      : 'A notification on this phone, and any other phone you have them on for.';
+      : byPush
+        ? 'The fastest way: a notification the moment a trade matches, on this phone and any other you use.'
+        : push.permission === 'denied'
+          ? 'Notifications are off for CongTrade in Settings, so this alert comes by email.'
+          : 'Recommended: a notification the moment a trade matches. Tap to turn on.';
+
+  const emailDetail = existing?.email ? `To ${existing.email}` : "To your account's email address";
 
   const headerSave = (
     <Tap
@@ -359,7 +375,7 @@ export default function AlertEditorScreen() {
             <Channel
               icon="mail-outline"
               title="Email"
-              detail={existing?.email ? `To ${existing.email}` : "To your account's email address"}
+              detail={byEmail || !byPush ? emailDetail : 'Off. Push is faster; switch on for a copy in your inbox too.'}
               value={byEmail}
               onChange={toggleEmail}
             />
@@ -430,7 +446,10 @@ export default function AlertEditorScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <PushPrimer visible={primer} onClose={() => setPrimer(false)} onEnabled={() => setByPush(true)} />
+      {/* Turned on from here, push takes over from email unless email was
+          switched on by hand: the same default a new alert gets on a phone
+          that already has notifications. */}
+      <PushPrimer visible={primer} onClose={() => setPrimer(false)} onEnabled={() => setPushChoice(true)} />
     </View>
   );
 }

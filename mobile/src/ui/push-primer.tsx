@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Platform, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,21 +47,22 @@ export function PushPrimer({
 }) {
   const { c, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const push = usePush();
-  const [result, setResult] = useState<'denied' | 'error' | 'signed-out' | null>(null);
+  const [result, setResult] = useState<'denied' | 'error' | null>(null);
 
   const denied = result === 'denied' || push.permission === 'denied';
 
   const turnOn = async () => {
     haptic.tap();
     const r = await push.enable();
-    if (r === 'on') {
+    // 'later' is a yes given before signing in; the phone is registered once
+    // someone does, so for this sheet it is the same as on.
+    if (r === 'on' || r === 'later') {
       haptic.success();
       setResult(null);
       onEnabled?.();
       onClose();
-    } else if (r === 'denied' || r === 'error' || r === 'signed-out') setResult(r);
+    } else if (r === 'denied' || r === 'error') setResult(r);
   };
 
   return (
@@ -134,9 +134,10 @@ export function PushPrimer({
                       now
                     </Text>
                   </View>
-                  <Text variant="bodyStrong">Nancy Pelosi bought NVDA</Text>
+                  {/* As the sender words it (ingest/src/alerts/pushMessage.ts). */}
+                  <Text variant="bodyStrong">New Trade</Text>
                   <Text variant="callout" tone="muted">
-                    $1M–$5M · NVIDIA Corp · Big tech buys
+                    1 new trade for alert “Big tech buys”
                   </Text>
                 </View>
               </View>
@@ -165,14 +166,6 @@ export function PushPrimer({
         <View style={styles.actions}>
           {push.unsupported ? (
             <Button label="OK" onPress={onClose} />
-          ) : result === 'signed-out' ? (
-            <Button
-              label="Sign in first"
-              onPress={() => {
-                onClose();
-                router.push('/sign-in');
-              }}
-            />
           ) : denied ? (
             <>
               <Button label="Open Settings" icon="settings-outline" onPress={push.openSettings} />

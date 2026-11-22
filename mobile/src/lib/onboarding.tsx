@@ -22,7 +22,10 @@ export type OnboardingAnswers = {
   notify: Notify;
 };
 
-const EMPTY: OnboardingAnswers = { goal: null, chamber: 'both', members: [], notify: 'both' };
+// Push to start with: it is how an alert is meant to arrive (the moment it is
+// sent, where an email can sit unread or in spam), and the step that asks
+// this goes on to ask the phone for permission (onboarding/notify.tsx).
+const EMPTY: OnboardingAnswers = { goal: null, chamber: 'both', members: [], notify: 'push' };
 
 const ANSWERS_KEY = 'congtrade.onboarding.answers';
 const DONE_KEY = 'congtrade.onboarding.done';

@@ -14,7 +14,7 @@ import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { Icon } from '@/ui/icon';
 import { PushSwitchCard } from '@/ui/push-primer';
-import { RowSkeleton } from '@/ui/skeleton';
+import { TradeRowSkeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -182,7 +182,7 @@ export default function AlertsScreen() {
               </View>
             </View>
           ) : trades === null ? (
-            <RowSkeleton count={6} />
+            <TradeRowSkeleton count={6} />
           ) : (
             <EmptyState
               icon="time-outline"

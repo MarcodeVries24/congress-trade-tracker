@@ -35,7 +35,7 @@ import { FilterFields } from '@/ui/filter-fields';
 import { Icon } from '@/ui/icon';
 import { SearchBar } from '@/ui/search-bar';
 import { TabHeader } from '@/ui/tab-header';
-import { RowSkeleton } from '@/ui/skeleton';
+import { TradeRowSkeleton } from '@/ui/skeleton';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
 import { TradeRow } from '@/ui/trade-row';
@@ -355,7 +355,7 @@ export default function TradesScreen() {
             ? 'Searching…'
             : ''}
       </Text>
-      {list.status === 'loading' && rows.length === 0 ? <RowSkeleton count={7} /> : null}
+      {list.status === 'loading' && rows.length === 0 ? <TradeRowSkeleton count={7} /> : null}
     </View>
   );
 

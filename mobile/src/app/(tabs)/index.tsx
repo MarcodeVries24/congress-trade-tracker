@@ -2,6 +2,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { fetchNews, fetchTiming, fetchTrades, type NewsItem, type TimingOverview, type Trade } from '@/lib/api';
 import { memberName, surname } from '@/lib/format';
@@ -19,7 +20,7 @@ import { NotAdvice } from '@/ui/not-advice';
 import { SearchBar } from '@/ui/search-bar';
 import { SectionHeader } from '@/ui/section';
 import { SentimentBar } from '@/ui/sentiment-bar';
-import { RowSkeleton, Skeleton } from '@/ui/skeleton';
+import { Shimmer, Skeleton, SkeletonLine, TradeRowSkeleton } from '@/ui/skeleton';
 import { TabHeader } from '@/ui/tab-header';
 import { Tap } from '@/ui/tap';
 import { Text } from '@/ui/text';
@@ -220,14 +221,22 @@ export default function DiscoverScreen() {
       <View style={styles.block}>
         <SectionHeader title="Just filed" subtitle="Members with new disclosures" />
         {loading ? (
-          <View style={styles.storiesRow}>
+          // A row, as the faces will be: storiesRow is also the horizontal
+          // ScrollView's content style, which lays its children out in a row
+          // by itself, so on a plain View the placeholders used to stack.
+          <Shimmer style={[styles.storiesRow, styles.storiesLoading]}>
             {Array.from({ length: 5 }, (_, i) => (
+              // The face with its ring (64 + 8), the surname and the count,
+              // as tall as the real ones.
               <View key={i} style={styles.story}>
-                <Skeleton width={70} height={70} round={35} />
-                <Skeleton width={56} height={10} />
+                <Skeleton width={72} height={72} round={36} />
+                <SkeletonLine variant="footnote" width={52} />
+                <View style={styles.storyCount}>
+                  <SkeletonLine variant="footnote" width={40} />
+                </View>
               </View>
             ))}
-          </View>
+          </Shimmer>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
             {stories.map((s) => (
@@ -264,9 +273,10 @@ export default function DiscoverScreen() {
             </Text>
           </Tap>
         ) : loading ? (
-          <RowSkeleton count={5} />
+          <TradeRowSkeleton count={LATEST} />
         ) : (
-          <View>
+          // Eases in over the placeholder rather than popping in.
+          <Animated.View entering={FadeIn.duration(260)}>
             {trades.slice(0, LATEST).map((t, i) => (
               <TradeRow key={t.id} trade={t} divider={i < Math.min(trades.length, LATEST) - 1} />
             ))}
@@ -279,7 +289,7 @@ export default function DiscoverScreen() {
                 onPress={() => router.push('/trades')}
               />
             </View>
-          </View>
+          </Animated.View>
         )}
       </View>
 
@@ -415,6 +425,7 @@ const styles = StyleSheet.create({
   // Each face is centred in a tile wider than it; this puts the first ring,
   // not the tile, on the page margin.
   storiesRow: { paddingHorizontal: 13, gap: 10 },
+  storiesLoading: { flexDirection: 'row' },
   story: { width: 78, alignItems: 'center', gap: 6 },
   storyName: { fontWeight: '600', maxWidth: 76 },
   storyCount: { marginTop: -4 },

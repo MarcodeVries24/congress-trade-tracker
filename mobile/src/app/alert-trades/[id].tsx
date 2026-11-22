@@ -9,7 +9,7 @@ import { useAuthedRequest } from '@/lib/use-api';
 import { useTheme } from '@/theme';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
-import { RowSkeleton } from '@/ui/skeleton';
+import { TradeRowSkeleton } from '@/ui/skeleton';
 import { Text } from '@/ui/text';
 import { TradeRow } from '@/ui/trade-row';
 
@@ -141,7 +141,7 @@ export default function AlertTradesScreen() {
       ) : null}
     </View>
   ) : (
-    <RowSkeleton count={6} />
+    <TradeRowSkeleton count={6} />
   );
 
   return (

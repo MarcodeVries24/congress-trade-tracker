@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AccountPanel } from '@/components/account-panel';
@@ -32,12 +32,15 @@ export default function SignInScreen() {
   // Settings > Account: the one way in that also offers deleting the account.
   const managing = params.manage === '1';
 
-  const openedSignedOut = useRef(!isSignedIn);
+  // Decided once, on opening. While it closes it stays the sign-in screen,
+  // title and all: turning into the account screen on the way out changed the
+  // header of a screen that was being removed, which crashed on Android.
+  const [closesItself] = useState(() => !isSignedIn && router.canGoBack());
   useEffect(() => {
-    if (isSignedIn && openedSignedOut.current && router.canGoBack()) router.back();
-  }, [isSignedIn, router]);
+    if (isSignedIn && closesItself) router.back();
+  }, [isSignedIn, closesItself, router]);
 
-  if (isSignedIn) {
+  if (isSignedIn && !closesItself) {
     return (
       <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={styles.account}>
         <Stack.Screen options={{ title: 'Account' }} />

@@ -542,6 +542,14 @@ export function fetchAlertTrades(id: string, options: RequestOptions = {}): Prom
   return get<AlertTrades>(`/api/alerts/${encodeURIComponent(id)}/trades`, undefined, options);
 }
 
+/** A sent trade with the alert that sent it. */
+export type AlertFeedTrade = SentTrade & { alert_id: string; alert_name: string };
+
+/** The latest trades all of this account's alerts have sent, newest send first; at most `max`. */
+export function fetchAllAlertTrades(options: RequestOptions = {}): Promise<{ trades: AlertFeedTrade[]; max: number }> {
+  return get<{ trades: AlertFeedTrade[]; max: number }>("/api/alerts/trades", undefined, options);
+}
+
 export async function createAlert(
   input: { name: string; frequency: AlertFrequency; filters: AlertFilters; email: boolean; push: boolean },
   options: RequestOptions = {}

@@ -1,16 +1,18 @@
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Switch } from 'react-native';
 
 import { useAccess } from '@/lib/access';
+import { fetchAlerts, setReminders } from '@/lib/api';
 import { useFollows } from '@/lib/follows';
 import { haptic } from '@/lib/haptics';
 import { confirmSignOut } from '@/lib/confirm-sign-out';
 import { LINKS, SITE, openPage } from '@/lib/links';
 import { manageStoreSubscription } from '@/lib/manage-store-subscription';
 import { usePush } from '@/lib/push';
+import { useAuthedRequest } from '@/lib/use-api';
 import { useTheme } from '@/theme';
 import { ListRow } from '@/ui/list-row';
 import { Group } from '@/ui/section';
@@ -35,6 +37,37 @@ export default function SettingsScreen() {
   const { status, renewing } = useAccess();
   const follows = useFollows();
   const [confirm, setConfirm] = useState<'follows' | 'onboarding' | null>(null);
+
+  // Whether the account wants the occasional reminder that new trades were
+  // published. Null until the server has said, and where it cannot arrive
+  // (push off on this phone): no row then.
+  const authed = useAuthedRequest();
+  const [reminders, setRemindersState] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!push.enabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await fetchAlerts(await authed());
+        if (!cancelled) setRemindersState(list.reminders ?? null);
+      } catch {
+        // The row stays away; nothing here depends on it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [push.enabled, authed]);
+  const toggleReminders = async (on: boolean) => {
+    haptic.select();
+    setRemindersState(on);
+    try {
+      await setReminders(on, await authed());
+    } catch {
+      setRemindersState(!on);
+    }
+  };
+  const showReminders = push.enabled && reminders !== null;
 
   const store = renewing.includes('apple')
     ? 'apple'
@@ -107,8 +140,25 @@ export default function SettingsScreen() {
                   : 'Off for this phone'
           }
           onPress={() => router.push('/email-alerts')}
-          last
+          last={!showReminders}
         />
+        {showReminders ? (
+          <ListRow
+            icon="time-outline"
+            label="New trades reminder"
+            detail="When your alerts are quiet"
+            right={
+              <Switch
+                value={reminders ?? true}
+                onValueChange={(v) => void toggleReminders(v)}
+                trackColor={{ true: c.gain, false: c.borderStrong }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="New trades reminder"
+              />
+            }
+            last
+          />
+        ) : null}
       </Group>
 
       <Group title="On this device">

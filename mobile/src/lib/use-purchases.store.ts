@@ -1,4 +1,4 @@
-import { appleSubscriptionElsewhereMessage } from '@congtrade/shared/storeProducts';
+import { subscriptionElsewhereMessage } from '@congtrade/shared/storeProducts';
 import { useAuth } from '@clerk/clerk-expo';
 import { getAvailablePurchases as ownedPurchases, isEligibleForIntroOfferIOS, useIAP } from 'expo-iap';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -145,8 +145,8 @@ export function usePurchases(onEntitled: () => void): Purchases {
         // rather than the server's UTC one.
         throw new OtherAccountError(
           data.until
-            ? appleSubscriptionElsewhereMessage(dayOf(data.until), data.renews !== false)
-            : (data.error ?? appleSubscriptionElsewhereMessage(null, true))
+            ? subscriptionElsewhereMessage('apple', dayOf(data.until), data.renews !== false)
+            : (data.error ?? subscriptionElsewhereMessage(Platform.OS === 'ios' ? 'apple' : 'google', null, true))
         );
       }
       if (!res.ok) throw new Error(data.error ?? `Could not confirm the purchase (${res.status}).`);
@@ -278,27 +278,29 @@ export function usePurchases(onEntitled: () => void): Purchases {
       // stays with the CongTrade account it was bought on: the person would
       // pay and get nothing on this one. So what it already owns is asked
       // about first, before Apple's sheet opens. Theirs is simply Pro again;
-      // another account's is said plainly, with until when it runs.
-      if (Platform.OS === 'ios') {
-        try {
-          const owned = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
-          for (const payload of owned.map(reportFor)) {
-            if (payload && (await report(payload))) {
-              setBusy(null);
-              onEntitled();
-              return;
-            }
-          }
-        } catch (err) {
-          if (err instanceof OtherAccountError) {
-            setError(err.message);
+      // another account's is said plainly, with until when it runs. Play sells
+      // the plans separately and refuses only the very one its account owns,
+      // with an error that does not say why, so there only that one is asked
+      // about.
+      try {
+        const all = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+        const owned = Platform.OS === 'ios' ? all : all.filter((p) => p.productId === product.id);
+        for (const payload of owned.map(reportFor)) {
+          if (payload && (await report(payload))) {
             setBusy(null);
+            onEntitled();
             return;
           }
-          // Anything else (offline, the store slow to answer) is no reason to
-          // refuse a purchase: one that goes through is reported and checked
-          // again as it completes.
         }
+      } catch (err) {
+        if (err instanceof OtherAccountError) {
+          setError(err.message);
+          setBusy(null);
+          return;
+        }
+        // Anything else (offline, the store slow to answer) is no reason to
+        // refuse a purchase: one that goes through is reported and checked
+        // again as it completes.
       }
       try {
         // Play requires exactly one offer token, and the offer it names is

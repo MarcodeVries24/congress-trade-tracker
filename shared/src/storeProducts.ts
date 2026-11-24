@@ -36,8 +36,8 @@ export function periodForStoreProduct(productId: string): StoreBillingPeriod | n
 }
 
 /**
- * What to say to someone whose Apple Account already pays for Pro on another
- * CongTrade account.
+ * What to say to someone whose store account (the Apple Account, or the Google
+ * account in Play) already pays for Pro on another CongTrade account.
  *
  * Apple allows one subscription per group per Apple Account. While one is
  * active, "buying" another plan only switches that same subscription, which
@@ -46,13 +46,19 @@ export function periodForStoreProduct(productId: string): StoreBillingPeriod | n
  * instead; the server says it too, for older builds and for restoring.
  *
  * `until` is the end of the paid period, already formatted: the app writes it
- * in the phone's own time zone, the server in UTC. Null when Apple gave no
- * date, which a subscription does not normally lack.
+ * in the phone's own time zone, the server in UTC. Null when the store
+ * gave no date, which a subscription does not normally lack.
  */
-export function appleSubscriptionElsewhereMessage(until: string | null, renews: boolean): string {
-  const opening = `Your Apple Account already ${renews ? "pays for" : "has"} CongTrade Pro on a different CongTrade account.`;
+export function subscriptionElsewhereMessage(
+  store: "apple" | "google",
+  until: string | null,
+  renews: boolean
+): string {
+  const account = store === "apple" ? "Your Apple Account" : "The Google account in your Play Store";
+  const settings = store === "apple" ? "your App Store settings" : "Google Play";
+  const opening = `${account} already ${renews ? "pays for" : "has"} CongTrade Pro on a different CongTrade account.`;
   if (!until) return `${opening} Sign in with that account to use it.`;
   return renews
-    ? `${opening} That account has Pro until ${until}, and it renews automatically. Sign in with that account to use it, or cancel it in your App Store settings and subscribe here after ${until}.`
+    ? `${opening} That account has Pro until ${until}, and it renews automatically. Sign in with that account to use it, or cancel it in ${settings} and subscribe here after ${until}.`
     : `${opening} That account has Pro until ${until}. Sign in with that account to use it, or subscribe here after ${until}.`;
 }

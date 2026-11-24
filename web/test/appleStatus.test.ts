@@ -8,7 +8,7 @@
 // end of the period, then nothing).
 
 import { statusForNotification } from "../lib/appleStore";
-import { appleSubscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
+import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
 
 let failures = 0;
 function check(name: string, got: unknown, want: unknown) {
@@ -28,13 +28,15 @@ check("an expiry is cancelled", statusForNotification("EXPIRED", "VOLUNTARY", 0)
 check("a refund is cancelled", statusForNotification("REFUND", undefined, 1), "canceled");
 check("an unknown type is left alone", statusForNotification("PRICE_INCREASE", undefined, 0), null);
 
-const renewing = appleSubscriptionElsewhereMessage("Nov 20, 2026", true);
+const renewing = subscriptionElsewhereMessage("apple", "Nov 20, 2026", true);
 check("renewing: says until when", renewing.includes("until Nov 20, 2026"), true);
 check("renewing: says it renews", renewing.includes("renews automatically"), true);
-const ending = appleSubscriptionElsewhereMessage("Nov 20, 2026", false);
+const ending = subscriptionElsewhereMessage("apple", "Nov 20, 2026", false);
 check("not renewing: says until when", ending.includes("until Nov 20, 2026"), true);
 check("not renewing: does not claim it renews", ending.includes("renews"), false);
-check("no date: still points at the other account", appleSubscriptionElsewhereMessage(null, true).includes("Sign in with that account"), true);
+const play = subscriptionElsewhereMessage("google", "Nov 20, 2026", true);
+check("Play: names Google, not Apple", play.includes("Google Play") && !/Apple|App Store/.test(play), true);
+check("no date: still points at the other account", subscriptionElsewhereMessage("apple", null, true).includes("Sign in with that account"), true);
 
 console.log(failures ? `\n${failures} failed` : "\nall passed");
 if (failures) process.exit(1);

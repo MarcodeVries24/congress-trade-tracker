@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { acknowledgeIfPending, fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
 import { accountTokenFor } from "@/lib/storeAccountToken";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
+import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
 
 /**
  * The app reporting a Play purchase, or asking to restore one.
@@ -39,7 +40,21 @@ export async function POST(req: NextRequest) {
   const expectedToken = await accountTokenFor(userId);
   if (state.clerkUserId && state.clerkUserId !== expectedToken) {
     console.error("[google] purchase belongs to another account", { userId });
-    return NextResponse.json({ entitled: false, reason: "other-account" }, { status: 409 });
+    // Only `error`, without the `until` Apple's route sends: builds up to 14
+    // word a date themselves as if it were always Apple's.
+    const until = state.expiryTimeMillis
+      ? new Date(state.expiryTimeMillis).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "UTC",
+        })
+      : null;
+    const renews = state.status !== "canceled" && !state.cancelAtPeriodEnd;
+    return NextResponse.json(
+      { entitled: false, reason: "other-account", error: subscriptionElsewhereMessage("google", until, renews) },
+      { status: 409 }
+    );
   }
 
   await upsertSubscription({

@@ -9,7 +9,7 @@ import {
 } from "@/lib/storeAccountToken";
 import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
-import { appleSubscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
+import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
 
 /**
  * The app reporting a purchase, or asking to restore one.
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           reason: "other-account",
           until: until?.toISOString() ?? null,
           renews,
-          error: appleSubscriptionElsewhereMessage(untilText, renews),
+          error: subscriptionElsewhereMessage("apple", untilText, renews),
         },
         { status: 409 }
       );

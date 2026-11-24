@@ -17,6 +17,7 @@ import { ChipRow } from '@/ui/chip-row';
 import { Icon } from '@/ui/icon';
 import { NewsCard } from '@/ui/news-card';
 import { NotAdvice } from '@/ui/not-advice';
+import { PushNudge } from '@/ui/push-nudge';
 import { SearchBar } from '@/ui/search-bar';
 import { SectionHeader } from '@/ui/section';
 import { SentimentBar } from '@/ui/sentiment-bar';
@@ -217,6 +218,8 @@ export default function DiscoverScreen() {
       <View style={styles.search}>
         <SearchBar onPress={() => router.push('/search')} />
       </View>
+
+      <PushNudge />
 
       <View style={styles.block}>
         <SectionHeader title="Just filed" subtitle="Members with new disclosures" />

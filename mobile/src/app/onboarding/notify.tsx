@@ -59,7 +59,7 @@ export default function NotifyScreen() {
       <OnboardingStep
         step={4}
         title="How should I tell you about new trades?"
-        subtitle="Only when something matches. Never marketing."
+        subtitle="When something matches, plus an occasional heads-up about new trades."
         onContinue={onContinue}>
         {OPTIONS.map((o) => (
           <Choice

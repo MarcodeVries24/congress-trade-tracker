@@ -89,7 +89,18 @@ async function pushToken(): Promise<string> {
   return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 }
 
-type Stored = { enabled: boolean; token: string | null };
+type Stored = {
+  /**
+   * This person wants push on this phone. Kept through signing out and through
+   * the system's permission being taken away, so it is on again by itself once
+   * someone is signed in and the permission is back.
+   */
+  enabled: boolean;
+  /** The token registered with the account, while it is. */
+  token: string | null;
+  /** Turned off with the app's own switch: an answer, not to be asked about again. */
+  off?: boolean;
+};
 
 interface PushState {
   /** Read storage and the system permission yet. */
@@ -97,6 +108,8 @@ interface PushState {
   /** This phone receives alert notifications: the switch is on and the system allows it. */
   enabled: boolean;
   permission: PushPermission;
+  /** Off because it was turned off with the app's own switch. */
+  turnedOff: boolean;
   /** Set when this phone cannot get them at all; say this instead of offering the switch. */
   unsupported: string | null;
   busy: boolean;
@@ -116,7 +129,7 @@ interface PushState {
 const PushContext = createContext<PushState | null>(null);
 
 export function PushProvider({ children }: { children: ReactNode }) {
-  const { isSignedIn, signOut: clerkSignOut } = useAuth();
+  const { isSignedIn, userId, signOut: clerkSignOut } = useAuth();
   const authed = useAuthedRequest();
   const router = useRouter();
   const unsupported = UNSUPPORTED;
@@ -125,7 +138,14 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Counts the times the app came to the front, for another try at
+  // registering when the last one failed.
+  const [fronted, setFronted] = useState(0);
+
+  // The wish as it is now, for work that started under an earlier one.
+  const wish = useRef(false);
   const save = useCallback((next: Stored) => {
+    wish.current = next.enabled;
     setStored(next);
     void AsyncStorage.setItem(STORE_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
@@ -144,7 +164,11 @@ export function PushProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORE_KEY);
-        if (raw && live) setStored(JSON.parse(raw) as Stored);
+        if (raw && live) {
+          const read = JSON.parse(raw) as Stored;
+          wish.current = read.enabled;
+          setStored(read);
+        }
       } catch {
         // Unreadable storage reads as "off", which is safe.
       }
@@ -152,7 +176,9 @@ export function PushProvider({ children }: { children: ReactNode }) {
       if (live) setReady(true);
     })();
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void readPermission().catch(() => {});
+      if (s !== 'active') return;
+      void readPermission().catch(() => {});
+      setFronted((n) => n + 1);
     });
     return () => {
       live = false;
@@ -160,29 +186,46 @@ export function PushProvider({ children }: { children: ReactNode }) {
     };
   }, [readPermission]);
 
-  // While on, re-register once per launch: it keeps the server's row fresh and
-  // follows a token that rotated. If permission was taken away in Settings,
-  // take the phone off the account instead, so the switch tells the truth.
-  const synced = useRef(false);
+  // While wanted, register this phone once per launch, per person signed in
+  // and per change of the system's permission: it keeps the server's row
+  // fresh, follows a token that rotated, and brings push back by itself after
+  // signing in again or allowing it again in Settings. While the permission is
+  // gone, the phone is taken off the account instead.
+  const synced = useRef<string | null>(null);
   useEffect(() => {
-    if (!ready || synced.current || !stored.enabled || !isSignedIn || unsupported) return;
-    synced.current = true;
+    if (!ready || unsupported) return;
+    if (!isSignedIn || !userId) {
+      synced.current = null;
+      return;
+    }
+    if (!stored.enabled) return;
+    const granted = permission === 'granted';
+    const key = `${userId}:${granted}`;
+    if (synced.current === key) return;
+    synced.current = key;
+    // Turned off, or someone else signed in, while this was under way.
+    const stale = () => synced.current !== key || !wish.current;
     void (async () => {
       const options = await authed();
-      if (permission !== 'granted') {
-        if (stored.token) await unregisterPushDevice(stored.token, options).catch(() => {});
-        save({ enabled: false, token: null });
+      if (!granted) {
+        if (!stored.token) return;
+        await unregisterPushDevice(stored.token, options).catch(() => {});
+        if (!stale()) save({ enabled: true, token: null });
         return;
       }
       try {
+        await ensureChannel();
         const token = await pushToken();
+        if (stale()) return;
         await registerPushDevice(token, Platform.OS === 'android' ? 'android' : 'ios', options);
-        if (token !== stored.token) save({ enabled: true, token });
+        if (token !== stored.token && !stale()) save({ enabled: true, token });
       } catch {
-        // Offline at launch: the row from last time still stands.
+        // Offline at launch, with a row from last time: that still stands.
+        // Without one nothing would arrive, so try again at the next front.
+        if (!stored.token && synced.current === key) synced.current = null;
       }
     })();
-  }, [ready, stored, isSignedIn, permission, unsupported, authed, save]);
+  }, [ready, stored, isSignedIn, userId, permission, unsupported, authed, save, fronted]);
 
   const enable = useCallback(async (): Promise<EnableResult> => {
     if (unsupported) return 'unsupported';
@@ -194,7 +237,12 @@ export function PushProvider({ children }: { children: ReactNode }) {
         p = permissionOf(await Notifications.requestPermissionsAsync());
         setPermission(p);
       }
-      if (p !== 'granted') return 'denied';
+      if (p !== 'granted') {
+        // The yes is kept all the same: allowing it in Settings afterwards is
+        // then enough, as the sheet says.
+        save({ enabled: true, token: stored.token });
+        return 'denied';
+      }
       // Asked before there is an account (onboarding asks how to be told
       // before the account step): the yes is kept, and the sync above
       // registers this phone the moment someone signs in.
@@ -205,14 +253,14 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const token = await pushToken();
       await registerPushDevice(token, Platform.OS === 'android' ? 'android' : 'ios', await authed());
       save({ enabled: true, token });
-      synced.current = true;
+      synced.current = userId ? `${userId}:true` : null;
       return 'on';
     } catch {
       return 'error';
     } finally {
       setBusy(false);
     }
-  }, [unsupported, isSignedIn, readPermission, authed, save]);
+  }, [unsupported, isSignedIn, userId, stored.token, readPermission, authed, save]);
 
   const disable = useCallback(async () => {
     setBusy(true);
@@ -222,15 +270,16 @@ export function PushProvider({ children }: { children: ReactNode }) {
       // Off locally regardless. A row the server keeps is cleaned up when Expo
       // reports the token gone, or replaced when this phone registers again.
     } finally {
-      save({ enabled: false, token: null });
+      save({ enabled: false, token: null, off: true });
       setBusy(false);
     }
   }, [stored.token, authed, save]);
 
   const signOut = useCallback(async () => {
-    if (stored.enabled && stored.token) {
+    if (stored.token) {
       await unregisterPushDevice(stored.token, await authed()).catch(() => {});
-      save({ enabled: false, token: null });
+      // Still wanted: signing in again registers the phone again.
+      save({ ...stored, token: null });
     }
     await clerkSignOut();
   }, [stored, authed, save, clerkSignOut]);
@@ -275,6 +324,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       // under whoever that is, since this phone already said yes.
       enabled: stored.enabled && permission === 'granted' && Boolean(isSignedIn),
       permission,
+      turnedOff: stored.off === true,
       unsupported,
       busy,
       enable,
@@ -282,7 +332,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       openSettings: () => void Linking.openSettings(),
       signOut,
     }),
-    [ready, stored.enabled, permission, isSignedIn, unsupported, busy, enable, disable, signOut]
+    [ready, stored.enabled, stored.off, permission, isSignedIn, unsupported, busy, enable, disable, signOut]
   );
 
   return <PushContext.Provider value={value}>{children}</PushContext.Provider>;

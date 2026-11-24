@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Platform, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -50,7 +50,18 @@ export function PushPrimer({
   const push = usePush();
   const [result, setResult] = useState<'denied' | 'error' | null>(null);
 
-  const denied = result === 'denied' || push.permission === 'denied';
+  const denied = push.permission !== 'granted' && (result === 'denied' || push.permission === 'denied');
+
+  // Sent to Settings from here and back with notifications allowed: that was
+  // the yes, so there is nothing left to tap.
+  const [sentToSettings, setSentToSettings] = useState(false);
+  useEffect(() => {
+    if (!visible || !sentToSettings || !push.enabled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSentToSettings(false);
+    onEnabled?.();
+    onClose();
+  }, [visible, sentToSettings, push.enabled, onEnabled, onClose]);
 
   const turnOn = async () => {
     haptic.tap();
@@ -168,7 +179,14 @@ export function PushPrimer({
             <Button label="OK" onPress={onClose} />
           ) : denied ? (
             <>
-              <Button label="Open Settings" icon="settings-outline" onPress={push.openSettings} />
+              <Button
+                label="Open Settings"
+                icon="settings-outline"
+                onPress={() => {
+                  setSentToSettings(true);
+                  push.openSettings();
+                }}
+              />
               <Button label="Not now" kind="ghost" onPress={onClose} />
             </>
           ) : (

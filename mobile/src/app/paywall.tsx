@@ -378,9 +378,20 @@ export default function PaywallScreen() {
             it, in one line under the button (with the store's own sheet,
             this is what guideline 3.1.2 asks for). The 24-hour rule is in
             the store descriptions and the terms. */}
+        {/* Subscribing is accepting the terms, said where the decision is
+            made rather than only behind the links below. */}
         <Text variant="caption" tone="faint" style={styles.legal}>
           {chosenTrial ? `${chosenTrial.length} free, then ` : ''}
           {chosen.price} a {PERIOD_WORD[chosen.key]}. Renews automatically until you cancel in your {STORE} settings.
+          By subscribing you agree to the{' '}
+          <Text variant="caption" tone="muted" style={styles.semibold} onPress={() => openPage(LINKS.terms)}>
+            Terms
+          </Text>{' '}
+          and the{' '}
+          <Text variant="caption" tone="muted" style={styles.semibold} onPress={() => openPage(LINKS.privacy)}>
+            Privacy Policy
+          </Text>
+          .
         </Text>
         <View style={styles.links}>
           {/* Apple requires a visible way to restore a purchase: someone who

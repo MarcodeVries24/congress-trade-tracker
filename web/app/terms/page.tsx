@@ -150,6 +150,12 @@ export default function TermsPage() {
             Fact-checking and verifying any information against the original source filing before relying on it is
             your own responsibility. Where we can, we link directly to the source filing so you can check it yourself.
           </p>
+          <p>
+            By using the Site, and by subscribing to CongTrade Pro, you accept that the data it shows may be
+            incomplete, out of date or wrong, and that you use it at your own risk. Within the limits set out in
+            section 16, we are not liable for any loss or damage arising from errors, omissions or delays in the data,
+            or in the alerts based on it, including any decision you make in reliance on it.
+          </p>
         </LegalSection>
 
         <LegalSection title="9. Acceptable use">

@@ -131,7 +131,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
 
       # A push notification, at most once a week, for subscribers who have no
-      # alert yet (src/alerts/sendReminders.ts). A nicety, so a failure never
+      # alert or whose alerts are quiet (src/alerts/sendReminders.ts). A nicety, so a failure never
       # fails the ingest.
       - run: npm run alerts:remind --workspace ingest
         if: ${{ !cancelled() }}

@@ -54,15 +54,22 @@ const many = pushMessageFor(alert, [1, 2, 3, 4, 5].map((id) => trade({ id })));
 check("several: title", many.title, "New Trades");
 check("several: body counts them for the alert", many.body, "5 new trades for alert “Big buys”");
 
-const reminder = reminderMessageFor(1234);
+const reminder = reminderMessageFor("first-alert", 1234);
 check("reminder: title", reminder.title, "New trades published");
 check(
   "reminder: counts them",
   reminder.body,
-  "1,234 new trades were published this week. Open the app and set up an alert to catch the next one."
+  "1,234 new trades this week. Open the app and set up an alert to catch the next one."
 );
-check("reminder: one trade", reminderMessageFor(1).body.startsWith("1 new trade was published"), true);
-check("reminder: tap opens the alerts screen", reminder.data, { type: "reminder" });
+check("reminder: one trade", reminderMessageFor("first-alert", 1).body.startsWith("1 new trade this week"), true);
+check("reminder: tap opens the alerts screen", reminder.data, { type: "reminder", about: "first-alert" });
+const quiet = reminderMessageFor("quiet", 42);
+check("quiet: title", quiet.title, "Your alerts have been quiet");
+check(
+  "quiet: counts them",
+  quiet.body,
+  "42 new trades this week, none matching your alerts. See what Congress traded."
+);
 
 if (failures) {
   console.error(`\n${failures} failed`);

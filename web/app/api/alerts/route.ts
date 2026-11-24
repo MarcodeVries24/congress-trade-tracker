@@ -3,7 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { hasProServer } from "@/lib/access";
 import { ALERT_FREQUENCIES, AlertFrequency, normalizeAlertFilters, summarizeAlert } from "@/lib/alertFilters";
 import { countAlerts, createAlert, listAlerts, MAX_ALERTS_PER_USER, recordEntitlement, syncAlertEmails } from "@/lib/alerts";
-import { countPushDevices } from "@/lib/pushDevices";
+import { countPushDevices, wantsPushReminders } from "@/lib/pushDevices";
 
 const VALID_FREQUENCIES = new Set<string>(ALERT_FREQUENCIES.map((f) => f.value));
 const MAX_NAME_LENGTH = 80;
@@ -32,10 +32,11 @@ export async function GET() {
   // Keep the snapshot the sender relies on current — see syncAlertEmails.
   if (email) await syncAlertEmails(userId, email);
 
-  const [alerts, isPro, pushDevices] = await Promise.all([
+  const [alerts, isPro, pushDevices, reminders] = await Promise.all([
     listAlerts(userId),
     hasProServer(),
     countPushDevices(userId),
+    wantsPushReminders(userId),
   ]);
   // Cheap gift to the cron: it needs this same answer and has to pay a Clerk
   // round trip for it, whereas here it's already in the session.
@@ -48,6 +49,7 @@ export async function GET() {
     email,
     maxAlerts: MAX_ALERTS_PER_USER,
     pushDevices,
+    reminders,
   });
 }
 

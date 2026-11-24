@@ -84,7 +84,7 @@ export default function TermsPage() {
             Alerts are sent by email to the address on your account and, if you turn notifications on in an app, as
             push notifications to that device. Each alert email carries a one-click unsubscribe link that switches
             that alert off, and push notifications, which include an occasional reminder
-            about new trades while you have no alert, can be turned off in the app or in your device&rsquo;s settings;
+            about new trades while you have no alert or yours are quiet, can be turned off in the app or in your device&rsquo;s settings;
             you can also pause or delete any alert, with or without an active subscription. The Site is updated
             daily, and an alert is sent once a matching filing has been published. We don&rsquo;t promise any
             particular delivery time, and an alert is a convenience rather than a guarantee that you&rsquo;ll be

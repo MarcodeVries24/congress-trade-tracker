@@ -518,6 +518,8 @@ export interface AlertList {
   maxAlerts: number;
   /** Phones this account gets push notifications on. */
   pushDevices?: number;
+  /** Whether it wants the occasional reminder that new trades were published. */
+  reminders?: boolean;
 }
 
 export function fetchAlerts(options: RequestOptions = {}): Promise<AlertList> {
@@ -578,6 +580,11 @@ export async function registerPushDevice(
 /** Turns them off again. */
 export async function unregisterPushDevice(token: string, options: RequestOptions = {}): Promise<void> {
   await send<{ ok: boolean }>("DELETE", "/api/push/devices", { token }, options);
+}
+
+/** Switches the occasional reminder that new trades were published. */
+export async function setReminders(on: boolean, options: RequestOptions = {}): Promise<void> {
+  await send<{ ok: boolean }>("PATCH", "/api/push/reminders", { on }, options);
 }
 
 /** Sends a feedback message; signed in, it is filed under the account. */

@@ -35,3 +35,25 @@ export async function countPushDevices(userId: string): Promise<number> {
   ])) as { count: number }[];
   return rows[0]?.count ?? 0;
 }
+
+/**
+ * Whether this account wants the occasional reminder that new trades were
+ * published; on unless switched off. Read through to_jsonb so that it answers
+ * "on" rather than failing while the column, which the next ingest adds, does
+ * not exist yet: the alerts screen must not wait for that.
+ */
+export async function wantsPushReminders(userId: string): Promise<boolean> {
+  const rows = (await sql.query(
+    `SELECT COALESCE((to_jsonb(e) ->> 'push_reminders')::boolean, TRUE) AS on FROM user_entitlements e WHERE user_id = $1`,
+    [userId]
+  )) as { on: boolean }[];
+  return rows[0]?.on ?? true;
+}
+
+export async function setPushReminders(userId: string, on: boolean): Promise<void> {
+  await sql.query(
+    `INSERT INTO user_entitlements (user_id, push_reminders) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET push_reminders = EXCLUDED.push_reminders`,
+    [userId, on]
+  );
+}

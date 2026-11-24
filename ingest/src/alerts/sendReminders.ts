@@ -1,56 +1,102 @@
 import "../loadEnv.js";
+import { periodForStoreProduct } from "@congtrade/shared/storeProducts";
 import { ensureSchema, sql } from "../db/index.js";
 import { ALERT_FROM_SQL, buildAlertConditions } from "../../../web/lib/alertFilters";
 import { resolveEntitlements } from "./entitlements.js";
 import { pushTokensFor, sendPush } from "./push.js";
 import { reminderMessageFor } from "./pushMessage.js";
+import { inTrial, reminderFor, type Reminder } from "./reminderRules.js";
 
 /**
- * A push notification for subscribers who have never set up an alert: new
- * trades were published, and an alert would tell them about the next ones.
- * Runs after every ingest, right after the alerts themselves
- * (.github/workflows/ingest.yml).
+ * A push notification that new trades were published, for subscribers who
+ * would otherwise hear nothing: those with no alert, and those whose alerts
+ * have sent nothing for a while (two weeks, or one in a free trial). Who is
+ * due, and how rarely, is in reminderRules.ts. Runs after every ingest, right
+ * after the alerts themselves (.github/workflows/ingest.yml), so an alert
+ * that just found something is not called quiet.
  *
- * Deliberately rare, because a notification too many costs the permission for
- * all of them:
- *  - only Pro, since making an alert needs it, and only a confirmed yes: for
- *    an alert an unanswered check sends anyway, here it waits;
- *  - only someone with no alerts at all. One who paused theirs chose silence;
- *  - at most once a week, not in the first days after the phone was
- *    registered, and not to someone who opened the app within the last day;
- *  - only right after filings were approved in /admin, the moment they are
+ *  - Only Pro, and only a confirmed yes: for an alert an unanswered check
+ *    sends anyway, here it waits.
+ *  - Only right after filings were approved in /admin, the moment they are
  *    published, like the alerts themselves.
- *
- * Turning it off needs no switch of its own: whoever gets it has no alerts,
- * so the app's switch for push on this phone stops only this.
+ *  - Never to someone who switched it off in the app (push_reminders, set by
+ *    web/app/api/push/reminders).
  *
  * Usage:
  *   npm run alerts:remind                # send what is due
  *   npm run alerts:remind -- --dry-run   # print who would get one, send nothing
  */
 
-/** Just under a week, so the runs' times shifting a little never skips one. */
-const EVERY = "6 days 20 hours";
-const SETTLE_IN = "2 days";
-const RECENTLY_OPENED = "1 day";
 /** A run comes every four hours; with some room for a late one. */
 const JUST_APPROVED = "6 hours";
 /** As the alert sender: an old filing only now approved is not news. */
 const MAX_FILING_AGE_DAYS = 60;
 
-async function usersDue(): Promise<string[]> {
+interface PersonRow {
+  user_id: string;
+  registered_at: string;
+  opened_at: string;
+  reminded_at: string | null;
+  alerts: number;
+  active_alerts: number;
+  alerts_touched_at: string | null;
+  /** Their store subscription, for telling a trial. */
+  product_id: string | null;
+  started_at: string | null;
+  period_end: string | null;
+}
+
+async function whoIsDue(now: Date): Promise<{ userId: string; reminder: Reminder }[]> {
   const rows = (await sql.query(
-    `SELECT d.user_id
-     FROM push_devices d
+    `SELECT d.user_id, d.registered_at, d.opened_at, e.reminded_at,
+            COALESCE(a.alerts, 0)::int AS alerts, COALESCE(a.active_alerts, 0)::int AS active_alerts,
+            a.alerts_touched_at, s.product_id, s.started_at, s.period_end
+     FROM (
+       SELECT user_id, MIN(created_at) AS registered_at, MAX(last_seen_at) AS opened_at
+       FROM push_devices GROUP BY user_id
+     ) d
      LEFT JOIN user_entitlements e ON e.user_id = d.user_id
-     WHERE NOT EXISTS (SELECT 1 FROM alerts a WHERE a.user_id = d.user_id)
-       AND (e.reminded_at IS NULL OR e.reminded_at < NOW() - INTERVAL '${EVERY}')
-     GROUP BY d.user_id
-     HAVING MIN(d.created_at) < NOW() - INTERVAL '${SETTLE_IN}'
-        AND MAX(d.last_seen_at) < NOW() - INTERVAL '${RECENTLY_OPENED}'
+     LEFT JOIN (
+       SELECT user_id, COUNT(*) AS alerts, COUNT(*) FILTER (WHERE active) AS active_alerts,
+              MAX(GREATEST(created_at, updated_at, last_sent_at)) AS alerts_touched_at
+       FROM alerts GROUP BY user_id
+     ) a ON a.user_id = d.user_id
+     LEFT JOIN LATERAL (
+       SELECT product_id, created_at AS started_at, current_period_end AS period_end
+       FROM subscriptions
+       WHERE clerk_user_id = d.user_id AND provider IN ('apple', 'google')
+       ORDER BY current_period_end DESC NULLS LAST
+       LIMIT 1
+     ) s ON TRUE
+     WHERE COALESCE(e.push_reminders, TRUE)
      ORDER BY d.user_id`
-  )) as { user_id: string }[];
-  return rows.map((r) => r.user_id);
+  )) as PersonRow[];
+
+  const date = (value: string | null) => (value ? new Date(value) : null);
+  return rows.flatMap((r) => {
+    const reminder = reminderFor(
+      {
+        registeredAt: new Date(r.registered_at),
+        openedAt: new Date(r.opened_at),
+        remindedAt: date(r.reminded_at),
+        alerts: r.alerts,
+        activeAlerts: r.active_alerts,
+        alertsTouchedAt: date(r.alerts_touched_at),
+        trial:
+          r.started_at !== null &&
+          inTrial(
+            {
+              annual: r.product_id !== null && periodForStoreProduct(r.product_id) === "annual",
+              startedAt: new Date(r.started_at),
+              periodEnd: date(r.period_end),
+            },
+            now
+          ),
+      },
+      now
+    );
+    return reminder ? [{ userId: r.user_id, reminder }] : [];
+  });
 }
 
 /**
@@ -79,23 +125,23 @@ async function newTrades(): Promise<{ week: number; now: number }> {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   await ensureSchema();
-  const due = await usersDue();
+  const due = await whoIsDue(new Date());
   if (due.length === 0) {
     console.log("No reminders due.");
     return;
   }
-  const { week, now } = await newTrades();
-  if (now === 0) {
+  const trades = await newTrades();
+  if (trades.now === 0) {
     console.log("Nothing was just approved, so no reminders.");
     return;
   }
 
-  const message = reminderMessageFor(week);
-  const entitlements = await resolveEntitlements(due);
+  const entitlements = await resolveEntitlements(due.map((d) => d.userId));
   let sent = 0;
   let failed = 0;
-  for (const userId of due) {
+  for (const { userId, reminder } of due) {
     if (entitlements.get(userId)?.status !== "entitled") continue;
+    const message = reminderMessageFor(reminder, trades.week);
     if (dryRun) {
       console.log(`  ${userId}: ${message.title} | ${message.body}`);
       sent++;

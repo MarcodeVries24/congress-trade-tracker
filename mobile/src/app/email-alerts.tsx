@@ -1,8 +1,9 @@
+import { useAuth } from '@clerk/clerk-expo';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
-import { ApiError, createAlert, fetchAlerts, updateAlert, type Alert, type AlertList } from '@/lib/api';
+import { ApiError, createAlert, fetchAlerts, setReminders, updateAlert, type Alert, type AlertList } from '@/lib/api';
 import { rememberAlerts } from '@/lib/alert-cache';
 import { memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -40,6 +41,7 @@ export default function EmailAlertsScreen() {
   const { c } = useTheme();
   const push = usePush();
   const router = useRouter();
+  const { isLoaded } = useAuth();
   const authed = useAuthedRequest();
   const { answers } = useOnboarding();
   const [data, setData] = useState<AlertList | null>(null);
@@ -61,10 +63,12 @@ export default function EmailAlertsScreen() {
   }, [authed]);
 
   // On focus, so an alert saved in the editor is in the list when it closes.
+  // Not before Clerk has read its session: a tapped reminder can open the app
+  // cold, and asking then would come back "sign in" to someone who has.
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load])
+      if (isLoaded) void load();
+    }, [load, isLoaded])
   );
 
   const toggle = async (alert: Alert, active: boolean) => {
@@ -77,6 +81,18 @@ export default function EmailAlertsScreen() {
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Could not update the alert.'));
       void load();
+    }
+  };
+
+  const toggleReminders = async (on: boolean) => {
+    haptic.select();
+    const set = (reminders: boolean) => setData((prev) => (prev ? { ...prev, reminders } : prev));
+    set(on);
+    try {
+      await setReminders(on, await authed());
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Could not change the reminder.'));
+      set(!on);
     }
   };
 
@@ -150,6 +166,25 @@ export default function EmailAlertsScreen() {
   const header = (
     <View style={styles.header}>
       <PushSwitchCard devices={data.pushDevices} />
+      {/* Only where it can arrive, and only from a server that knows it. */}
+      {push.enabled && data.reminders !== undefined ? (
+        <View style={[styles.reminder, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={styles.rowText}>
+            <Text variant="bodyStrong">Tell me when it&apos;s quiet</Text>
+            <Text variant="caption" tone="muted">
+              A notification about new trades, at most once a week, when you have no alerts or they haven&apos;t sent
+              anything for a while.
+            </Text>
+          </View>
+          <Switch
+            value={data.reminders}
+            onValueChange={(v) => void toggleReminders(v)}
+            trackColor={{ true: c.gain, false: c.borderStrong }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Tell me when it's quiet"
+          />
+        </View>
+      ) : null}
       <Text variant="callout" tone="muted">
         Each alert is a set of filters. When a new filing matches, you get a notification, an email to{' '}
         {data.email ?? 'your account'}, or both, as you choose per alert. The disclosure sites are checked every few
@@ -262,6 +297,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingBottom: 40, gap: 10 },
   header: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 14 },
+  reminder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   suggest: { padding: 16, gap: 8, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
   suggestIcon: {
     width: 38,

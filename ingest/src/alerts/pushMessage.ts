@@ -9,7 +9,7 @@ export interface PushMessage {
   title: string;
   body: string;
   /** Read by the app when the notification is tapped; see mobile/src/lib/push.tsx. */
-  data: { type: "alert"; alertId: string };
+  data: { type: "alert"; alertId: string } | { type: "reminder" };
 }
 
 /**
@@ -25,5 +25,18 @@ export function pushMessageFor(alert: { id: string; name: string }, matches: Ale
     title: n === 1 ? "New Trade" : "New Trades",
     body: `${n} new ${n === 1 ? "trade" : "trades"} for alert “${alert.name}”`,
     data: { type: "alert", alertId: alert.id },
+  };
+}
+
+/**
+ * For a subscriber without an alert (sendReminders.ts). Tapping it opens the
+ * app's alerts screen, where the one from the setup questions is one tap.
+ */
+export function reminderMessageFor(count: number): PushMessage {
+  const trades = count === 1 ? "1 new trade was" : `${count.toLocaleString("en-US")} new trades were`;
+  return {
+    title: "New trades published",
+    body: `${trades} published this week. Open the app and set up an alert to catch the next one.`,
+    data: { type: "reminder" },
   };
 }

@@ -237,7 +237,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
 
   // A tapped alert opens the trades it sent, grouped by notification, so the
   // ones just announced are at the top (the alert's filtered search is a
-  // button there). Only the alert's id travels in the payload, which has a
+  // button there). A reminder to set up a first alert opens the alerts.
+  // Only the alert's id travels in the payload, which has a
   // 4KB ceiling; the screen asks the server for the rest. Covers a tap that
   // launched the app (the last response) and one while it runs.
   const handled = useRef<string | null>(null);
@@ -249,6 +250,10 @@ export function PushProvider({ children }: { children: ReactNode }) {
       handled.current = id;
       void Notifications.clearLastNotificationResponseAsync().catch(() => {});
       const data = response.notification.request.content.data as { type?: string; alertId?: string } | undefined;
+      if (data?.type === 'reminder') {
+        router.push('/email-alerts');
+        return;
+      }
       if (data?.type !== 'alert' || !data.alertId) return;
       noteAlertTapped();
       router.push({ pathname: '/alert-trades/[id]', params: { id: data.alertId } });

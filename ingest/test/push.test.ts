@@ -5,7 +5,7 @@
 //
 // Prints one line per assertion and exits non-zero if any failed.
 
-import { pushMessageFor } from "../src/alerts/pushMessage.js";
+import { pushMessageFor, reminderMessageFor } from "../src/alerts/pushMessage.js";
 import type { AlertTradeRow } from "../../web/lib/alertFilters";
 
 let failures = 0;
@@ -53,6 +53,16 @@ check("tap opens the alert", one.data, { type: "alert", alertId: "7" });
 const many = pushMessageFor(alert, [1, 2, 3, 4, 5].map((id) => trade({ id })));
 check("several: title", many.title, "New Trades");
 check("several: body counts them for the alert", many.body, "5 new trades for alert “Big buys”");
+
+const reminder = reminderMessageFor(1234);
+check("reminder: title", reminder.title, "New trades published");
+check(
+  "reminder: counts them",
+  reminder.body,
+  "1,234 new trades were published this week. Open the app and set up an alert to catch the next one."
+);
+check("reminder: one trade", reminderMessageFor(1).body.startsWith("1 new trade was published"), true);
+check("reminder: tap opens the alerts screen", reminder.data, { type: "reminder" });
 
 if (failures) {
   console.error(`\n${failures} failed`);

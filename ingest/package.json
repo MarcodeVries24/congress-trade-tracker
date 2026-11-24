@@ -15,6 +15,7 @@
     "sync-prices:new": "tsx src/ingest/syncPrices.ts --new-only",
     "send-daily-report": "tsx src/ingest/sendDailyReport.ts",
     "alerts:send": "tsx src/alerts/sendAlerts.ts",
+    "alerts:remind": "tsx src/alerts/sendReminders.ts",
     "review:queue": "tsx src/ingest/reviewQueue.ts",
     "review:approve": "tsx src/ingest/approveFiling.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -144,7 +144,7 @@ export function PushPrimer({
 
               <View style={styles.points}>
                 <Point icon="options-outline">
-                  Only for the alerts you switch Push on for, with exactly the filters you set.
+                  For the alerts you switch Push on for. No alerts yet? At most one reminder a week about new trades.
                 </Point>
                 <Point icon="time-outline">
                   As often as each alert says: as it happens, or a daily or weekly roundup.

@@ -81,7 +81,9 @@ export default function PrivacyPage() {
           </p>
           <p>
             If you turn on push notifications in an app, we store that device&rsquo;s push token, whether it is an
-            iPhone or Android device, and when it was registered and last used, so alerts can reach it. Notifications
+            iPhone or Android device, and when it was registered and last used, so alerts can reach it. If
+            you have CongTrade Pro but no alert yet, we also use it to tell you about newly published trades and
+            remind you to set up an alert, at most once a week, and we record when we last did. Notifications
             are delivered through Expo&rsquo;s push service and then Apple&rsquo;s or Google&rsquo;s. A token is
             deleted when you turn notifications off or sign out on that device, when you delete your account, and
             automatically when Apple or Google report that it no longer works.

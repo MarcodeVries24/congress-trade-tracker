@@ -273,6 +273,9 @@ export const SCHEMA_STATEMENTS = [
     last_error_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // When this person was last sent the push reminder to set up a first alert
+  // (src/alerts/sendReminders.ts); at most once a week.
+  `ALTER TABLE user_entitlements ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMPTZ`,
   // Watermark for the daily report: everything ingested after this instant is
   // what the next report covers.
   //

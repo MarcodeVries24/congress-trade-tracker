@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { acknowledgeIfPending, fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
 import { accountTokenFor } from "@/lib/storeAccountToken";
+import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
 
@@ -57,21 +58,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const currentPeriodEnd = state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null;
+  const providerSubscriptionId = state.linkedPurchaseToken ?? purchaseToken;
   await upsertSubscription({
     clerkUserId: userId,
     provider: "google",
     providerAccountId: purchaseToken,
-    providerSubscriptionId: state.linkedPurchaseToken ?? purchaseToken,
+    providerSubscriptionId,
     status: state.status,
     productId: state.productId,
-    currentPeriodEnd: state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null,
+    currentPeriodEnd,
     cancelAtPeriodEnd: state.cancelAtPeriodEnd,
   });
 
   await acknowledgeIfPending(purchaseToken, state);
 
-  return NextResponse.json({
-    entitled: state.status === "active" || state.status === "past_due",
+  // The same rule as everywhere else access is decided, as in the Apple route:
+  // a cancelled subscription keeps Pro to the end of the period paid for.
+  const entitled = grantsAccess({
+    clerk_user_id: userId,
+    provider: "google",
+    provider_account_id: purchaseToken,
+    provider_subscription_id: providerSubscriptionId,
     status: state.status,
+    product_id: state.productId,
+    current_period_end: currentPeriodEnd?.toISOString() ?? null,
+    cancel_at_period_end: state.cancelAtPeriodEnd,
   });
+  return NextResponse.json({ entitled, status: state.status });
 }

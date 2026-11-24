@@ -42,7 +42,7 @@ export function Header() {
         <nav className="hidden items-center gap-1 sm:flex">
           <Link
             href="/trades"
-            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
+            className="rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-muted transition-colors hover:bg-panel-muted hover:text-ink md:text-[11px] md:tracking-wider"
           >
             All Trades
           </Link>
@@ -70,16 +70,6 @@ export function Header() {
           >
             News
           </Link>
-          {/* For everyone, signed in or not: the app is where alerts arrive as
-              they are sent, so a subscriber wants it as much as a visitor. */}
-          <Link
-            href={GET_THE_APP_HREF}
-            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
-          >
-            {/* One word while the row is tight; the full phrase once it is not. */}
-            <span className="lg:hidden">App</span>
-            <span className="hidden lg:inline">Get the app</span>
-          </Link>
           {/* Signed-out only. A signed-in free account reaches the same page
               from the avatar menu, and someone already paying does not need
               the row spent on it. Without this a signed-out visitor on a
@@ -93,6 +83,17 @@ export function Header() {
               Pro
             </Link>
           </SignedOut>
+          {/* Last, and the only link in the accent colour: the app is where
+              alerts arrive as they are sent, so it is the one to notice,
+              signed in or not. */}
+          <Link
+            href={GET_THE_APP_HREF}
+            className="whitespace-nowrap rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-panel-muted md:text-[11px] md:tracking-wider"
+          >
+            {/* One word while the row is tight; the full phrase once it is not. */}
+            <span className="lg:hidden">App</span>
+            <span className="hidden lg:inline">Get the app</span>
+          </Link>
         </nav>
 
         {/* `ml-auto` pins these right; `shrink-0` + `whitespace-nowrap` stop

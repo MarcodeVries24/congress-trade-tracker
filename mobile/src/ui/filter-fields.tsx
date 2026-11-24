@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { memberDisplayNameFromFiledName, shortDate } from '@/lib/format';
 import {
@@ -67,8 +68,10 @@ export function FilterSection({
       {foldable ? <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} color={c.textMuted} /> : null}
     </>
   );
+  // Slides to its new place when a section above it grows or shrinks (a
+  // calendar opening, a folded section opening) instead of jumping there.
   return (
-    <View style={[styles.section, { borderBottomColor: c.border }]}>
+    <Animated.View layout={SECTION_MOTION} style={[styles.section, { borderBottomColor: c.border }]}>
       {foldable ? (
         <Tap onPress={() => setOpen((o) => !o)} scaleTo={0.99} style={styles.sectionHead}>
           {heading}
@@ -77,7 +80,7 @@ export function FilterSection({
         <View style={styles.sectionHead}>{heading}</View>
       )}
       {open ? <View style={styles.sectionBody}>{children}</View> : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -100,6 +103,10 @@ export function FilterFields({
   mode: 'search' | 'alert';
 }) {
   const { c } = useTheme();
+  // Which calendar is open, across the whole sheet: one at a time. Each date
+  // filter used to keep its own, so Traded's and Filed's could both be open,
+  // one of them often off screen.
+  const [calendar, setCalendar] = useState<string | null>(null);
   const list = (values: string[]) => (values.length ? values : undefined);
   const input = [styles.input, { backgroundColor: c.surface, borderColor: c.border, color: c.text }];
   const sort = SORTS.find((s) => s.key === draft.sort) ?? SORTS[0];
@@ -135,6 +142,9 @@ export function FilterFields({
       {mode === 'search' ? (
         <FilterSection title="Traded" hint="By the date the trade was made, past days or exact dates">
           <DateWindow
+            name="traded"
+            calendar={calendar}
+            setCalendar={setCalendar}
             from={draft.tradedFrom}
             to={draft.tradedTo}
             earliest={EARLIEST_TRADED}
@@ -146,6 +156,9 @@ export function FilterFields({
       {mode === 'search' ? (
         <FilterSection title="Filed" hint="By the date the disclosure was published, past days or exact dates">
           <DateWindow
+            name="filed"
+            calendar={calendar}
+            setCalendar={setCalendar}
             from={draft.dateFrom}
             to={draft.dateTo}
             earliest={EARLIEST_FILED}
@@ -237,18 +250,28 @@ export function FilterFields({
  * makes it exact dates, and the presets let go.
  */
 function DateWindow({
+  name,
+  calendar,
+  setCalendar,
   from,
   to,
   earliest,
   onChange,
 }: {
+  /** Which date filter this is, to tell its calendars from the other one's. */
+  name: string;
+  /** The calendar open in the sheet ("traded:from"), shared so only one is. */
+  calendar: string | null;
+  setCalendar: (key: string | null) => void;
   from: string | undefined;
   to: string | undefined;
   earliest: string;
   onChange: (from: string | undefined, to: string | undefined) => void;
 }) {
   const { c } = useTheme();
-  const [editing, setEditing] = useState<'from' | 'to' | null>(null);
+  const editing: 'from' | 'to' | null =
+    calendar === `${name}:from` ? 'from' : calendar === `${name}:to` ? 'to' : null;
+  const setEditing = (which: 'from' | 'to' | null) => setCalendar(which ? `${name}:${which}` : null);
   const preset = windowFor(from, to);
   const today = todayIso();
 
@@ -310,18 +333,23 @@ function DateWindow({
         {field('to')}
       </View>
       {editing ? (
-        <DayPicker
-          key={editing}
-          value={editing === 'from' ? from : to}
-          min={editing === 'from' ? earliest : (from ?? earliest)}
-          max={editing === 'from' ? (to ?? today) : today}
-          onPick={(day) => (editing === 'from' ? onChange(day, to) : onChange(from, day))}
-          onClose={() => setEditing(null)}
-        />
+        // Fades in and out while the sections below slide (SECTION_MOTION),
+        // rather than appearing and vanishing at full height in one frame.
+        <Animated.View key={editing} entering={FadeIn.duration(220)} exiting={FadeOut.duration(140)}>
+          <DayPicker
+            value={editing === 'from' ? from : to}
+            min={editing === 'from' ? earliest : (from ?? earliest)}
+            max={editing === 'from' ? (to ?? today) : today}
+            onPick={(day) => (editing === 'from' ? onChange(day, to) : onChange(from, day))}
+            onClose={() => setEditing(null)}
+          />
+        </Animated.View>
       ) : null}
     </>
   );
 }
+
+const SECTION_MOTION = LinearTransition.duration(240);
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

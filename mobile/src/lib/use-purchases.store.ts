@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { API_BASE } from '@/lib/api';
 import type { Purchases } from '@/lib/purchases-types';
+import { mayPass, wasCancelled } from '@/lib/purchase-errors';
 import { PRODUCT_IDS, periodForProduct, type BillingPeriod, type StoreProduct, type Trial } from '@/lib/products';
 
 /**
@@ -32,6 +33,9 @@ class OtherAccountError extends Error {}
 function dayOf(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/** Before a purchase Play refused for no reason of its own is tried once more. */
+const RETRY_AFTER_MS = 700;
 
 type Subscription = ReturnType<typeof useIAP>['subscriptions'][number];
 type StorePurchase = Parameters<NonNullable<Parameters<typeof useIAP>[0]>['onPurchaseSuccess'] & {}>[0];
@@ -155,8 +159,49 @@ export function usePurchases(onEntitled: () => void): Purchases {
     [getToken]
   );
 
+  // The purchase under way. Play can refuse the first one after a switch of
+  // account with its "something went wrong on our end" and take the very same
+  // one a moment later, so an error of that kind gets one more try by itself.
+  // `id` tells the tries apart, as one failure can be reported twice (as an
+  // event and as the request's rejection); `settled` is the last one dealt with.
+  const run = useRef<{ id: number; settled: number; again: (() => Promise<void>) | null }>({
+    id: 0,
+    settled: -1,
+    again: null,
+  });
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const failed = useCallback((err: unknown, id: number) => {
+    if (run.current.settled === id) return;
+    run.current.settled = id;
+    const again = run.current.again;
+    run.current.again = null;
+    const { code, message } = (err ?? {}) as { code?: string; message?: string };
+    // A cancelled purchase is not a failure and should not shout about it.
+    if (wasCancelled({ code, message })) setError(null);
+    else if (Platform.OS === 'android' && mayPass({ code, message })) {
+      if (again) {
+        // A moment for Play's sheet to close, and for the other report of this
+        // same failure to arrive before the next try has an id of its own.
+        setTimeout(() => {
+          if (mounted.current) void again();
+        }, RETRY_AFTER_MS);
+        return;
+      }
+      setError("Google Play couldn't start the purchase. Please try again in a moment.");
+    } else setError(message || 'The purchase did not go through.');
+    setBusy(null);
+  }, []);
+
   const iap = useIAP({
     onPurchaseSuccess: (purchase) => {
+      run.current.again = null;
       const payload = reportFor(purchase);
       void (async () => {
         try {
@@ -178,12 +223,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
         }
       })();
     },
-    onPurchaseError: (err) => {
-      // A cancelled purchase is not a failure and should not shout about it.
-      const cancelled = /cancel/i.test(err?.code ?? '') || /cancel/i.test(err?.message ?? '');
-      setError(cancelled ? null : (err?.message ?? 'The purchase did not go through.'));
-      setBusy(null);
-    },
+    onPurchaseError: (err) => failed(err, run.current.id),
     onError: (err) => setError(err.message),
   });
 
@@ -268,70 +308,82 @@ export function usePurchases(onEntitled: () => void): Purchases {
       }
       // The paywall sends anyone signed out to sign in first and comes back
       // here once this is set; reaching it unset means the fetch failed.
-      if (!accountToken.current) {
+      const token = accountToken.current;
+      if (!token) {
         setError('Could not reach your account. Check your connection and try again.');
         return;
       }
       setBusy(period);
-      // Apple keeps one subscription per group per Apple Account. While that
-      // Apple Account has one, buying another plan only switches it, and it
-      // stays with the CongTrade account it was bought on: the person would
-      // pay and get nothing on this one. So what it already owns is asked
-      // about first, before Apple's sheet opens. Theirs is simply Pro again;
-      // another account's is said plainly, with until when it runs. Play sells
-      // the plans separately and refuses only the very one its account owns,
-      // with an error that does not say why, so there only that one is asked
-      // about.
-      try {
-        const all = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
-        const owned = Platform.OS === 'ios' ? all : all.filter((p) => p.productId === product.id);
-        for (const payload of owned.map(reportFor)) {
-          if (payload && (await report(payload))) {
-            setBusy(null);
-            onEntitled();
-            return;
-          }
-        }
-      } catch (err) {
-        if (err instanceof OtherAccountError) {
-          setError(err.message);
+      const attempt = async () => {
+        // Someone else signed in before the second try: not theirs to finish.
+        if (accountToken.current !== token) {
           setBusy(null);
           return;
         }
-        // Anything else (offline, the store slow to answer) is no reason to
-        // refuse a purchase: one that goes through is reported and checked
-        // again as it completes.
-      }
-      try {
-        // Play requires exactly one offer token, and the offer it names is
-        // what is bought: the free-trial offer when there is one, otherwise the
-        // base plan itself (the offer with a single, paid pricing phase). Apple
-        // applies an introductory offer on its own, which is why this is built
-        // per platform.
-        const found = subscriptions.find((s) => s.id === product.id);
-        const listed = Platform.OS === 'android' ? (found?.subscriptionOffers ?? []) : [];
-        const basePlan =
-          listed.find((o) => o.offerTokenAndroid && o.pricingPhasesAndroid?.pricingPhaseList.length === 1) ??
-          listed.find((o) => o.offerTokenAndroid);
-        const offerToken = product.trial?.offerToken ?? basePlan?.offerTokenAndroid ?? null;
-        const offers = offerToken ? [{ sku: product.id, offerToken }] : [];
-        await requestPurchase({
-          type: 'subs',
-          request: {
-            apple: { sku: product.id, appAccountToken: accountToken.current },
-            google: {
-              skus: [product.id],
-              obfuscatedAccountId: accountToken.current,
-              ...(offers.length ? { subscriptionOffers: offers } : {}),
+        const id = ++run.current.id;
+        // Apple keeps one subscription per group per Apple Account. While that
+        // Apple Account has one, buying another plan only switches it, and it
+        // stays with the CongTrade account it was bought on: the person would
+        // pay and get nothing on this one. So what it already owns is asked
+        // about first, before Apple's sheet opens. Theirs is simply Pro again;
+        // another account's is said plainly, with until when it runs. Play sells
+        // the plans separately and refuses only the very one its account owns,
+        // with an error that does not say why, so there only that one is asked
+        // about.
+        try {
+          const all = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
+          const owned = Platform.OS === 'ios' ? all : all.filter((p) => p.productId === product.id);
+          for (const payload of owned.map(reportFor)) {
+            if (payload && (await report(payload))) {
+              run.current.again = null;
+              setBusy(null);
+              onEntitled();
+              return;
+            }
+          }
+        } catch (err) {
+          if (err instanceof OtherAccountError) {
+            run.current.again = null;
+            setError(err.message);
+            setBusy(null);
+            return;
+          }
+          // Anything else (offline, the store slow to answer) is no reason to
+          // refuse a purchase: one that goes through is reported and checked
+          // again as it completes.
+        }
+        try {
+          // Play requires exactly one offer token, and the offer it names is
+          // what is bought: the free-trial offer when there is one, otherwise the
+          // base plan itself (the offer with a single, paid pricing phase). Apple
+          // applies an introductory offer on its own, which is why this is built
+          // per platform.
+          const found = subscriptions.find((s) => s.id === product.id);
+          const listed = Platform.OS === 'android' ? (found?.subscriptionOffers ?? []) : [];
+          const basePlan =
+            listed.find((o) => o.offerTokenAndroid && o.pricingPhasesAndroid?.pricingPhaseList.length === 1) ??
+            listed.find((o) => o.offerTokenAndroid);
+          const offerToken = product.trial?.offerToken ?? basePlan?.offerTokenAndroid ?? null;
+          const offers = offerToken ? [{ sku: product.id, offerToken }] : [];
+          await requestPurchase({
+            type: 'subs',
+            request: {
+              apple: { sku: product.id, appAccountToken: token },
+              google: {
+                skus: [product.id],
+                obfuscatedAccountId: token,
+                ...(offers.length ? { subscriptionOffers: offers } : {}),
+              },
             },
-          },
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'The purchase did not start.');
-        setBusy(null);
-      }
+          });
+        } catch (err) {
+          failed(err, id);
+        }
+      };
+      run.current.again = attempt;
+      await attempt();
     },
-    [products, requestPurchase, subscriptions, report, onEntitled]
+    [products, requestPurchase, subscriptions, report, onEntitled, failed]
   );
 
   /**

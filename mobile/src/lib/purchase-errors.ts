@@ -12,11 +12,12 @@ export function wasCancelled(err: StoreError): boolean {
 
 /**
  * Play's "something went wrong on our end" (billing response 6), and the names
- * the purchase library gives an error it cannot place. Not the ones with a
- * reason trying again would not change: already owned, no network, a product
- * that is not for sale.
+ * the purchase library gives an error it cannot place. And "not available for
+ * purchase" (response 4), which Play answers for the same passing reason: the
+ * plan was on sale a second earlier, or it could not have been picked. Not the
+ * ones trying again would not change: already owned, no network.
  */
-const PASSING = new Set(['service-error', 'purchase-error', 'remote-error', 'unknown', '6']);
+const PASSING = new Set(['service-error', 'purchase-error', 'remote-error', 'item-unavailable', 'unknown', '4', '6']);
 
 export function mayPass(err: StoreError): boolean {
   return !wasCancelled(err) && PASSING.has(String(err.code ?? ''));

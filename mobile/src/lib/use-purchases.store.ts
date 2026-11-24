@@ -159,9 +159,10 @@ export function usePurchases(onEntitled: () => void): Purchases {
     [getToken]
   );
 
-  // The purchase under way. Play can refuse the first one after a switch of
-  // account with its "something went wrong on our end" and take the very same
-  // one a moment later, so an error of that kind gets one more try by itself.
+  // The purchase under way. Play can refuse the first one after the plans open
+  // ("something went wrong on our end", or the product not being available),
+  // from what it had prepared, and take the very same one a moment later, so
+  // an error of that kind gets one more try by itself.
   // `id` tells the tries apart, as one failure can be reported twice (as an
   // event and as the request's rejection); `settled` is the last one dealt with.
   const run = useRef<{ id: number; settled: number; again: (() => Promise<void>) | null }>({

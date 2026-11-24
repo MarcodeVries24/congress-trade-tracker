@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { clerkClient } from "@clerk/nextjs/server";
+import { appleOwner } from "@/lib/appleOwner";
 import { sql } from "@/lib/db";
+import type { SubscriptionRow } from "@/lib/subscriptionAccess";
 
 /**
  * The UUID that ties a store purchase back to a CongTrade account.
@@ -62,18 +64,31 @@ export async function accountStillExists(clerkUserId: string): Promise<boolean> 
 }
 
 /**
- * Who holds an App Store subscription now, by its original transaction id.
- * Usually the account whose token is in the purchase; after a subscription
- * has moved from a deleted account, the one it moved to, which the token
- * (fixed in the purchase forever) no longer says.
+ * The account an App Store subscription belongs to, or null when nobody holds
+ * it and its token names no account. The row by its original transaction id,
+ * and the token in the latest purchase, as lib/appleOwner weighs them. A token
+ * naming a deleted account says nothing: after a subscription has moved from
+ * one, the token (fixed in the purchase) still names it.
  */
-export async function appleSubscriptionHolder(originalTransactionId: string): Promise<string | null> {
-  const rows = (await sql.query(
-    `SELECT clerk_user_id FROM subscriptions WHERE provider = 'apple' AND provider_account_id = $1
-     ORDER BY updated_at DESC LIMIT 1`,
-    [originalTransactionId]
-  )) as { clerk_user_id: string }[];
-  return rows[0]?.clerk_user_id ?? null;
+export async function appleSubscriptionOwner(
+  originalTransactionId: string | null | undefined,
+  accountToken: string | null | undefined
+): Promise<string | null> {
+  const rows = originalTransactionId
+    ? ((await sql.query(
+        `SELECT clerk_user_id, provider, provider_account_id, provider_subscription_id,
+                status, product_id, current_period_end, cancel_at_period_end
+         FROM subscriptions WHERE provider = 'apple' AND provider_account_id = $1
+         ORDER BY updated_at DESC LIMIT 1`,
+        [originalTransactionId]
+      )) as SubscriptionRow[])
+    : [];
+  const holder = rows[0] ?? null;
+  let tokenUser = accountToken ? await userForAccountToken(accountToken) : null;
+  if (holder && tokenUser && tokenUser !== holder.clerk_user_id && !(await accountStillExists(tokenUser))) {
+    tokenUser = null;
+  }
+  return appleOwner(holder, tokenUser);
 }
 
 /** Drops a subscription's rows held by anyone but `keep`, when it moves to `keep`. */

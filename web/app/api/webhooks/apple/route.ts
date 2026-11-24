@@ -6,7 +6,7 @@ import {
   verifyRenewalInfo,
   verifyTransaction,
 } from "@/lib/appleStore";
-import { appleSubscriptionHolder, userForAccountToken } from "@/lib/storeAccountToken";
+import { appleSubscriptionOwner, releaseAppleSubscription } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -77,13 +77,10 @@ export async function POST(req: NextRequest) {
   // only thing tying a receipt to an account, so a purchase we cannot resolve
   // is recorded nowhere rather than attached to a guess.
   //
-  // Whoever holds the subscription now comes first: after it has moved from a
-  // deleted account (see the store route) the token, fixed in the purchase,
-  // still names the old one.
+  // Whoever holds the subscription keeps it while they have Pro from it,
+  // whatever the token says; see lib/appleOwner.
   const accountToken = transaction.appAccountToken;
-  const clerkUserId =
-    (transaction.originalTransactionId ? await appleSubscriptionHolder(transaction.originalTransactionId) : null) ??
-    (accountToken ? await userForAccountToken(accountToken) : null);
+  const clerkUserId = await appleSubscriptionOwner(transaction.originalTransactionId, accountToken);
   if (!clerkUserId) {
     console.error("[apple] could not resolve the purchase to an account", {
       notificationUUID,
@@ -93,6 +90,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true, unlinked: true });
   }
 
+  // One subscription, one row: an ended one that someone else subscribed to
+  // anew leaves the account that held it.
+  if (transaction.originalTransactionId) {
+    await releaseAppleSubscription(transaction.originalTransactionId, clerkUserId);
+  }
   await upsertSubscription({
     clerkUserId,
     provider: "apple",

@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { appleApiConfigured, describeAppleError, subscriptionStatusFor } from "@/lib/appleStore";
-import {
-  accountStillExists,
-  accountTokenFor,
-  releaseAppleSubscription,
-  userForAccountToken,
-} from "@/lib/storeAccountToken";
+import { accountStillExists, appleSubscriptionOwner, releaseAppleSubscription } from "@/lib/storeAccountToken";
 import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
@@ -52,20 +47,21 @@ export async function POST(req: NextRequest) {
 
   const { status, transaction } = result;
 
-  // The transaction has to belong to this account. The token is the UUID we
-  // issued for this user, not the Clerk id, because that is all StoreKit will
-  // carry. A mismatch means the subscription was bought signed in as someone
-  // else. While that account exists it keeps it: one Apple Account's
+  // The subscription has to belong to this account: the one that holds it, or
+  // for a new one, the one its token names (the UUID we issued, which is all
+  // StoreKit will carry); see lib/appleOwner. Going by the token alone missed
+  // a subscription held by another account whose plan this one had changed,
+  // and recording it here then failed on the row that was already there.
+  // While the other account exists it keeps it: one Apple Account's
   // subscription does not unlock several CongTrade accounts. Once it has
   // been deleted (or the token was never ours to resolve), the subscription
   // belongs to nobody, and it moves to the account restoring it, so someone
   // who deleted their account and made a new one is not locked out of what
   // they are still paying for.
-  const expectedToken = await accountTokenFor(userId);
   const subscriptionId = transaction.originalTransactionId ?? originalTransactionId;
-  if (transaction.appAccountToken && transaction.appAccountToken !== expectedToken) {
-    const holder = await userForAccountToken(transaction.appAccountToken);
-    if (holder && holder !== userId && (await accountStillExists(holder))) {
+  const owner = await appleSubscriptionOwner(subscriptionId, transaction.appAccountToken);
+  if (owner !== userId) {
+    if (owner && (await accountStillExists(owner))) {
       console.error("[apple] transaction belongs to another account", { userId, originalTransactionId });
       // When that account's Pro ends, and whether it renews, so the person
       // knows when they could subscribe here instead. The app writes the date
@@ -87,9 +83,10 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    console.info("[apple] subscription moved from a deleted account", { userId, from: holder, originalTransactionId });
-    await releaseAppleSubscription(subscriptionId, userId);
+    if (owner) console.info("[apple] subscription moved from a deleted account", { userId, from: owner, originalTransactionId });
   }
+  // One subscription, one row: whoever held it before, it is this account's now.
+  await releaseAppleSubscription(subscriptionId, userId);
 
   const currentPeriodEnd = transaction.expiresDate ? new Date(transaction.expiresDate) : null;
   await upsertSubscription({

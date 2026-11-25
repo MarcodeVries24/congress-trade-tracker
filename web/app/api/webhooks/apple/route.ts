@@ -6,7 +6,7 @@ import {
   verifyRenewalInfo,
   verifyTransaction,
 } from "@/lib/appleStore";
-import { appleSubscriptionOwner, releaseAppleSubscription } from "@/lib/storeAccountToken";
+import { appleSubscriptionOwner, releaseStoreSubscription } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   // One subscription, one row: an ended one that someone else subscribed to
   // anew leaves the account that held it.
   if (transaction.originalTransactionId) {
-    await releaseAppleSubscription(transaction.originalTransactionId, clerkUserId);
+    await releaseStoreSubscription("apple", transaction.originalTransactionId, clerkUserId);
   }
   await upsertSubscription({
     clerkUserId,

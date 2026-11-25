@@ -159,6 +159,29 @@ export function usePurchases(onEntitled: () => void): Purchases {
     [getToken]
   );
 
+  /**
+   * Reports what this store account owns until the server accepts one as this
+   * CongTrade account's. A refusal is kept until the rest has been asked about:
+   * a Play account can own two plans, one of them somebody else's and the other
+   * theirs. Another account's is the answer that matters, above a failed call.
+   */
+  const claim = useCallback(
+    async (owned: StorePurchase[]): Promise<boolean> => {
+      let refused: unknown = null;
+      for (const payload of owned.map(reportFor)) {
+        if (!payload) continue;
+        try {
+          if (await report(payload)) return true;
+        } catch (err) {
+          if (!(refused instanceof OtherAccountError)) refused = err;
+        }
+      }
+      if (refused) throw refused;
+      return false;
+    },
+    [report]
+  );
+
   // The purchase under way. Play can refuse the first one after the plans open
   // ("something went wrong on our end", or the product not being available),
   // from what it had prepared, and take the very same one a moment later, so
@@ -328,19 +351,15 @@ export function usePurchases(onEntitled: () => void): Purchases {
         // pay and get nothing on this one. So what it already owns is asked
         // about first, before Apple's sheet opens. Theirs is simply Pro again;
         // another account's is said plainly, with until when it runs. Play sells
-        // the plans separately and refuses only the very one its account owns,
-        // with an error that does not say why, so there only that one is asked
-        // about.
+        // the plans separately and would take a second one, but someone with
+        // Pro on another account has nearly always forgotten which account they
+        // bought it on, and would be paying twice. So it is the same there.
         try {
-          const all = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
-          const owned = Platform.OS === 'ios' ? all : all.filter((p) => p.productId === product.id);
-          for (const payload of owned.map(reportFor)) {
-            if (payload && (await report(payload))) {
-              run.current.again = null;
-              setBusy(null);
-              onEntitled();
-              return;
-            }
+          if (await claim(ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true })))) {
+            run.current.again = null;
+            setBusy(null);
+            onEntitled();
+            return;
           }
         } catch (err) {
           if (err instanceof OtherAccountError) {
@@ -384,7 +403,7 @@ export function usePurchases(onEntitled: () => void): Purchases {
       run.current.again = attempt;
       await attempt();
     },
-    [products, requestPurchase, subscriptions, report, onEntitled, failed]
+    [products, requestPurchase, subscriptions, claim, onEntitled, failed]
   );
 
   /**
@@ -407,20 +426,15 @@ export function usePurchases(onEntitled: () => void): Purchases {
         await restorePurchases().catch(() => {});
         owned = ourPurchases(await ownedPurchases({ onlyIncludeActiveItemsIOS: true }));
       }
-      const payloads = owned.map(reportFor).filter((p): p is NonNullable<typeof p> => p !== null);
-      if (payloads.length === 0) {
+      if (!owned.some((p) => reportFor(p) !== null)) {
         setError(`No subscription found for this ${Platform.OS === 'android' ? 'Google account' : 'Apple Account'}.`);
         return;
       }
-      // One at a time: the first the server accepts is enough, and the rest
-      // are the same subscription's other transactions.
-      let entitled = false;
-      for (const payload of payloads) if (await report(payload)) entitled = true;
-      if (entitled) onEntitled();
+      if (await claim(owned)) onEntitled();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not restore purchases.');
     }
-  }, [restorePurchases, report, onEntitled]);
+  }, [restorePurchases, claim, onEntitled]);
 
   return { available: true, ready: connected, products, busy, error, accountReady, buy, restore };
 }

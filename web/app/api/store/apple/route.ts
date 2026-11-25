@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { appleApiConfigured, describeAppleError, subscriptionStatusFor } from "@/lib/appleStore";
-import { accountStillExists, appleSubscriptionOwner, releaseAppleSubscription } from "@/lib/storeAccountToken";
+import { accountStillExists, appleSubscriptionOwner, releaseStoreSubscription } from "@/lib/storeAccountToken";
 import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     if (owner) console.info("[apple] subscription moved from a deleted account", { userId, from: owner, originalTransactionId });
   }
   // One subscription, one row: whoever held it before, it is this account's now.
-  await releaseAppleSubscription(subscriptionId, userId);
+  await releaseStoreSubscription("apple", subscriptionId, userId);
 
   const currentPeriodEnd = transaction.expiresDate ? new Date(transaction.expiresDate) : null;
   await upsertSubscription({

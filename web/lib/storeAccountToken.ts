@@ -91,10 +91,38 @@ export async function appleSubscriptionOwner(
   return appleOwner(holder, tokenUser);
 }
 
-/** Drops a subscription's rows held by anyone but `keep`, when it moves to `keep`. */
-export async function releaseAppleSubscription(originalTransactionId: string, keep: string): Promise<void> {
+/**
+ * The account a Play subscription belongs to, or null when nobody's. Simpler
+ * than Apple's: a Play purchase is made once, for the account its token names.
+ * Only when that account is gone does the row say more, as the subscription
+ * may have moved to whoever claimed it since. A purchase made anew in Play
+ * itself points at the one before it, so that one's row counts too.
+ */
+export async function googleSubscriptionOwner(
+  purchaseToken: string,
+  accountToken: string | null,
+  linkedPurchaseToken: string | null
+): Promise<string | null> {
+  const tokenUser = accountToken ? await userForAccountToken(accountToken) : null;
+  const rows = (await sql.query(
+    `SELECT clerk_user_id FROM subscriptions
+     WHERE provider = 'google' AND provider_account_id = ANY($1)
+     ORDER BY (provider_account_id = $2) DESC, updated_at DESC LIMIT 1`,
+    [[purchaseToken, linkedPurchaseToken].filter(Boolean), purchaseToken]
+  )) as { clerk_user_id: string }[];
+  const holder = rows[0]?.clerk_user_id ?? null;
+  if (!tokenUser || !holder || tokenUser === holder) return tokenUser ?? holder;
+  return (await accountStillExists(tokenUser)) ? tokenUser : holder;
+}
+
+/** Drops a store subscription's rows held by anyone but `keep`, when it moves to `keep`. */
+export async function releaseStoreSubscription(
+  provider: "apple" | "google",
+  providerAccountId: string,
+  keep: string
+): Promise<void> {
   await sql.query(
-    `DELETE FROM subscriptions WHERE provider = 'apple' AND provider_account_id = $1 AND clerk_user_id <> $2`,
-    [originalTransactionId, keep]
+    `DELETE FROM subscriptions WHERE provider = $1 AND provider_account_id = $2 AND clerk_user_id <> $3`,
+    [provider, providerAccountId, keep]
   );
 }

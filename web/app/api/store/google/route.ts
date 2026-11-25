@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { acknowledgeIfPending, fetchSubscriptionState, googleApiConfigured } from "@/lib/googleStore";
-import { accountTokenFor } from "@/lib/storeAccountToken";
+import { accountStillExists, googleSubscriptionOwner, releaseStoreSubscription } from "@/lib/storeAccountToken";
 import { grantsAccess } from "@/lib/subscription";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 import { subscriptionElsewhereMessage } from "@congtrade/shared/storeProducts";
@@ -37,9 +37,19 @@ export async function POST(req: NextRequest) {
   }
 
   // obfuscatedExternalAccountId is the UUID the app attached at purchase time.
-  // A purchase carrying somebody else's is not this person's to claim.
-  const expectedToken = await accountTokenFor(userId);
-  if (state.clerkUserId && state.clerkUserId !== expectedToken) {
+  // A purchase carrying somebody else's is not this person's to claim, while
+  // that account exists. Once it has been deleted the subscription moves to
+  // the account asking, as in the Apple route: the app refuses a purchase
+  // while the Play account has Pro elsewhere, and someone who deleted their
+  // account and made a new one would be refused for an account they no
+  // longer have.
+  const owner = await googleSubscriptionOwner(purchaseToken, state.clerkUserId, state.linkedPurchaseToken);
+  if (owner && owner !== userId && (await accountStillExists(owner))) {
+    // Over, with Play's cache on the phone not yet knowing: nothing to refuse
+    // a new purchase for, and not this person's to record either.
+    if (state.expiryTimeMillis !== null && state.expiryTimeMillis <= Date.now()) {
+      return NextResponse.json({ entitled: false, reason: "ended" });
+    }
     console.error("[google] purchase belongs to another account", { userId });
     // Only `error`, without the `until` Apple's route sends: builds up to 14
     // word a date themselves as if it were always Apple's.
@@ -57,6 +67,10 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
+
+  if (owner && owner !== userId) console.info("[google] subscription moved from a deleted account", { userId, from: owner });
+  // One subscription, one row: whoever held it before, it is this account's now.
+  await releaseStoreSubscription("google", purchaseToken, userId);
 
   const currentPeriodEnd = state.expiryTimeMillis ? new Date(state.expiryTimeMillis) : null;
   const providerSubscriptionId = state.linkedPurchaseToken ?? purchaseToken;

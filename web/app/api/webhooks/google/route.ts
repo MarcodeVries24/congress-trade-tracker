@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { acknowledgeIfPending, fetchSubscriptionState, googleNotificationsConfigured } from "@/lib/googleStore";
-import { userForAccountToken } from "@/lib/storeAccountToken";
+import { googleSubscriptionOwner, releaseStoreSubscription } from "@/lib/storeAccountToken";
 import { claimStoreEvent } from "@/lib/storeEvents";
 import { upsertSubscription } from "@/lib/subscriptionWrite";
 
@@ -73,8 +73,9 @@ export async function POST(req: NextRequest) {
 
   // obfuscatedExternalAccountId carries the UUID we issued, not a Clerk id, so
   // that one answer works for both stores. A purchase we cannot resolve is
-  // recorded nowhere rather than attached to a guess.
-  const clerkUserId = state.clerkUserId ? await userForAccountToken(state.clerkUserId) : null;
+  // recorded nowhere rather than attached to a guess. One that moved from a
+  // deleted account still carries that account's UUID; its row knows better.
+  const clerkUserId = await googleSubscriptionOwner(purchaseToken, state.clerkUserId, state.linkedPurchaseToken);
   if (!clerkUserId) {
     console.error("[google] could not resolve the purchase to an account", {
       messageId,
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true, unlinked: true });
   }
 
+  await releaseStoreSubscription("google", purchaseToken, clerkUserId);
   await upsertSubscription({
     clerkUserId,
     provider: "google",
